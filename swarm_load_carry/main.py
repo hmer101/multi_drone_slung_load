@@ -28,14 +28,13 @@ async def main(config):
         await drone_fly_couroutine
 
 
-# Ensure multiple mavsdk_servers are running first, using e.g. ./multi_mavsdk_server.sh -n 3
+# Ensure multiple mavsdk_servers are running first (but after spawning), using e.g. ./multi_mavsdk_server.sh -n 3
 if __name__ == '__main__':
     # Accept number of drones to control
     parser = argparse.ArgumentParser(description="Launch multiple drone control nodes", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("-n","--num_drones", default=1, help="number of drones to control")
     args = parser.parse_args()
     config = vars(args)
-    print("about to loop")
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main(config))

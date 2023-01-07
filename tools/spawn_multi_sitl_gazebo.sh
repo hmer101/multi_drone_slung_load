@@ -54,8 +54,7 @@ function spawn_drones() {
 
 		# Wait longer for first drone as Gazebo takes time to start
 		if [ $i == 0 ]; then
-			#PX4_SYS_AUTOSTART=$PX4_SYS_AUTOSTART PX4_GZ_MODEL_POSE="${SPAWN_PTS_X[$i]},${SPAWN_PTS_Y[$i]}" PX4_GZ_MODEL=$PX4_GZ_MODEL ~/repos/PX4-Autopilot/build/px4_sitl_default/bin/px4 -i $i
-			sleep 10 #If Gazebo already started, laptop works with 2
+			sleep 5 #If Gazebo already started, laptop works with 2, conservative at 10
 		else
 			sleep 2 #If Gazebo already started, laptop works with 0.5
 		fi
@@ -65,10 +64,12 @@ function spawn_drones() {
 
 
 # RUN COMMANDS
-# Create multiple MAVSDK servers
-#gnome-terminal --tab -- bash -c ./multi_mavsdk_server.sh -n $NUM_DRONES
-
 # Spawn drones
 cleanup
 generate_spawn_points
 spawn_drones
+
+sleep 2
+
+# Create multiple MAVSDK servers
+gnome-terminal --tab -- bash -c "./multi_mavsdk_server.sh -n $NUM_DRONES"
