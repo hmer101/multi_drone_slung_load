@@ -1,0 +1,26 @@
+from setuptools import setup
+
+package_name = 'swarm_load_carry'
+
+setup(
+    name=package_name,
+    version='0.0.0',
+    packages=[package_name],
+    data_files=[
+        ('share/ament_index/resource_index/packages',
+            ['resource/' + package_name]),
+        ('share/' + package_name, ['package.xml']),
+    ],
+    install_requires=['setuptools'],
+    zip_safe=True,
+    maintainer='harvey',
+    maintainer_email='hmer101@mit.edu',
+    description='Control multiple PX4 drones for collaborative load carrying',
+    license='MIT',
+    tests_require=['pytest'],
+    entry_points={
+        'console_scripts': [
+            'my_node = swarm_load_carry.my_node:main'
+        ],
+    },
+)
