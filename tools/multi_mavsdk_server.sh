@@ -20,6 +20,8 @@ MAVSDK_SERVER_PROCESS_NAME="mavsdk_server"
 MAX_INSTANCES=9
 USAGE_TEXT="Usage: $0 [-h Print help][-n <num_vehicles>]"
 
+START_DRONE_NUM=1
+
 
 # trap ctrl-c and call ctrl_c()
 trap on_exit SIGINT
@@ -76,7 +78,7 @@ sleep 1
 instances_to_run=$((num_vehicles>MAX_INSTANCES ? MAX_INSTANCES : num_vehicles))
 echo "Spawning: $instances_to_run instances" 
 
-for ((i=0;i<instances_to_run;i++));
+for ((i=$START_DRONE_NUM; i<$((instances_to_run + $START_DRONE_NUM)); i++));
 do
 	$MAVSDK_SERVER_EXEC udp://:$((14540+i)) -p $((50050+i)) &
 	echo "Instance: " $((i)) "udp://:" $((14540+i)) "-p" $((50050+i)) " PID:" $!

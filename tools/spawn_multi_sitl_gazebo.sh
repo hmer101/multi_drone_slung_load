@@ -20,6 +20,7 @@ PX4_SYS_AUTOSTART=4001
 PX4_GZ_MODEL=x500
 
 NUM_DRONES=3
+START_DRONE_NUM=1
 SPAWN_CENTER_X=0
 SPAWN_CENTER_Y=0
 SPAWN_R=0.5
@@ -48,12 +49,12 @@ function generate_spawn_points() {
 
 # Spawns drones using defined spawn points
 function spawn_drones() {
-	# Spawn all drones
-	for (( i=0;i<$NUM_DRONES;i++ )); do
-		gnome-terminal --tab -- bash -c "PX4_SYS_AUTOSTART=$PX4_SYS_AUTOSTART PX4_GZ_MODEL_POSE="${SPAWN_PTS_X[$i]},${SPAWN_PTS_Y[$i]}" PX4_GZ_MODEL=$PX4_GZ_MODEL $FIRMWARE_DIR/build/px4_sitl_default/bin/px4 -i $i"
+	# Spawn all drones numbering from first selected number
+	for (( i=$START_DRONE_NUM; i<$(($NUM_DRONES + $START_DRONE_NUM)); i++ )); do
+		gnome-terminal --tab -- bash -c "PX4_SYS_AUTOSTART=$PX4_SYS_AUTOSTART PX4_GZ_MODEL_POSE="${SPAWN_PTS_X[$(($i-$START_DRONE_NUM))]},${SPAWN_PTS_Y[$(($i-$START_DRONE_NUM))]}" PX4_GZ_MODEL=$PX4_GZ_MODEL $FIRMWARE_DIR/build/px4_sitl_default/bin/px4 -i $i"
 
 		# Wait longer for first drone as Gazebo takes time to start
-		if [ $i == 0 ]; then
+		if [ $i == $START_DRONE_NUM ]; then
 			sleep 5 #If Gazebo already started, laptop works with 2, conservative at 10
 		else
 			sleep 2 #If Gazebo already started, laptop works with 0.5
@@ -73,3 +74,6 @@ sleep 2
 
 # Create multiple MAVSDK servers
 gnome-terminal --tab -- bash -c "./multi_mavsdk_server.sh -n $NUM_DRONES"
+
+# Create ROS2 agent
+gnome-terminal --tab -- bash -c "cd ~/repos/PX4-Autopilot; micro-ros-agent udp4 --port 8888"

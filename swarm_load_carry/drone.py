@@ -3,7 +3,6 @@
 # Author: Harvey Merton
 # Date: 01/06/2023
 
-
 import asyncio, rclpy, utils # Note import utils needs additions to setup.py. See here: https://stackoverflow.com/questions/57426715/import-modules-in-package-in-ros2
 import numpy as np
 
@@ -27,7 +26,7 @@ class Drone(Node):
 
     @classmethod
     async def create(cls, system_address="udp://:14540", port=50050, mavsdk_server_address="localhost"):
-        self = Drone('droneX')
+        self = Drone('px4_X')
         #self.drone_id = 
 
         # Connect to drone via MAVLINK through UDP
@@ -43,16 +42,15 @@ class Drone(Node):
             history=qos.HistoryPolicy.KEEP_LAST, #QoSHistoryPolicy.HistoryPolicy.KEEP_LAST,
             depth=1
         )
-        #self.sub_pose_setpoint = 
-        # Sub to other drones and load setpoints for distributed control!
-        self.attitude_sub = self.create_subscription(
+        
+        self.sub_attitude = self.create_subscription(
             VehicleAttitude,
-            '/fmu/out/vehicle_attitude',
+            'px4_1/fmu/out/vehicle_attitude',
             self.vehicle_attitude_callback,
             qos_profile)
-        self.local_position_sub = self.create_subscription(
+        self.sub_local_position = self.create_subscription(
             VehicleLocalPosition,
-            '/fmu/out/vehicle_local_position',
+            'px4_1/fmu/out/vehicle_local_position',
             self.vehicle_local_position_callback,
             qos_profile)
 
@@ -61,29 +59,15 @@ class Drone(Node):
         self.vehicle_local_velocity = np.array([0.0, 0.0, 0.0])
         self.setpoint_position = np.array([0.0, 0.0, 0.0])
 
+        # Sub to other drones and load setpoints for distributed control!
+
         # Create publishers
-        self.pub_pose_actual = self.create_publisher(Pose, 'pose_actual', 10)
-
-
-        # TEMP - POLLING FOR PUBLISHING
-        timer_period = 0.5
-        #self.timer = self.create_timer(timer_period, self.timer_callback)
+        #self.pub_pose_actual = self.create_publisher(Pose, 'pose_actual', 10)
 
 
         return self
 
-    ## TEMP
-    def timer_callback(self):
-        pose = Pose()
-        pose.position = Point()
-        pose.position.x, pose.position.y, pose.position.z = 0.0, 1.0, 2.0
-        pose.orientation = Quaternion()
-        pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w  = 3.0, 4.0, 5.0, 6.0
-
-        self.pub_pose_actual.publish(pose)
-        self.get_logger().info(f'Publishing position: {pose.position}')
-
-
+    ## CALLBACKS
     def vehicle_attitude_callback(self, msg):
         # TODO: handle NED->ENU transformation 
         self.vehicle_attitude[0] = msg.q[0]
@@ -100,15 +84,15 @@ class Drone(Node):
         self.vehicle_local_velocity[1] = -msg.vy
         self.vehicle_local_velocity[2] = -msg.vz
 
-        self.get_logger().info(f'Publishing pose: {self.vehicle_local_position}, {self.vehicle_attitude}')
+        # self.get_logger().info(f'Publishing pose: {self.vehicle_local_position}, {self.vehicle_attitude}')
 
-        pose = Pose()
-        pose.position = Point()
-        pose.position.x, pose.position.y, pose.position.z = self.vehicle_local_position[0], self.vehicle_local_position[1], self.vehicle_local_position[2]
-        pose.orientation = Quaternion()
-        pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w  = self.vehicle_attitude[0], self.vehicle_attitude[1], self.vehicle_attitude[2], self.vehicle_attitude[3]
+        # pose = Pose()
+        # pose.position = Point()
+        # pose.position.x, pose.position.y, pose.position.z = self.vehicle_local_position[0], self.vehicle_local_position[1], self.vehicle_local_position[2]
+        # pose.orientation = Quaternion()
+        # pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w  = self.vehicle_attitude[0], self.vehicle_attitude[1], self.vehicle_attitude[2], self.vehicle_attitude[3]
 
-        self.pub_pose_actual.publish(pose)
+        # self.pub_pose_actual.publish(pose)
 
 
 
@@ -258,7 +242,9 @@ class Drone(Node):
 async def main_async(args=None):
     # Create node
     rclpy.init(args=args)
-    drone = await Drone.create()
+    drone = await Drone.create(system_address="udp://:14541", port=50051)
+    #drone_fly_coroutine = asyncio.ensure_future(drone.run_hardcoded_mavlink())
+    #await drone_fly_coroutine
 
     # Maintain node
     rclpy.spin(drone)
