@@ -4,30 +4,18 @@
 # Date: 01/06/2023
 
 
-import asyncio, rclpy, utils # Note import utils needs additions to setup.py. See here: https://stackoverflow.com/questions/57426715/import-modules-in-package-in-ros2
-import numpy as np
-
+import asyncio, rclpy, utils
 from mavsdk import System, offboard, telemetry
-from rclpy.node import Node
-from geometry_msgs.msg import Pose, Point, Quaternion
-
-from px4_msgs.msg import VehicleAttitude, VehicleLocalPosition
-
-import rclpy.qos as qos
-from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
-
-
-NUM_DRONES = 3
 
 # Node to encapsulate drone information and actions
-class Drone(Node):
+class Drone():
     ## Initialization
     #def __init__(self):
      #   super().__init__('droneX')
 
     @classmethod
     async def create(cls, system_address="udp://:14540", port=50050, mavsdk_server_address="localhost"):
-        self = Drone('droneX')
+        self = Drone()
         #self.drone_id = 
 
         # Connect to drone via MAVLINK through UDP
@@ -35,81 +23,9 @@ class Drone(Node):
         await self.drone_system.connect(system_address)
         await self.wait_for_drone(system_address, port)
 
-        # Create subscribers
-        # Subscribing to FMU outputs
-        qos_profile = QoSProfile(
-            reliability=qos.ReliabilityPolicy.BEST_EFFORT, #QoSReliabilityPolicy.ReliabilityPolicy.BEST_EFFORT,
-            durability=qos.DurabilityPolicy.TRANSIENT_LOCAL, #QoSDurabilityPolicy.DurabilityPolicy.TRANSIENT_LOCAL,
-            history=qos.HistoryPolicy.KEEP_LAST, #QoSHistoryPolicy.HistoryPolicy.KEEP_LAST,
-            depth=1
-        )
-        #self.sub_pose_setpoint = 
-        # Sub to other drones and load setpoints for distributed control!
-        self.attitude_sub = self.create_subscription(
-            VehicleAttitude,
-            '/fmu/out/vehicle_attitude',
-            self.vehicle_attitude_callback,
-            qos_profile)
-        self.local_position_sub = self.create_subscription(
-            VehicleLocalPosition,
-            '/fmu/out/vehicle_local_position',
-            self.vehicle_local_position_callback,
-            qos_profile)
-
-        self.vehicle_attitude = np.array([1.0, 0.0, 0.0, 0.0])
-        self.vehicle_local_position = np.array([0.0, 0.0, 0.0])
-        self.vehicle_local_velocity = np.array([0.0, 0.0, 0.0])
-        self.setpoint_position = np.array([0.0, 0.0, 0.0])
-
-        # Create publishers
-        self.pub_pose_actual = self.create_publisher(Pose, 'pose_actual', 10)
-
-
-        # TEMP - POLLING FOR PUBLISHING
-        timer_period = 0.5
-        #self.timer = self.create_timer(timer_period, self.timer_callback)
-
+        #self.uid = self.drone_system.info.get_identification()
 
         return self
-
-    ## TEMP
-    def timer_callback(self):
-        pose = Pose()
-        pose.position = Point()
-        pose.position.x, pose.position.y, pose.position.z = 0.0, 1.0, 2.0
-        pose.orientation = Quaternion()
-        pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w  = 3.0, 4.0, 5.0, 6.0
-
-        self.pub_pose_actual.publish(pose)
-        self.get_logger().info(f'Publishing position: {pose.position}')
-
-
-    def vehicle_attitude_callback(self, msg):
-        # TODO: handle NED->ENU transformation 
-        self.vehicle_attitude[0] = msg.q[0]
-        self.vehicle_attitude[1] = msg.q[1]
-        self.vehicle_attitude[2] = -msg.q[2]
-        self.vehicle_attitude[3] = -msg.q[3]
-
-    def vehicle_local_position_callback(self, msg):
-        # TODO: handle NED->ENU transformation 
-        self.vehicle_local_position[0] = msg.x
-        self.vehicle_local_position[1] = -msg.y
-        self.vehicle_local_position[2] = -msg.z
-        self.vehicle_local_velocity[0] = msg.vx
-        self.vehicle_local_velocity[1] = -msg.vy
-        self.vehicle_local_velocity[2] = -msg.vz
-
-        self.get_logger().info(f'Publishing pose: {self.vehicle_local_position}, {self.vehicle_attitude}')
-
-        pose = Pose()
-        pose.position = Point()
-        pose.position.x, pose.position.y, pose.position.z = self.vehicle_local_position[0], self.vehicle_local_position[1], self.vehicle_local_position[2]
-        pose.orientation = Quaternion()
-        pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w  = self.vehicle_attitude[0], self.vehicle_attitude[1], self.vehicle_attitude[2], self.vehicle_attitude[3]
-
-        self.pub_pose_actual.publish(pose)
-
 
 
     ## SETUP 
@@ -253,23 +169,3 @@ class Drone(Node):
 
         # End mission (maybe replace entirely with offboard later - for multi-drone co-ordination)
         await self.mission_end()
-
-
-async def main_async(args=None):
-    # Create node
-    rclpy.init(args=args)
-    drone = await Drone.create()
-
-    # Maintain node
-    rclpy.spin(drone)
-
-    # Destroy node
-    drone.destroy_node()
-    rclpy.shutdown()
-
-def main():
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main_async())
-
-if __name__ == '__main__':
-    main()

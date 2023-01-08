@@ -2,7 +2,8 @@
 
 import asyncio, argparse
 from mavsdk import System, telemetry
-from drone import Drone
+from drone_noROS import Drone
+# from drone import Drone
 
 
 UDP_NUM_START = 14540

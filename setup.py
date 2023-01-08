@@ -10,6 +10,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('lib/' + package_name, [package_name+'/utils.py']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -20,7 +21,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'my_node = swarm_load_carry.my_node:main'
+            'drone = swarm_load_carry.drone:main',
+            'gcs = swarm_load_carry.gcs:main'
         ],
     },
 )
