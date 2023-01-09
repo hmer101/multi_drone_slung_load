@@ -7,16 +7,19 @@ import asyncio, rclpy, utils # Note import utils needs additions to setup.py. Se
 import numpy as np
 
 from mavsdk import System, offboard, telemetry
-from rclpy.node import Node
-from geometry_msgs.msg import Pose, Point, Quaternion
-
-from px4_msgs.msg import VehicleAttitude, VehicleLocalPosition
 
 import rclpy.qos as qos
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
+from rclpy.node import Node
+from rclpy.clock import Clock
+
+from geometry_msgs.msg import Pose, Point, Quaternion
+
+from px4_msgs.msg import VehicleAttitude, VehicleLocalPosition, OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand
 
 
 NUM_DRONES = 3
+OFFBOARD_TIME_MAX = 10 # Maximum time to be in offboard mode (ROS)
 
 # Node to encapsulate drone information and actions
 class Drone(Node):
@@ -29,53 +32,84 @@ class Drone(Node):
         self = Drone('px4_X')
         #self.drone_id = 
 
+
+        ### MAVLINK
         # Connect to drone via MAVLINK through UDP
         self.drone_system = System(mavsdk_server_address=mavsdk_server_address, port=port)
         await self.drone_system.connect(system_address)
         await self.wait_for_drone(system_address, port)
 
-        # Create subscribers
-        # Subscribing to FMU outputs
+
+
+        ### ROS2
+        ## SUBSCRIBERS
         qos_profile = QoSProfile(
             reliability=qos.ReliabilityPolicy.BEST_EFFORT, #QoSReliabilityPolicy.ReliabilityPolicy.BEST_EFFORT,
             durability=qos.DurabilityPolicy.TRANSIENT_LOCAL, #QoSDurabilityPolicy.DurabilityPolicy.TRANSIENT_LOCAL,
             history=qos.HistoryPolicy.KEEP_LAST, #QoSHistoryPolicy.HistoryPolicy.KEEP_LAST,
             depth=1
         )
-        
-        self.sub_attitude = self.create_subscription(
-            VehicleAttitude,
-            'px4_1/fmu/out/vehicle_attitude',
-            self.vehicle_attitude_callback,
-            qos_profile)
-        self.sub_local_position = self.create_subscription(
-            VehicleLocalPosition,
-            'px4_1/fmu/out/vehicle_local_position',
-            self.vehicle_local_position_callback,
+        # Local FMU outputs
+        self.status_sub = self.create_subscription(
+            VehicleStatus,
+            '/px4_1/fmu/out/vehicle_status',
+            self.clbk_vehicle_status,
             qos_profile)
 
+        self.sub_attitude = self.create_subscription(
+            VehicleAttitude,
+            '/px4_1/fmu/out/vehicle_attitude',
+            self.clbk_vehicle_attitude,
+            qos_profile)
+
+        self.sub_local_position = self.create_subscription(
+            VehicleLocalPosition,
+            '/px4_1/fmu/out/vehicle_local_position',
+            self.clbk_vehicle_local_position,
+            qos_profile)  
+
+        # TODO: Sub to other drones and load setpoints for distributed control!
+
+        ## PUBLISHERS
+        #self.pub_vehicle_cmd = self.create_publisher(VehicleCommand, '/px4_1/fmu/in/vehicle_command', qos_profile)
+        self.pub_offboard_mode = self.create_publisher(OffboardControlMode, '/px4_1/fmu/in/offboard_control_mode', qos_profile)
+        self.pub_trajectory = self.create_publisher(TrajectorySetpoint, '/px4_1/fmu/in/trajectory_setpoint', qos_profile)
+
+        #self.pub_pose_actual = self.create_publisher(Pose, 'pose_actual', 10)
+        #self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_MODE, float(1), float(6))
+
+        ## TIMERS
+        timer_period = 0.02  # seconds
+        self.timer = self.create_timer(timer_period, self.clbk_cmdloop)
+
+        
+        ## INSTANCE VARS
         self.vehicle_attitude = np.array([1.0, 0.0, 0.0, 0.0])
         self.vehicle_local_position = np.array([0.0, 0.0, 0.0])
         self.vehicle_local_velocity = np.array([0.0, 0.0, 0.0])
         self.setpoint_position = np.array([0.0, 0.0, 0.0])
 
-        # Sub to other drones and load setpoints for distributed control!
+        self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
+        #self.time_offboard = 0 # Length of time been in offboard mode for
+        #self.offboard_done = False
 
-        # Create publishers
-        #self.pub_pose_actual = self.create_publisher(Pose, 'pose_actual', 10)
+        self.dt = timer_period
+        self.theta = 0.0
+        self.radius = 10.0
+        self.omega = 0.5
 
 
         return self
 
     ## CALLBACKS
-    def vehicle_attitude_callback(self, msg):
+    def clbk_vehicle_attitude(self, msg):
         # TODO: handle NED->ENU transformation 
         self.vehicle_attitude[0] = msg.q[0]
         self.vehicle_attitude[1] = msg.q[1]
         self.vehicle_attitude[2] = -msg.q[2]
         self.vehicle_attitude[3] = -msg.q[3]
 
-    def vehicle_local_position_callback(self, msg):
+    def clbk_vehicle_local_position(self, msg):
         # TODO: handle NED->ENU transformation 
         self.vehicle_local_position[0] = msg.x
         self.vehicle_local_position[1] = -msg.y
@@ -94,6 +128,55 @@ class Drone(Node):
 
         # self.pub_pose_actual.publish(pose)
 
+    async def clbk_vehicle_status(self, msg):
+        # TODO: handle NED->ENU transformation
+        print("NAV_STATUS: ", msg.nav_state)
+        print("  - offboard status: ", VehicleStatus.NAVIGATION_STATE_OFFBOARD)
+        self.nav_state = msg.nav_state
+
+    def clbk_cmdloop(self):
+        #self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_MODE, float(1), float(6))
+        #print("SENDING")
+        #self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, float(1))
+
+        # Publish offboard control modes
+        offboard_msg = OffboardControlMode()
+        offboard_msg.timestamp = int(Clock().now().nanoseconds / 1000)
+        offboard_msg.position=True
+        offboard_msg.velocity=False
+        offboard_msg.acceleration=False
+        self.pub_offboard_mode.publish(offboard_msg)
+
+        if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+
+            trajectory_msg = TrajectorySetpoint()
+            trajectory_msg.position[0] = self.radius * np.cos(self.theta)
+            trajectory_msg.position[1] = self.radius * np.sin(self.theta)
+            trajectory_msg.position[2] = -5.0
+            self.pub_trajectory.publish(trajectory_msg)
+
+            self.theta = self.theta + self.omega * self.dt
+
+            # Start timer 
+            # if self.time_offboard_start == False:
+            #     self.time_offboard_start = int(Clock().now().nanoseconds / 1000)
+            # elif (int(Clock().now().nanoseconds / 1000) - self.time_offboard_start) == OFFBOARD_TIME_MAX:
+            #     self.time_offboard_start == True
+
+
+    def publish_vehicle_command(self, command: int, param1: float, param2: float =0.0):
+        msg = VehicleCommand()
+        msg.param1 = param1
+        #msg.param2 = param2
+        msg.command = command
+        msg.target_system = 1
+        msg.target_component = 1
+        msg.source_system = 1
+        msg.source_component = 1
+        msg.from_external = True
+        msg.timestamp = int(Clock().now().nanoseconds / 1000)
+
+        self.pub_vehicle_cmd.publish(msg)
 
 
     ## SETUP 
@@ -165,8 +248,8 @@ class Drone(Node):
 
     # Use MAVLink to send waypoints
     # TODO: error checking
-    async def mission_offboard(self):
-        print("STARTING: Offboard routine")
+    async def mission_offboard_mav(self):
+        print("STARTING: Offboard routine - MAV")
         
         # Start sending velocity command (stay at current position)
         vel_start = offboard.VelocityBodyYawspeed(0,0,0,0)
@@ -198,8 +281,28 @@ class Drone(Node):
         
         print("-- At desired position")
         await asyncio.sleep(5)
-        print("COMPLETE: Offboard routine \n")
+        print("COMPLETE: Offboard routine - MAV\n")
 
+
+    # Start Offboard mode to allow ROS' control of waypoints (note that waypoints must first be allowed to be sent)
+    # TODO: error checking
+    async def mission_offboard_ros(self):
+        print("STARTING: Offboard routine - ROS")
+        
+        # Start sending velocity command (stay at current position)
+        vel_start = offboard.VelocityBodyYawspeed(0,0,0,0)
+        await self.drone_system.offboard.set_velocity_body(vel_start)
+
+        # Switch to offboard control mode
+        print("-- Switch to offboard control")
+        await self.drone_system.offboard.start()
+        
+        # Wait until drone switched back into hold mode (ROS offboard is done)
+        # async for current_flight_mode in self.drone_system.telemetry.flight_mode(): 
+        #     if current_flight_mode == telemetry.FlightMode.HOLD:
+        #         break
+
+        print("COMPLETE: Offboard routine - ROS\n")
 
 
     # RTL, land and disarm using MAVSDK (can alternatively do on remote)
@@ -224,30 +327,34 @@ class Drone(Node):
         print("COMPLETE: Landing routine \n")
 
 
-    # Run hardcoded offboard control mission using MavLink
-    async def run_hardcoded_mavlink(self):
+    # Run hardcoded offboard control mission with ros or MAVLINK sending offboard control commands
+    async def run_hardcoded(self, method_ros=True):
         # Set drone parameters to default values
         await self.set_params()
 
-        # Start mission (maybe replace entirely with offboard later - for multi-drone co-ordination)
+        # Start mission
         await self.mission_start()
 
         # Run mission
-        #await self.mission_offboard()
+        if method_ros:
+            await self.mission_offboard_ros()
+        else:
+            await self.mission_offboard_mav()
 
-        # End mission (maybe replace entirely with offboard later - for multi-drone co-ordination)
-        await self.mission_end()
+            # End mission
+            await self.mission_end()
 
 
 async def main_async(args=None):
-    # Create node
+    # Create node and connect
     rclpy.init(args=args)
     drone = await Drone.create(system_address="udp://:14541", port=50051)
-    #drone_fly_coroutine = asyncio.ensure_future(drone.run_hardcoded_mavlink())
+    #drone_fly_coroutine = asyncio.ensure_future(drone.run_hardcoded())
     #await drone_fly_coroutine
 
-    # Maintain node
-    rclpy.spin(drone)
+    # Offboard flight
+    await drone.run_hardcoded()
+    await rclpy.spin(drone)
 
     # Destroy node
     drone.destroy_node()
