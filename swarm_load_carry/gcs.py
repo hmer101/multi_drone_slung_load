@@ -45,12 +45,11 @@ def main(args=None):
     gcs = GroundControlStation()
 
     # Send offboard start
-    gcs.offboard_ros_mode_change(ModeChange.Request.MODE_OFFBOARD_ROS_START)
-
-    # Wait for user input
-    input('Press enter when you want to end offboard control')
+    input('Press enter when you want to start offboard control')
+    gcs.offboard_ros_mode_change(ModeChange.Request.MODE_OFFBOARD_ROS_START) 
 
     # Send offboard end
+    input('Press enter when you want to end offboard control')
     gcs.offboard_ros_mode_change(ModeChange.Request.MODE_OFFBOARD_ROS_END)
 
     # Maintain node

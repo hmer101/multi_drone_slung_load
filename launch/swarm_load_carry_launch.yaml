@@ -1,0 +1,13 @@
+launch:
+  
+  - node:
+     pkg: "swarm_load_carry"
+     exec: "drone"
+     name: "offboard_comp"
+     namespace: "px4_1"
+
+  - node:
+     pkg: "swarm_load_carry"
+     exec: "gcs"
+     name: "gcs"
+     namespace: "gcs_1"

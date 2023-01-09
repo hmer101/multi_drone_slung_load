@@ -1,4 +1,6 @@
+import os
 from setuptools import setup
+from glob import glob
 
 package_name = 'swarm_load_carry'
 
@@ -11,6 +13,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('lib/' + package_name, [package_name+'/utils.py']),
+        (os.path.join('share', package_name), glob('launch/*launch.[pxy][yma]*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
