@@ -44,6 +44,9 @@ def main(args=None):
     rclpy.init(args=args)
     gcs = GroundControlStation()
 
+    # Send takeoff
+    #input('Press enter when you want to take off')
+
     # Send offboard start
     input('Press enter when you want to start offboard control')
     gcs.offboard_ros_mode_change(ModeChange.Request.MODE_OFFBOARD_ROS_START) 
@@ -51,6 +54,10 @@ def main(args=None):
     # Send offboard end
     input('Press enter when you want to end offboard control')
     gcs.offboard_ros_mode_change(ModeChange.Request.MODE_OFFBOARD_ROS_END)
+
+    # Send land
+    #input('Press enter when you want to land at home')
+
 
     # Maintain node
     #rclpy.spin(gcs)
