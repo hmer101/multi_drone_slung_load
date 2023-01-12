@@ -158,7 +158,7 @@ class Drone(Node):
         # Call helper functions if required
         match self.mode:
             case ModeChange.Request.MODE_TAKEOFF_MAV_START:
-                #await self.mission_start()
+                self.mission_start()
                 #await asyncio.ensure_future(self.drone_system.action.arm())
                 # async def test_async_func():
                 #     await self.drone_system.action.arm()
@@ -174,17 +174,17 @@ class Drone(Node):
                 #threading.Thread(target=asyncio.create_task, args=(self.dummy_test(),)).start()
                 #threading.Thread(target=asyncio.run, args=(self.mission_start(),)).start()
                 #asyncio.run_in_executor(None, asyncio.run,self.dummy_test())
-                print("-- Arming")
-                self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.arm())
+                #print("-- Arming")
+                #self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.arm())
                 #self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.mission_start())
                 #await loop.run_in_executor(None, self.drone_system.action.arm())
 
-                time.sleep(2)
+                #time.sleep(2)
         #self.async_loop.create_task(asyncio.sleep(2)) 
 
         # Get drone to take off
-                print("-- Taking off")
-                self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.takeoff())
+                #print("-- Taking off")
+                #self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.takeoff())
 
                 # with ThreadPoolExecutor() as pool:
                 #     result = await loop.run_in_executor(
@@ -345,47 +345,31 @@ class Drone(Node):
     ## MISSION
     # Arm, takeoff and switch to offboard control mode using MAVSDK (can alternatively do on remote)
     # TODO: Add error checking between connection, arming and each mode transition to ensure successful. See: https://mavsdk.mavlink.io/main/en/cpp/guide/taking_off_landing.html 
-    async def mission_start(self):
+    def mission_start(self):
         print("STARTING: Takeoff routine")
 
-        await asyncio.sleep(2)
-        print("successfully waited!!")
-
         # Start in hold mode
-        print("About to hold")
-        await self.drone_system.action.hold()
-        #future = asyncio.run_coroutine_threadsafe(self.drone_system.action.hold(), self.event_loop_mav)
-        #result = future.result(self.TIMEOUT_WAIT_COROUTINE)
+        #await self.drone_system.action.hold()
+        self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.hold())
+        time.sleep(1)
 
         # Arm drone and wait 2 sec
         print("-- Arming")
-        await self.drone_system.action.arm()
-
-        # while True:
-        #     print('Printing before awaiting')
-        #     time.sleep(0.5)
-        #self.async_loop.run_in_executor(None, asyncio.run, self.drone_system.action.arm()) # THIS WORKS!!! Try to not use run function again as shouldn't need another event loop
-        
-        #asyncio.run_coroutine_threadsafe #- TRY THIS: https://stackoverflow.com/questions/37841222/scheduling-an-asyncio-coroutine-from-another-thread
-
-
         #await self.drone_system.action.arm()
-        print('ARMING FINISHED')
-
-        await asyncio.sleep(2)
-        #self.async_loop.create_task(asyncio.sleep(2)) 
+        self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.arm())
+        time.sleep(2)
 
         # Get drone to take off
         print("-- Taking off")
-        await self.drone_system.action.takeoff()
-        #self.async_loop.create_task(self.drone_system.action.takeoff()) 
+        #await self.drone_system.action.takeoff()
+        self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.takeoff())
 
         # Wait until takeoff complete
-        async for current_flight_mode in self.drone_system.telemetry.flight_mode(): 
-            if current_flight_mode == telemetry.FlightMode.HOLD:
-                break
+        # async for current_flight_mode in self.drone_system.telemetry.flight_mode(): 
+        #     if current_flight_mode == telemetry.FlightMode.HOLD:
+        #         break
 
-        await asyncio.sleep(2)
+        time.sleep(2)
 
         print("COMPLETE: Takeoff routine \n")
 
