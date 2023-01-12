@@ -53,11 +53,11 @@ class Drone(Node):
         # For MAVLINK connection
         self.drone_system = None
         self.msg_future_return = None
-        #self.async_loop = asyncio.get_event_loop()
+        self.async_loop = asyncio.get_event_loop()
         
         # Event loop running in separate thread to handle MAVLINK commands
-        self.event_loop_mav = asyncio.new_event_loop()
-        self.thread_mav = threading.Thread(target=lambda: self.run_event_loop(self.event_loop_mav)).start() 
+        #self.event_loop_mav = asyncio.new_event_loop()
+        #self.thread_mav = threading.Thread(target=lambda: self.run_event_loop(self.event_loop_mav)).start() 
 
         ## TIMERS
         self.timer = self.create_timer(timer_period, self.clbk_cmdloop)
@@ -174,13 +174,21 @@ class Drone(Node):
                 #threading.Thread(target=asyncio.create_task, args=(self.dummy_test(),)).start()
                 #threading.Thread(target=asyncio.run, args=(self.mission_start(),)).start()
                 #asyncio.run_in_executor(None, asyncio.run,self.dummy_test())
-                #loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.arm())
+                print("-- Arming")
+                self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.arm())
                 #self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.mission_start())
-                #await self.async_loop.run_in_executor(None, self.mission_start())
+                #await loop.run_in_executor(None, self.drone_system.action.arm())
+
+                time.sleep(2)
+        #self.async_loop.create_task(asyncio.sleep(2)) 
+
+        # Get drone to take off
+                print("-- Taking off")
+                self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.takeoff())
 
                 # with ThreadPoolExecutor() as pool:
-                #     result = await self.async_loop.run_in_executor(
-                #         pool, self.mission_start())
+                #     result = await loop.run_in_executor(
+                #         pool, asyncio.run, self.mission_start())
                 #     print('custom thread pool', result)
 
 
@@ -199,10 +207,14 @@ class Drone(Node):
                 #future = asyncio.run_coroutine_threadsafe(self.mission_start(), self.event_loop_mav)
                 #result = future.result(self.TIMEOUT_WAIT_COROUTINE)
                 #await self.mission_start()
-                print("-- Arming")
-                #await self.drone_system.action.arm()
-                future = asyncio.run_coroutine_threadsafe(self.drone_system.action.arm(), self.event_loop_mav)
-                result = future.result(self.TIMEOUT_WAIT_COROUTINE)
+                #print("-- Arming")
+                #future = await self.drone_system.action.arm()
+                
+                #test = asyncio.ensure_future(self.drone_system.action.arm())
+                #await test
+
+                #future = asyncio.run_coroutine_threadsafe(self.drone_system.action.arm(), self.event_loop_mav)
+                #result = future.result() #self.TIMEOUT_WAIT_COROUTINE)
 
                 print('!!Taken off!!')
 
