@@ -55,7 +55,7 @@ function spawn_drones() {
 
 		# Wait longer for first drone as Gazebo takes time to start
 		if [ $i == $START_DRONE_NUM ]; then
-			sleep 5 #If Gazebo already started, laptop works with 2, conservative at 10
+			sleep 10 #If Gazebo already started, laptop works with 2, conservative at 10
 		else
 			sleep 2 #If Gazebo already started, laptop works with 0.5
 		fi
