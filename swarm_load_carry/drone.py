@@ -18,29 +18,49 @@ from geometry_msgs.msg import Pose, Point, Quaternion
 from px4_msgs.msg import VehicleAttitude, VehicleLocalPosition, OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand
 from swarm_load_carry_interfaces.srv import ModeChange # Note must build workspace and restart IDE before custom packages are found by python
 
+import threading
+from concurrent.futures import ThreadPoolExecutor
+import time
 
-NUM_DRONES = 3
-OFFBOARD_TIME_MAX = 10 # Maximum time to be in offboard mode (ROS)
+#NUM_DRONES = 3
+#OFFBOARD_TIME_MAX = 10 # Maximum time to be in offboard mode (ROS)
 
 # Node to encapsulate drone information and actions
 class Drone(Node):
+    TIMEOUT_WAIT_COROUTINE = None
+
     ## Initialization
-    #def __init__(self):
-     #   super().__init__('droneX')
+    def __init__(self, name, namespace):
+        super().__init__(node_name=name, namespace=namespace)
 
-    @classmethod
-    async def create(cls, msg_future_return, system_address="udp://:14540", port=50050, mavsdk_server_address="localhost"):
-        self = Drone('px4_X')
-        #self.drone_id = 
+        self.ns = self.get_namespace()
+        self.drone_id = int(str(self.ns)[-1])
 
+        self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
+        self.mode = ModeChange.Request.MODE_UNASSIGNED
 
-        ### MAVLINK
-        # Connect to drone via MAVLINK through UDP
-        self.drone_system = System(mavsdk_server_address=mavsdk_server_address, port=port)
-        await self.drone_system.connect(system_address)
-        await self.wait_for_drone(system_address, port)
+        self.vehicle_attitude = np.array([1.0, 0.0, 0.0, 0.0])
+        self.vehicle_local_position = np.array([0.0, 0.0, 0.0])
+        self.vehicle_local_velocity = np.array([0.0, 0.0, 0.0])
+        self.setpoint_position = np.array([0.0, 0.0, 0.0])
 
+        timer_period = 0.02  # seconds
+        self.dt = timer_period
+        self.theta = 0.0
+        self.radius = 10.0
+        self.omega = 0.5
 
+        # For MAVLINK connection
+        self.drone_system = None
+        self.msg_future_return = None
+        #self.async_loop = asyncio.get_event_loop()
+        
+        # Event loop running in separate thread to handle MAVLINK commands
+        self.event_loop_mav = asyncio.new_event_loop()
+        self.thread_mav = threading.Thread(target=lambda: self.run_event_loop(self.event_loop_mav)).start() 
+
+        ## TIMERS
+        self.timer = self.create_timer(timer_period, self.clbk_cmdloop)
 
         ### ROS2
         qos_profile = QoSProfile(
@@ -53,26 +73,26 @@ class Drone(Node):
         ## PUBLISHERS
         #self.pub_vehicle_cmd = self.create_publisher(VehicleCommand, '/px4_1/fmu/in/vehicle_command', qos_profile)
         #self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_MODE, float(1), float(6))
-        self.pub_offboard_mode = self.create_publisher(OffboardControlMode, '/px4_1/fmu/in/offboard_control_mode', qos_profile)
-        self.pub_trajectory = self.create_publisher(TrajectorySetpoint, '/px4_1/fmu/in/trajectory_setpoint', qos_profile)
+        self.pub_offboard_mode = self.create_publisher(OffboardControlMode, f'{self.ns}/fmu/in/offboard_control_mode', qos_profile)
+        self.pub_trajectory = self.create_publisher(TrajectorySetpoint, f'{self.ns}/fmu/in/trajectory_setpoint', qos_profile)
 
         ## SUBSCRIBERS
         # Local FMU outputs
         self.status_sub = self.create_subscription(
             VehicleStatus,
-            '/px4_1/fmu/out/vehicle_status',
+            f'{self.ns}/fmu/out/vehicle_status',
             self.clbk_vehicle_status,
             qos_profile)
 
         self.sub_attitude = self.create_subscription(
             VehicleAttitude,
-            '/px4_1/fmu/out/vehicle_attitude',
+            f'{self.ns}/fmu/out/vehicle_attitude',
             self.clbk_vehicle_attitude,
             qos_profile)
 
         self.sub_local_position = self.create_subscription(
             VehicleLocalPosition,
-            '/px4_1/fmu/out/vehicle_local_position',
+            f'{self.ns}/fmu/out/vehicle_local_position',
             self.clbk_vehicle_local_position,
             qos_profile)  
 
@@ -81,38 +101,32 @@ class Drone(Node):
         ## SERVICES
         self.srv_mode_change = self.create_service(
             ModeChange,
-            '/px4_1/mode_change',
+            f'{self.ns}/mode_change',
             self.clbk_change_mode)
 
         ## CLIENTS
 
+        # Print information
+        print('DRONE NODE STARTED')
+        print(f'Namespace: {self.get_namespace()}')
+        print(f'Name: {self.get_name()}')
+        #print(f'ID: {self.drone_id}')
+    
 
-        ## TIMERS
-        timer_period = 0.02  # seconds
-        self.timer = self.create_timer(timer_period, self.clbk_cmdloop)
-
+    # Create a node with MAVLINK connections initialized
+    @classmethod
+    async def create(cls, node_name='drone1', namespace='px4_1', msg_future_return=None):
+        # Create node without MAVLINK connections (i.e. only has ROS connections here)
+        self = Drone(name=node_name, namespace=namespace)
         
-        ## INSTANCE VARS
+        # Connect MAVLINK
+        await self.connect_mavlink()
         self.msg_future_return = msg_future_return
-
-        self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
-        self.mode = ModeChange.Request.MODE_UNASSIGNED
-
-        self.vehicle_attitude = np.array([1.0, 0.0, 0.0, 0.0])
-        self.vehicle_local_position = np.array([0.0, 0.0, 0.0])
-        self.vehicle_local_velocity = np.array([0.0, 0.0, 0.0])
-        self.setpoint_position = np.array([0.0, 0.0, 0.0])
-
-        #self.time_offboard = 0 # Length of time been in offboard mode for
-        #self.offboard_done = False
-
-        self.dt = timer_period
-        self.theta = 0.0
-        self.radius = 10.0
-        self.omega = 0.5
-
+        
+        print('DRONE NODE CONNECTED THROUGH MAVLINK')
 
         return self
+
 
     ## CALLBACKS
     def clbk_vehicle_attitude(self, msg):
@@ -131,16 +145,6 @@ class Drone(Node):
         self.vehicle_local_velocity[1] = -msg.vy
         self.vehicle_local_velocity[2] = -msg.vz
 
-        # self.get_logger().info(f'Publishing pose: {self.vehicle_local_position}, {self.vehicle_attitude}')
-
-        # pose = Pose()
-        # pose.position = Point()
-        # pose.position.x, pose.position.y, pose.position.z = self.vehicle_local_position[0], self.vehicle_local_position[1], self.vehicle_local_position[2]
-        # pose.orientation = Quaternion()
-        # pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w  = self.vehicle_attitude[0], self.vehicle_attitude[1], self.vehicle_attitude[2], self.vehicle_attitude[3]
-
-        # self.pub_pose_actual.publish(pose)
-
     def clbk_vehicle_status(self, msg):
         # TODO: handle NED->ENU transformation
         #if self.mode == ModeChange.Request.MODE_UNASSIGNED: 
@@ -148,20 +152,90 @@ class Drone(Node):
         print("  - offboard status: ", VehicleStatus.NAVIGATION_STATE_OFFBOARD)
         self.nav_state = msg.nav_state
 
-    def clbk_change_mode(self, request, response):
+    async def clbk_change_mode(self, request, response):
         self.mode = request.mode
+
+        # Call helper functions if required
+        match self.mode:
+            case ModeChange.Request.MODE_TAKEOFF_MAV_START:
+                #await self.mission_start()
+                #await asyncio.ensure_future(self.drone_system.action.arm())
+                # async def test_async_func():
+                #     await self.drone_system.action.arm()
+
+                # result = asyncio.run(test_async_func())
+                #print('creating task')
+                #task = asyncio.create_task(self.drone_system.action.arm())
+                #loop = asyncio.get_event_loop()
+                # print(f'Current loop: {loop}')
+                # loop.create_task(self.dummy_test())
+
+                #threading.Thread(target=asyncio.run, args=(self.dummy_test(),)).start()
+                #threading.Thread(target=asyncio.create_task, args=(self.dummy_test(),)).start()
+                #threading.Thread(target=asyncio.run, args=(self.mission_start(),)).start()
+                #asyncio.run_in_executor(None, asyncio.run,self.dummy_test())
+                #loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.arm())
+                #self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.mission_start())
+                #await self.async_loop.run_in_executor(None, self.mission_start())
+
+                # with ThreadPoolExecutor() as pool:
+                #     result = await self.async_loop.run_in_executor(
+                #         pool, self.mission_start())
+                #     print('custom thread pool', result)
+
+
+                #task = asyncio.create_task(self.dummy_test())
+                #print(task)
+                # async with asyncio.TaskGroup() as tg:
+                #     task1 = tg.create_task(self.dummy_test())
+                #     #task2 = tg.create_task(another_coro(...))
+                # print("Both tasks have completed now.")
+
+                #self.mode=ModeChange.Request.MODE_TAKEOFF_MAV_START
+                # print('about to wait')
+                # time.sleep(2)
+                # print('Just waited 2 sec')
+
+                #future = asyncio.run_coroutine_threadsafe(self.mission_start(), self.event_loop_mav)
+                #result = future.result(self.TIMEOUT_WAIT_COROUTINE)
+                #await self.mission_start()
+                print("-- Arming")
+                #await self.drone_system.action.arm()
+                future = asyncio.run_coroutine_threadsafe(self.drone_system.action.arm(), self.event_loop_mav)
+                result = future.result(self.TIMEOUT_WAIT_COROUTINE)
+
+                print('!!Taken off!!')
+
+                self.mode=ModeChange.Request.MODE_TAKEOFF_MAV_END
+
+            case ModeChange.Request.MODE_TAKEOFF_MAV_END:
+                print("Waiting in takeoff end")
+                await asyncio.sleep(2)
+
+            case ModeChange.Request.MODE_LAND_MAV_START:
+                self.mode=ModeChange.Request.MODE_LAND_MAV_END
+
         response.success = True
         print(f'Changed to mode: {self.mode}')
 
         return response
 
-    def clbk_cmdloop(self):
-        #self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_MODE, float(1), float(6))
-        #print("SENDING")
-        #self.publish_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, float(1))
+    #async def dummy_thread(self):
 
+    async def dummy_test(self):
+        print('Dummy task performed')
+
+
+    def clbk_cmdloop(self):
         # Publish offboard control modes if OFFBOARD_ROS_START is set
         match self.mode:
+            # case ModeChange.Request.MODE_TAKEOFF_MAV_START:
+            #     print('about to arm')
+            #     await self.drone_system.action.arm()
+
+            #     print('ARMED!')
+            #     self.mode=ModeChange.Request.MODE_TAKEOFF_MAV_END
+
             case ModeChange.Request.MODE_OFFBOARD_ROS_START:
                 offboard_msg = OffboardControlMode()
                 offboard_msg.timestamp = int(Clock().now().nanoseconds / 1000)
@@ -181,36 +255,48 @@ class Drone(Node):
 
                     self.theta = self.theta + self.omega * self.dt
 
-                    # Start timer 
-                    # if self.time_offboard_start == False:
-                    #     self.time_offboard_start = int(Clock().now().nanoseconds / 1000)
-                    # elif (int(Clock().now().nanoseconds / 1000) - self.time_offboard_start) == OFFBOARD_TIME_MAX:
-                    #     self.time_offboard_start == True
             case ModeChange.Request.MODE_OFFBOARD_ROS_END:
                 # Commanded to end offboard ROS control - return future end message
                 self.msg_future_return.set_result(True)
 
 
-    def publish_vehicle_command(self, command: int, param1: float, param2: float =0.0):
-        msg = VehicleCommand()
-        msg.param1 = param1
-        #msg.param2 = param2
-        msg.command = command
-        msg.target_system = 1
-        msg.target_component = 1
-        msg.source_system = 1
-        msg.source_component = 1
-        msg.from_external = True
-        msg.timestamp = int(Clock().now().nanoseconds / 1000)
+    # def publish_vehicle_command(self, command: int, param1: float, param2: float =0.0):
+    #     msg = VehicleCommand()
+    #     msg.param1 = param1
+    #     #msg.param2 = param2
+    #     msg.command = command
+    #     msg.target_system = 1
+    #     msg.target_component = 1
+    #     msg.source_system = 1
+    #     msg.source_component = 1
+    #     msg.from_external = True
+    #     msg.timestamp = int(Clock().now().nanoseconds / 1000)
 
-        self.pub_vehicle_cmd.publish(msg)
+    #     self.pub_vehicle_cmd.publish(msg)
 
 
+    ### MAVLINK
     ## SETUP 
+    # Run event loop forever (used for creating a perpetual event loop in another thread)
+    def run_event_loop(self, loop):
+        asyncio.set_event_loop(loop)
+        loop.run_forever()
+
+    # Connect to drone via MAVLINK through UDP
     # Return system object representing drone connected on input address
     # Perform health checks upon connection if desired
-    async def wait_for_drone(self, system_address, port):
+    async def connect_mavlink(self, system_address=None, port=None, mavsdk_server_address="localhost"):
+        # Set MAVLINK connection ports/addresses based on drone id if not already set
+        if system_address == None:
+            system_address = f'udp://:1454{self.drone_id}' 
+        if port == None:
+            port = 50050 + self.drone_id
+
+        self.drone_system = System(mavsdk_server_address=mavsdk_server_address, port=port)
+
+        # Wait for drone to connect
         print(f'STARTING: Connecting to drone at {system_address} through port {port}')
+        await self.drone_system.connect(system_address)
 
         async for state in self.drone_system.core.connection_state():
             if state.is_connected:
@@ -224,7 +310,6 @@ class Drone(Node):
                 break
         
         print(f'COMPLETE: Connecting to drone at {system_address} \n')
-
 
     # Set drone PX4 parameters
     async def set_params(self, takeoff_alt_set=2, rtl_alt_set=5):
@@ -251,17 +336,37 @@ class Drone(Node):
     async def mission_start(self):
         print("STARTING: Takeoff routine")
 
+        await asyncio.sleep(2)
+        print("successfully waited!!")
+
         # Start in hold mode
+        print("About to hold")
         await self.drone_system.action.hold()
+        #future = asyncio.run_coroutine_threadsafe(self.drone_system.action.hold(), self.event_loop_mav)
+        #result = future.result(self.TIMEOUT_WAIT_COROUTINE)
 
         # Arm drone and wait 2 sec
         print("-- Arming")
         await self.drone_system.action.arm()
+
+        # while True:
+        #     print('Printing before awaiting')
+        #     time.sleep(0.5)
+        #self.async_loop.run_in_executor(None, asyncio.run, self.drone_system.action.arm()) # THIS WORKS!!! Try to not use run function again as shouldn't need another event loop
+        
+        #asyncio.run_coroutine_threadsafe #- TRY THIS: https://stackoverflow.com/questions/37841222/scheduling-an-asyncio-coroutine-from-another-thread
+
+
+        #await self.drone_system.action.arm()
+        print('ARMING FINISHED')
+
         await asyncio.sleep(2)
+        #self.async_loop.create_task(asyncio.sleep(2)) 
 
         # Get drone to take off
         print("-- Taking off")
         await self.drone_system.action.takeoff()
+        #self.async_loop.create_task(self.drone_system.action.takeoff()) 
 
         # Wait until takeoff complete
         async for current_flight_mode in self.drone_system.telemetry.flight_mode(): 
@@ -364,29 +469,47 @@ class Drone(Node):
             await self.mission_offboard_mav()
 
 
+# async def main_async_hardcoded(args=None):
+#     # Create node and connect
+#     rclpy.init(args=args)
+#     drone_future_msg = Future()
+#     drone = await Drone.create_with_mav(node_name='drone1', namespace='px4_1', msg_future_return=drone_future_msg) #, system_address="udp://:14541", port=50051)
+#     #drone_fly_coroutine = asyncio.ensure_future(drone.run_hardcoded())
+#     #await drone_fly_coroutine
+
+#     # Offboard flight
+#     await drone.run_hardcoded()
+#     #await rclpy.spin(drone)
+#     rclpy.spin_until_future_complete(drone,drone_future_msg)
+
+#     # End mission
+#     await drone.mission_end()
+
+#     # Destroy node
+#     drone.destroy_node()
+#     rclpy.shutdown()
+
+# def main_hardcoded():
+#     loop = asyncio.get_event_loop()
+#     loop.run_until_complete(main_async_hardcoded())
+
 async def main_async(args=None):
-    # Create node and connect
     rclpy.init(args=args)
-    drone_future_msg = Future()
-    drone = await Drone.create(drone_future_msg, system_address="udp://:14541", port=50051)
-    #drone_fly_coroutine = asyncio.ensure_future(drone.run_hardcoded())
-    #await drone_fly_coroutine
 
-    # Offboard flight
-    await drone.run_hardcoded()
-    #await rclpy.spin(drone)
-    rclpy.spin_until_future_complete(drone,drone_future_msg)
+    # Could use a task group here if wanted to create multiple independent drone tasks for some reason
+    drone = await Drone.create(node_name='drone1', namespace='px4_1')
 
-    # End mission
-    await drone.mission_end()
+    rclpy.spin(drone)
 
     # Destroy node
     drone.destroy_node()
     rclpy.shutdown()
 
 def main():
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main_async())
+    #loop = asyncio.get_event_loop()
+    #loop.run_until_complete(main_async())
+    asyncio.run(main_async())
 
 if __name__ == '__main__':
     main()
+    #main_hardcoded()
