@@ -8,29 +8,49 @@ from rclpy.node import Node
 from geometry_msgs.msg import Pose, Point, Quaternion
 from swarm_load_carry_interfaces.srv import ModeChange
 
-NUM_DRONES=3
+DEFAULT_DRONE_NUM=1
+DEFAULT_FIRST_DRONE_NUM=1
 
 class GroundControlStation(Node):
 
-    def __init__(self, drone_id=1):
+    def __init__(self):
         super().__init__('gcs')
+
+        ## Print information
+        print('GCS NODE')
+        print(f'Namespace: {self.get_namespace()}')
+        print(f'Name: {self.get_name()}')
+
+        ## PARAMETERS
+        self.declare_parameter('num_drones', DEFAULT_DRONE_NUM)
+        self.declare_parameter('first_drone_num', DEFAULT_FIRST_DRONE_NUM)
+    
+        self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
+        self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
 
         ## PUBLISHERS
         ## SUBSCRIBERS
         ## SERVICES
 
         ## CLIENTS
-        self.cli_mode_change_1 = self.create_client(ModeChange,f'/px4_1/mode_change')
-        while not self.cli_mode_change_1.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info(f'Waiting for offboard ROS start service 1')
-        
-        self.cli_mode_change_2 = self.create_client(ModeChange,f'/px4_2/mode_change')
-        while not self.cli_mode_change_2.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info(f'Waiting for offboard ROS start service 2')
+        self.cli_mode_change = [None] * self.num_drones
 
-        self.cli_mode_change_3 = self.create_client(ModeChange,f'/px4_3/mode_change')
-        while not self.cli_mode_change_3.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info(f'Waiting for offboard ROS start service 3')
+        for i in range(self.first_drone_num, self.num_drones+self.first_drone_num):
+            self.cli_mode_change[i-self.first_drone_num] = self.create_client(ModeChange,f'/px4_{i}/mode_change')
+            while not self.cli_mode_change[i-self.first_drone_num].wait_for_service(timeout_sec=1.0):
+                self.get_logger().info(f'Waiting for offboard ROS start service {i}')
+
+        # self.cli_mode_change_1 = self.create_client(ModeChange,f'/px4_1/mode_change')
+        # while not self.cli_mode_change_1.wait_for_service(timeout_sec=1.0):
+        #     self.get_logger().info(f'Waiting for offboard ROS start service 1')
+        
+        # self.cli_mode_change_2 = self.create_client(ModeChange,f'/px4_2/mode_change')
+        # while not self.cli_mode_change_2.wait_for_service(timeout_sec=1.0):
+        #     self.get_logger().info(f'Waiting for offboard ROS start service 2')
+
+        # self.cli_mode_change_3 = self.create_client(ModeChange,f'/px4_3/mode_change')
+        # while not self.cli_mode_change_3.wait_for_service(timeout_sec=1.0):
+        #     self.get_logger().info(f'Waiting for offboard ROS start service 3')
 
 
     ## CALLBACKS
@@ -42,16 +62,25 @@ class GroundControlStation(Node):
         offboard_mode_req = ModeChange.Request()
         offboard_mode_req.mode = mode_desired 
 
-        # Send request and wait for response
-        offboard_mode_future_1 = self.cli_mode_change_1.call_async(offboard_mode_req)
-        offboard_mode_future_2 = self.cli_mode_change_2.call_async(offboard_mode_req)
-        offboard_mode_future_3 = self.cli_mode_change_3.call_async(offboard_mode_req)
+        # Send request
+        offboard_mode_future = [None] * self.num_drones
 
-        rclpy.spin_until_future_complete(self, offboard_mode_future_1)
-        rclpy.spin_until_future_complete(self, offboard_mode_future_2)
-        rclpy.spin_until_future_complete(self, offboard_mode_future_3)
+        for i in range(self.num_drones):
+            self.cli_mode_change[i].call_async(offboard_mode_req)
+        
+        # Wait for response
+        for i in range(self.num_drones):
+            rclpy.spin_until_future_complete(self, offboard_mode_future[i])
+        
+        # offboard_mode_future_1 = self.cli_mode_change_1.call_async(offboard_mode_req)
+        # offboard_mode_future_2 = self.cli_mode_change_2.call_async(offboard_mode_req)
+        # offboard_mode_future_3 = self.cli_mode_change_3.call_async(offboard_mode_req)
 
-        return offboard_mode_future_1.result()
+        # rclpy.spin_until_future_complete(self, offboard_mode_future_1)
+        # rclpy.spin_until_future_complete(self, offboard_mode_future_2)
+        # rclpy.spin_until_future_complete(self, offboard_mode_future_3)
+
+        return offboard_mode_future[0].result()
 
 
 def main(args=None):

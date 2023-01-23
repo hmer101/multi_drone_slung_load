@@ -1,0 +1,5 @@
+/**:
+    ros__parameters:
+      first_drone_num: 1
+      num_drones: 3
+      
