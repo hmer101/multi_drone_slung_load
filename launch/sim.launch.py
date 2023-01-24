@@ -18,7 +18,7 @@ def generate_launch_description():
     gcs = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('swarm_load_carry'), 'launch'),
-         '/gcs.launch.py']) #_upper
+         '/gcs.launch.py'])
       )
 
     ## RUN LAUNCH FILES

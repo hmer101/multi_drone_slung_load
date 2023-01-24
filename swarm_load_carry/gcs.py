@@ -33,11 +33,6 @@ class GroundControlStation(Node):
         ## PUBLISHERS
         ## SUBSCRIBERS
         ## SERVICES
-        # self.srv_mode_change = self.create_service(
-        #     ModeChange,
-        #     f'{self.ns}/mode_change',
-        #     self.clbk_mode_change)
-
 
         ## CLIENTS
         self.cli_mode_change = [None] * self.num_drones
@@ -54,34 +49,41 @@ class GroundControlStation(Node):
 
     ## MISSION CONTROL
     # Change the mode of all drones
-    def mode_change(self, mode_desired): #clbk_mode_change(self, request, response)
+    def mode_change(self, mode_desired):
         # Prepare request
         mode_req = ModeChange.Request()
-        mode_req.mode = mode_desired #request.mode 
-
-        self.get_logger().info('GCS about to send request')
+        mode_req.mode = mode_desired
 
         # Send request
         mode_future = [None] * self.num_drones
 
-        self.get_logger().info(f'CLI MODE CHANGE: {self.cli_mode_change}')
-
         for i in range(self.num_drones):
             mode_future[i] = self.cli_mode_change[i].call_async(mode_req)
-        
-        self.get_logger().info('GCS WAITING FOR RESPONSE')
 
         # Wait for response
         for i in range(self.num_drones):
-            self.get_logger().info(f'Mode_future[{i}]: {mode_future[i]}')
             rclpy.spin_until_future_complete(self, mode_future[i])
-            self.get_logger().info(f'RESPONSE FROM DRONE {i}')
 
-        self.get_logger().info('GCS RESPONSE RECEIVED')
 
-        #response.success = True
+    # Hardcoded offboard flight test
+    def offboard_test(self):
+        # Send takeoff
+        input('Press enter when you want to take off')
+        self.mode_change(ModeChange.Request.MODE_TAKEOFF_MAV_START)
 
-        return True #response
+        # Send offboard start
+        input('Press enter when you want to start offboard control')
+        self.mode_change(ModeChange.Request.MODE_OFFBOARD_ROS_START) 
+
+        # Send offboard end
+        input('Press enter when you want to end offboard control')
+        self.mode_change(ModeChange.Request.MODE_OFFBOARD_ROS_END)
+
+        # Send land
+        input('Press enter when you want to land at home')
+        self.mode_change(ModeChange.Request.MODE_LAND_MAV_START)
+
+
 
 
 def main(args=None):
@@ -89,23 +91,8 @@ def main(args=None):
     rclpy.init(args=args)
     gcs = GroundControlStation()
 
-
-    # Send takeoff
-    input('Press enter when you want to take off')
-    gcs.mode_change(ModeChange.Request.MODE_TAKEOFF_MAV_START)
-
-    # Send offboard start
-    input('Press enter when you want to start offboard control')
-    gcs.mode_change(ModeChange.Request.MODE_OFFBOARD_ROS_START) 
-
-    # Send offboard end
-    input('Press enter when you want to end offboard control')
-    gcs.mode_change(ModeChange.Request.MODE_OFFBOARD_ROS_END)
-
-    # Send land
-    input('Press enter when you want to land at home')
-    gcs.mode_change(ModeChange.Request.MODE_LAND_MAV_START)
-
+    # Run offboard flight
+    gcs.offboard_test()
 
     # Maintain node
     rclpy.spin(gcs)

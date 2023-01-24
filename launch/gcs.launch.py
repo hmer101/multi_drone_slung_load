@@ -20,35 +20,10 @@ def generate_launch_description():
         if arg.startswith("env:="):
             env = int(arg.split(":=")[1])
 
-
     ## GET PARAMETERS
-    # config = None
-
-    # if env=="sim":
-    #   config = os.path.join(
-    #     get_package_share_directory('swarm_load_carry'),
-    #     'config',
-    #     'sim.yaml'
-    #     )
-    # elif env=="phys":
-    #    config = os.path.join(
-    #     get_package_share_directory('swarm_load_carry'),
-    #     'config',
-    #     'phys.yaml'
-    #     ) 
 
     ## LAUNCH
     return LaunchDescription([
-        # Node(
-        #  package='swarm_load_carry',
-        #  executable='gcs',
-        #  namespace='gcs_1',
-        #  name='gcs',
-        #  output='screen',
-        #  #emulate_tty=True,
-        #  parameters=[config]
-        # )
-
         ExecuteProcess(
             cmd=[[
                 f'gnome-terminal --tab -- bash -c "ros2 run swarm_load_carry gcs --ros-args --params-file ~/px4_ros_com_ros2/src/swarm_load_carry/config/{env}.yaml"',

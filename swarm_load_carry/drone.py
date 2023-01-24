@@ -18,7 +18,6 @@ from geometry_msgs.msg import Pose, Point, Quaternion
 from px4_msgs.msg import VehicleAttitude, VehicleLocalPosition, OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand
 from swarm_load_carry_interfaces.srv import ModeChange # Note must build workspace and restart IDE before custom packages are found by python
 
-import threading
 from concurrent.futures import ThreadPoolExecutor
 import time
 
