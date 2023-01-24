@@ -17,9 +17,11 @@ class GroundControlStation(Node):
         super().__init__('gcs')
 
         ## Print information
-        print('GCS NODE')
-        print(f'Namespace: {self.get_namespace()}')
-        print(f'Name: {self.get_name()}')
+        self.ns = self.get_namespace()
+
+        self.get_logger().info('GCS NODE')
+        self.get_logger().info(f'Namespace: {self.ns}')
+        self.get_logger().info(f'Name: {self.get_name()}')
 
         ## PARAMETERS
         self.declare_parameter('num_drones', DEFAULT_DRONE_NUM)
@@ -31,6 +33,11 @@ class GroundControlStation(Node):
         ## PUBLISHERS
         ## SUBSCRIBERS
         ## SERVICES
+        # self.srv_mode_change = self.create_service(
+        #     ModeChange,
+        #     f'{self.ns}/mode_change',
+        #     self.clbk_mode_change)
+
 
         ## CLIENTS
         self.cli_mode_change = [None] * self.num_drones
@@ -40,53 +47,48 @@ class GroundControlStation(Node):
             while not self.cli_mode_change[i-self.first_drone_num].wait_for_service(timeout_sec=1.0):
                 self.get_logger().info(f'Waiting for offboard ROS start service {i}')
 
-        # self.cli_mode_change_1 = self.create_client(ModeChange,f'/px4_1/mode_change')
-        # while not self.cli_mode_change_1.wait_for_service(timeout_sec=1.0):
-        #     self.get_logger().info(f'Waiting for offboard ROS start service 1')
-        
-        # self.cli_mode_change_2 = self.create_client(ModeChange,f'/px4_2/mode_change')
-        # while not self.cli_mode_change_2.wait_for_service(timeout_sec=1.0):
-        #     self.get_logger().info(f'Waiting for offboard ROS start service 2')
-
-        # self.cli_mode_change_3 = self.create_client(ModeChange,f'/px4_3/mode_change')
-        # while not self.cli_mode_change_3.wait_for_service(timeout_sec=1.0):
-        #     self.get_logger().info(f'Waiting for offboard ROS start service 3')
+        self.get_logger().info('Setup complete')
 
 
     ## CALLBACKS
 
     ## MISSION CONTROL
-    # Change the offboard ROS mode of the specified drones
-    def mode_change(self, mode_desired):
+    # Change the mode of all drones
+    def mode_change(self, mode_desired): #clbk_mode_change(self, request, response)
         # Prepare request
-        offboard_mode_req = ModeChange.Request()
-        offboard_mode_req.mode = mode_desired 
+        mode_req = ModeChange.Request()
+        mode_req.mode = mode_desired #request.mode 
+
+        self.get_logger().info('GCS about to send request')
 
         # Send request
-        offboard_mode_future = [None] * self.num_drones
+        mode_future = [None] * self.num_drones
+
+        self.get_logger().info(f'CLI MODE CHANGE: {self.cli_mode_change}')
 
         for i in range(self.num_drones):
-            self.cli_mode_change[i].call_async(offboard_mode_req)
+            mode_future[i] = self.cli_mode_change[i].call_async(mode_req)
         
+        self.get_logger().info('GCS WAITING FOR RESPONSE')
+
         # Wait for response
         for i in range(self.num_drones):
-            rclpy.spin_until_future_complete(self, offboard_mode_future[i])
-        
-        # offboard_mode_future_1 = self.cli_mode_change_1.call_async(offboard_mode_req)
-        # offboard_mode_future_2 = self.cli_mode_change_2.call_async(offboard_mode_req)
-        # offboard_mode_future_3 = self.cli_mode_change_3.call_async(offboard_mode_req)
+            self.get_logger().info(f'Mode_future[{i}]: {mode_future[i]}')
+            rclpy.spin_until_future_complete(self, mode_future[i])
+            self.get_logger().info(f'RESPONSE FROM DRONE {i}')
 
-        # rclpy.spin_until_future_complete(self, offboard_mode_future_1)
-        # rclpy.spin_until_future_complete(self, offboard_mode_future_2)
-        # rclpy.spin_until_future_complete(self, offboard_mode_future_3)
+        self.get_logger().info('GCS RESPONSE RECEIVED')
 
-        return offboard_mode_future[0].result()
+        #response.success = True
+
+        return True #response
 
 
 def main(args=None):
     # Create node
     rclpy.init(args=args)
     gcs = GroundControlStation()
+
 
     # Send takeoff
     input('Press enter when you want to take off')
@@ -106,7 +108,7 @@ def main(args=None):
 
 
     # Maintain node
-    #rclpy.spin(gcs)
+    rclpy.spin(gcs)
 
     # Destroy node
     gcs.destroy_node()

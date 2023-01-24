@@ -156,8 +156,8 @@ class Drone(Node):
     def clbk_vehicle_status(self, msg):
         # TODO: handle NED->ENU transformation
         #if self.mode == ModeChange.Request.MODE_UNASSIGNED: 
-        self.get_logger().info("NAV_STATUS: ", msg.nav_state)
-        self.get_logger().info("  - offboard status: ", VehicleStatus.NAVIGATION_STATE_OFFBOARD)
+        self.get_logger().info(f'NAV_STATUS: {msg.nav_state}')
+        self.get_logger().info(f'  - offboard status: {VehicleStatus.NAVIGATION_STATE_OFFBOARD}')
         self.nav_state = msg.nav_state
 
     async def clbk_change_mode(self, request, response):
@@ -175,7 +175,7 @@ class Drone(Node):
 
             case ModeChange.Request.MODE_TAKEOFF_MAV_END:
                 self.mode=ModeChange.Request.MODE_TAKEOFF_MAV_END
-                self.get_logger().info("In mode takeoff end")
+                #self.get_logger().info("In mode takeoff end")
 
             case ModeChange.Request.MODE_OFFBOARD_ROS_START:
                 self.mode=ModeChange.Request.MODE_OFFBOARD_ROS_START
@@ -185,7 +185,7 @@ class Drone(Node):
             
             case ModeChange.Request.MODE_OFFBOARD_ROS_END:
                 self.mode=ModeChange.Request.MODE_OFFBOARD_ROS_END
-                self.get_logger().info("In mode offboard ROS end")
+                #self.get_logger().info("In mode offboard ROS end")
 
                 # Switch to hold mode (doing nothing will leave hovering in offboard mode)
                 self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.hold())
@@ -200,7 +200,18 @@ class Drone(Node):
 
             case ModeChange.Request.MODE_LAND_MAV_END:
                 self.mode=ModeChange.Request.MODE_LAND_MAV_END
-                self.get_logger().info("In mode land end")
+                #self.get_logger().info("In mode land end")
+
+            case ModeChange.Request.MODE_HOLD:
+                self.mode=ModeChange.Request.MODE_HOLD
+
+                self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.hold())
+
+            case ModeChange.Request.MODE_KILL:
+                self.mode=ModeChange.Request.MODE_KILL
+
+                self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.kill())
+
 
         response.success = True
         self.get_logger().info(f'Changed to mode: {self.mode}')
