@@ -24,9 +24,10 @@ def generate_launch_description():
 
     ## LAUNCH
     return LaunchDescription([
+        launch_arg_sim_phys,
         ExecuteProcess(
             cmd=[[
-                f'gnome-terminal --tab -- bash -c "ros2 run swarm_load_carry gcs --ros-args --params-file ~/px4_ros_com_ros2/src/swarm_load_carry/config/{env}.yaml"',
+                f'gnome-terminal --tab -- bash -c "ros2 run swarm_load_carry gcs --ros-args -r __node:=gcs1 --params-file ~/px4_ros_com_ros2/src/swarm_load_carry/config/{env}.yaml"', #-r __ns:=/gcs_1 
             ]],
             shell=True
         )

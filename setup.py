@@ -30,7 +30,7 @@ setup(
         'console_scripts': [
             'drone = swarm_load_carry.drone:main',
             'gcs = swarm_load_carry.gcs:main',
-            'controller = swarm_load_carry.controller:main'
+            'load = swarm_load_carry.load:main',
         ],
     },
 )

@@ -15,6 +15,11 @@ def generate_launch_description():
          get_package_share_directory('swarm_load_carry'), 'launch'),
          '/drones.launch.py'])
       )
+    load = IncludeLaunchDescription(
+      PythonLaunchDescriptionSource([os.path.join(
+         get_package_share_directory('swarm_load_carry'), 'launch'),
+         '/load.launch.py'])
+      )
     gcs = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('swarm_load_carry'), 'launch'),
@@ -24,5 +29,6 @@ def generate_launch_description():
     ## RUN LAUNCH FILES
     return LaunchDescription([
         drones,
+        load,
         gcs    
     ])

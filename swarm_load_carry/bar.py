@@ -9,7 +9,7 @@ from rclpy.qos import QoSProfile
 
 class Bar(Node):
     def __init__(self):
-        super().__init__('foo')
+        super().__init__('bar')
 
         # Setup test publisher
         qos_profile = QoSProfile(
@@ -40,4 +40,4 @@ def main():
         bar.send_msg()
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    main()

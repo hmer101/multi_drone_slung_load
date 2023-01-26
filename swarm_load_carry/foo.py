@@ -29,10 +29,16 @@ class Foo(Node):
 
     # Test callback function
     async def clbk(self, msg):
-        self.get_logger().info(f'Received: {msg.data}. About to await fxn')
-        # await asyncio.sleep(3)
+        self.get_logger().info(f'Received: {msg.data}. About to test async')
+        
+        # This doesn't cause a problem
+        await self.test_async()
 
-        # This appears to run sleep in a separate thread.
+        # This doesn't work
+        self.get_logger().info('About to sleep')
+        await asyncio.sleep(3)
+
+        # Workaround: This appears to run sleep in a separate thread.
         # executor = ThreadPoolExecutor(max_workers=1)
         # asyncio.get_event_loop().run_in_executor(executor, asyncio.run, asyncio.sleep(3))
         # executor.shutdown(wait=True)
@@ -42,39 +48,30 @@ class Foo(Node):
         # asyncio.get_event_loop().run_in_executor(executor, asyncio.run, self.sleep_with_return())
         # executor.shutdown(wait=True)
 
-        # Also doesn't wait for a generator
-        executor = ThreadPoolExecutor(max_workers=1)
-        asyncio.get_event_loop().run_in_executor(executor, asyncio.run, self.test_generator())
-        executor.shutdown(wait=True)
-
-
         self.get_logger().info('Clbk complete')
 
 
-    # Workaround failure cases
+    # Working async function
+    async def test_async(self):
+        self.get_logger().info('Test async works!')
+
+
+    # Workaround failure case
     async def sleep_with_return(self):
         await asyncio.sleep(3)
 
         return True
-    
-    async def test_generator(self):
-        async for next_num in self.async_generator():
-            print(f'next_num: {next_num}')
-    
-    async def async_generator(self):
-        for i in range(10):
-            # suspend and sleep a moment
-            await asyncio.sleep(1)
-            # yield a value to the caller
-            yield i
 
 
-async def main():
+async def async_main():
     rclpy.init()
 
     # Create node and spin
     foo = Foo()
     rclpy.spin(foo)
 
+def main():
+    asyncio.run(async_main())
+
 if __name__ == '__main__':
-    asyncio.run(main())
+    main()

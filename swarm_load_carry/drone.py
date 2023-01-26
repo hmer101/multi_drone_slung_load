@@ -9,7 +9,7 @@ import numpy as np
 from mavsdk import System, offboard, telemetry
 
 import rclpy.qos as qos
-from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
+from rclpy.qos import QoSProfile
 from rclpy.node import Node
 from rclpy.clock import Clock
 from rclpy.task import Future
@@ -24,6 +24,7 @@ import time
 
 DEFAULT_DRONE_NUM=1
 DEFAULT_FIRST_DRONE_NUM=1
+DEFAULT_LOAD_ID=1
 
 # Node to encapsulate drone information and actions
 class Drone(Node):
@@ -58,11 +59,13 @@ class Drone(Node):
         self.takeoff_altitude = 0.0 # THIS IS TEMPORARY - REPLACE USEAGE WITH 'await self.drone_system.action.get_takeoff_altitude()'
 
         # Parameters
-        # self.declare_parameter('num_drones', DEFAULT_DRONE_NUM)
-        # self.declare_parameter('first_drone_num', DEFAULT_FIRST_DRONE_NUM)
+        self.declare_parameter('num_drones', DEFAULT_DRONE_NUM)
+        self.declare_parameter('first_drone_num', DEFAULT_FIRST_DRONE_NUM)
+        self.declare_parameter('load_id', DEFAULT_LOAD_ID)
 
-        # self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
-        # self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
+        self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
+        self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
+        self.load_id = self.get_parameter('load_id').get_parameter_value().integer_value
 
 
         ## TIMERS
@@ -70,9 +73,9 @@ class Drone(Node):
 
         ### ROS2
         qos_profile = QoSProfile(
-            reliability=qos.ReliabilityPolicy.BEST_EFFORT, #QoSReliabilityPolicy.ReliabilityPolicy.BEST_EFFORT,
-            durability=qos.DurabilityPolicy.TRANSIENT_LOCAL, #QoSDurabilityPolicy.DurabilityPolicy.TRANSIENT_LOCAL,
-            history=qos.HistoryPolicy.KEEP_LAST, #QoSHistoryPolicy.HistoryPolicy.KEEP_LAST,
+            reliability=qos.ReliabilityPolicy.BEST_EFFORT,
+            durability=qos.DurabilityPolicy.TRANSIENT_LOCAL,
+            history=qos.HistoryPolicy.KEEP_LAST,
             depth=1
         )
 
@@ -101,6 +104,31 @@ class Drone(Node):
             f'{self.ns}/fmu/out/vehicle_local_position',
             self.clbk_vehicle_local_position,
             qos_profile)  
+
+        # Payload 
+        # self.sub_payload_attitude_desired = self.create_subscription(
+        #     VehicleAttitude,
+        #     f'load_{self.load_id}/out/attitude',
+        #     self.clbk_load_attitude,
+        #     qos_profile)
+        
+        # self.sub_payload_position_desired = self.create_subscription(
+        #     VehicleLocalPosition,
+        #     f'load_{self.load_id}/out/local_position',
+        #     self.clbk_load_local_position,
+        #     qos_profile)
+
+        # self.sub_payload_attitude_desired = self.create_subscription(
+        #     VehicleAttitudeSetpoint,
+        #     f'load_{self.load_id}/in/desired_attitude',
+        #     self.clbk_load_desired_attitude,
+        #     qos_profile)
+        
+        # self.sub_payload_position_desired = self.create_subscription(
+        #     VehicleLocalPositionSetpoint,
+        #     f'load_{self.load_id}/in/desired_local_position',
+        #     self.clbk_load_desired_local_position,
+        #     qos_profile)
 
         # TODO: Sub to other drones and load setpoints for distributed control!
 
@@ -155,8 +183,8 @@ class Drone(Node):
         self.vehicle_local_velocity[1] = -msg.vy
         self.vehicle_local_velocity[2] = -msg.vz
 
-        pos_current = (self.vehicle_local_position[0], self.vehicle_local_position[1], self.vehicle_local_position[2])
-        self.get_logger().info(f'POS UPDATE: {pos_current}')
+        # pos_current = (self.vehicle_local_position[0], self.vehicle_local_position[1], self.vehicle_local_position[2])
+        # self.get_logger().info(f'POS UPDATE: {pos_current}')
 
     def clbk_vehicle_status(self, msg):
         # TODO: handle NED->ENU transformation
@@ -176,14 +204,12 @@ class Drone(Node):
                 # Takeoff
                 self.mode=ModeChange.Request.MODE_TAKEOFF_MAV_START
                 await self.mission_start()
-                #await self.mission_start_test()
 
                 # Takeoff finished - transition to end
                 self.mode=ModeChange.Request.MODE_TAKEOFF_MAV_END
 
             case ModeChange.Request.MODE_TAKEOFF_MAV_END:
                 self.mode=ModeChange.Request.MODE_TAKEOFF_MAV_END
-                #self.get_logger().info("In mode takeoff end")
 
             case ModeChange.Request.MODE_OFFBOARD_ROS_START:
                 self.mode=ModeChange.Request.MODE_OFFBOARD_ROS_START
@@ -193,11 +219,9 @@ class Drone(Node):
             
             case ModeChange.Request.MODE_OFFBOARD_ROS_END:
                 self.mode=ModeChange.Request.MODE_OFFBOARD_ROS_END
-                #self.get_logger().info("In mode offboard ROS end")
 
                 # Switch to hold mode (doing nothing will leave hovering in offboard mode)
                 self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.hold())
-
 
             case ModeChange.Request.MODE_LAND_MAV_START:
                 self.mode=ModeChange.Request.MODE_LAND_MAV_START
@@ -250,17 +274,17 @@ class Drone(Node):
                     self.theta = self.theta + self.omega * self.dt
 
 
-    # Only return once vehicle has reached desired position
-    def wait_for_pos(self, goal_pos, error_dist):
-        pos_current = (self.vehicle_local_position[0], self.vehicle_local_position[1], self.vehicle_local_position[2])
+    # # Only return once vehicle has reached desired position
+    # def wait_for_pos(self, goal_pos, error_dist):
+    #     pos_current = (self.vehicle_local_position[0], self.vehicle_local_position[1], self.vehicle_local_position[2])
 
-        while not utils.within_radius_3D(pos_current, goal_pos, error_dist):
-            pos_current = (self.vehicle_local_position[0], self.vehicle_local_position[1], self.vehicle_local_position[2])
-            self.get_logger().info(f'pos_current: {pos_current}')
-            self.get_logger().info(f'goal_pos: {goal_pos}')
-            time.sleep(2)
+    #     while not utils.within_radius_3D(pos_current, goal_pos, error_dist):
+    #         pos_current = (self.vehicle_local_position[0], self.vehicle_local_position[1], self.vehicle_local_position[2])
+    #         self.get_logger().info(f'pos_current: {pos_current}')
+    #         self.get_logger().info(f'goal_pos: {goal_pos}')
+    #         time.sleep(1)
 
-        return True
+    #     return True
 
 
     ### MAVLINK
@@ -323,148 +347,39 @@ class Drone(Node):
 
         # Start in hold mode
         #await self.drone_system.action.hold()
-        executor1 = ThreadPoolExecutor(max_workers=1)
-        self.async_loop.run_in_executor(executor1, asyncio.run, self.drone_system.action.hold())
-        executor1.shutdown(wait=True)
+        executor = ThreadPoolExecutor(max_workers=1)
+        self.async_loop.run_in_executor(executor, asyncio.run, self.drone_system.action.hold())
+        executor.shutdown(wait=True)
 
         #time.sleep(self.WAIT_SEC_BETWEEN_COMMANDS)
 
         # Arm drone and wait 2 sec
         self.get_logger().info("-- Arming")
         #await self.drone_system.action.arm()
-        executor2 = ThreadPoolExecutor(max_workers=1)
-        self.async_loop.run_in_executor(executor2, asyncio.run, self.drone_system.action.arm())
-        executor2.shutdown(wait=True)
+        executor = ThreadPoolExecutor(max_workers=1)
+        self.async_loop.run_in_executor(executor, asyncio.run, self.drone_system.action.arm())
+        executor.shutdown(wait=True)
 
         #time.sleep(self.WAIT_SEC_BETWEEN_COMMANDS)
 
         # Get drone to take off
         self.get_logger().info("-- Taking off")
         #await self.drone_system.action.takeoff()
-        executor3 = ThreadPoolExecutor(max_workers=1)
-        self.async_loop.run_in_executor(executor3, asyncio.run, self.drone_system.action.takeoff())
-        executor3.shutdown(wait=True)
-        #self.get_logger().info(f'RESULT: {result}') #o/p: "RESULT: <Future pending cb=[_chain_future.<locals>._call_check_cancel() at /usr/lib/python3.10/asyncio/futures.py:385]>""
+        executor = ThreadPoolExecutor(max_workers=1)
+        self.async_loop.run_in_executor(executor, asyncio.run, self.drone_system.action.takeoff())
+        executor.shutdown(wait=True)
 
-
-        # End in hold mode
-        # executor = ThreadPoolExecutor(max_workers=1)
-        # self.async_loop.run_in_executor(executor, asyncio.run, self.drone_system.action.hold())
-        # executor.shutdown(wait=True)
-        
-        # Wait until takeoff complete
-        # executor4 = ThreadPoolExecutor()
-        # asyncio.get_event_loop().run_in_executor(executor4, asyncio.run, self.test()) #self.async_loop.
-        # executor4.shutdown(wait=True)
-
-        #asyncio.set_event_loop(self.async_loop)
-        # async for current_flight_mode in self.drone_system.telemetry.flight_mode(): 
-        #     self.get_logger().info('IN THIS')
-
-        # while self.nav_state != VehicleStatus.NAVIGATION_STATE_AUTO_LOITER:
-        #     self.get_logger().info("Waiting for takeoff to finish")
-        #     #time.sleep(1)
-
-        self.get_logger().info("Waiting for takeoff to finish")
-
-
-        th = Thread(target = self.wait_for_pos, args=(takeoff_goal_pos, 0.1))
-        th.start()
-        # wait for the thread to finish
-        self.get_logger().info("WAITING FOR THREAD TO FINISH")
+        # self.get_logger().info("Waiting for takeoff to finish")
+        # th = Thread(target = self.wait_for_pos, args=(takeoff_goal_pos, 0.1))
+        # th.start()
+        # # wait for the thread to finish
+        # self.get_logger().info("WAITING FOR THREAD TO FINISH")
         #th.join()
         #self.wait_for_pos(takeoff_goal_pos, 0.1)
 
-        #time.sleep(5)
+        time.sleep(5)
 
         self.get_logger().info("COMPLETE: Takeoff routine \n")
-    
-    # # TEMPPPPPPP
-    # async def test(self):
-    #     self.get_logger().info("IN TEST")
-
-    #     #while True:
-            
-    #     #self.get_logger().info('Looping')
-
-    #         #fm_gen = self.drone_system.telemetry.flight_mode()
-    #         #self.get_logger().info(f'fm_gen: {fm_gen}')
-    #     async for current_flight_mode in self.drone_system.telemetry.flight_mode(): 
-    #         self.get_logger().info('IN LOOP') # NOT GETTING IN HERERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    #             # if current_flight_mode == telemetry.FlightMode.HOLD:
-    #             #     self.get_logger().info('HERER')
-    #             #     return
-    #         #time.sleep(2)
-
-    #     # async for next_num in self.async_generator():
-    #     #     self.get_logger().info(f'next_num: {next_num}')
-
-    #     self.get_logger().info("END TEST")
-
-    # async def async_generator(self):
-    #     for i in range(10):
-    #         # suspend and sleep a moment
-    #         await asyncio.sleep(1)
-    #         # yield a value to the caller
-    #         yield i
-
-    
-    # It appears that callbacks are run in separate threads to the original node. As the original node contains the event loop, 
-    # using 'await' causes problems as there is no event loop to await. Get around this by either using the asyncio.run function in a new thread
-    # or by using 'create_task' to attach the function to be awaited to the original event loop
-    async def mission_start_test(self):
-        self.get_logger().info("STARTING: Takeoff routine")
-
-        asyncio.set_event_loop(self.async_loop)
-
-        # Start in hold mode
-        await self.drone_system.action.hold()
-        # executor1 = ThreadPoolExecutor(max_workers=1)
-        # self.async_loop.run_in_executor(executor1, asyncio.run, self.drone_system.action.hold())
-        # executor1.shutdown(wait=True)
-        #self.async_loop.create_task(self.drone_system.action.hold())
-        #await self.drone_system.action.hold()
-
-        #time.sleep(self.WAIT_SEC_BETWEEN_COMMANDS)
-
-        # Arm drone and wait 2 sec
-        self.get_logger().info("-- Arming")
-        await self.drone_system.action.arm()
-        # executor2 = ThreadPoolExecutor(max_workers=1)
-        # self.async_loop.run_in_executor(executor2, asyncio.run, self.drone_system.action.arm())
-        # executor2.shutdown(wait=True)
-        #self.async_loop.create_task(self.drone_system.action.arm())
-        #await self.drone_system.action.arm()
-
-        #time.sleep(self.WAIT_SEC_BETWEEN_COMMANDS)
-
-        # Get drone to take off
-        self.get_logger().info("-- Taking off")
-        await self.drone_system.action.takeoff()
-        # executor3 = ThreadPoolExecutor(max_workers=1)
-        # self.async_loop.run_in_executor(executor3, asyncio.run, self.drone_system.action.takeoff())
-        # executor3.shutdown(wait=True)
-        #self.async_loop.create_task(self.drone_system.action.takeoff())
-        #await self.drone_system.action.takeoff()
-
-        # End in hold mode
-        # executor = ThreadPoolExecutor(max_workers=1)
-        # self.async_loop.run_in_executor(executor, asyncio.run, self.drone_system.action.hold())
-        # executor.shutdown(wait=True)
-
-        # Wait until takeoff complete
-        # executor4 = ThreadPoolExecutor(max_workers=1)
-        # future = self.async_loop.run_in_executor(executor4, asyncio.run, self.test())
-        # executor4.shutdown(wait=True)
-        #await self.test()
-        #self.async_loop.create_task(self.test())
-
-        async for current_flight_mode in self.drone_system.telemetry.flight_mode(): 
-            self.get_logger().info('IN THIS')
-
-        #time.sleep(5)
-
-        self.get_logger().info("COMPLETE: Takeoff routine - TESTTTTTTTT\n")
 
 
 
@@ -492,9 +407,6 @@ class Drone(Node):
         err_rad = 0.25
 
         async for drone_pos_vel in self.drone_system.telemetry.position_velocity_ned():
-            # self.get_logger().info(f"Current: {drone_pos_vel.position.north_m}, {drone_pos_vel.position.east_m}, {drone_pos_vel.position.down_m}")
-            # self.get_logger().info(f"Setpoint: {pos_2_set.north_m}, {pos_2_set.east_m}, {pos_2_set.down_m}")
-
             pos_current = (drone_pos_vel.position.north_m, drone_pos_vel.position.east_m, drone_pos_vel.position.down_m)
             pos_setpoint = (pos_2_set.north_m, pos_2_set.east_m, pos_2_set.down_m)
 
@@ -514,14 +426,15 @@ class Drone(Node):
         # Start sending velocity command (stay at current position)
         vel_start = offboard.VelocityBodyYawspeed(0,0,0,0)
         #await self.drone_system.offboard.set_velocity_body(vel_start)
-        self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.offboard.set_velocity_body(vel_start))
-        #time.sleep(1)
+        executor = ThreadPoolExecutor(max_workers=1)
+        self.async_loop.run_in_executor(executor, asyncio.run, self.drone_system.offboard.set_velocity_body(vel_start))
+        executor.shutdown(wait=True)
 
         # Switch to offboard control mode
-        #self.get_logger().info("-- Switch to offboard control")
         #await self.drone_system.offboard.start()
-        self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.offboard.start())
-        #time.sleep(5)
+        executor = ThreadPoolExecutor(max_workers=1)
+        self.async_loop.run_in_executor(executor, asyncio.run, self.drone_system.offboard.start())
+        executor.shutdown(wait=True)
 
         self.get_logger().info("COMPLETE: Offboard routine setup - ROS\n")
 
@@ -533,36 +446,20 @@ class Drone(Node):
 
         # Turn off offboard mode
         #await self.drone_system.offboard.stop()
-        self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.offboard.stop())
-        time.sleep(self.WAIT_SEC_BETWEEN_COMMANDS)
+        executor = ThreadPoolExecutor(max_workers=1)
+        self.async_loop.run_in_executor(executor, asyncio.run, self.drone_system.offboard.stop())
+        executor.shutdown(wait=True)
 
         # Return to home and land
         self.get_logger().info("-- Returning to home")
         #await self.drone_system.action.return_to_launch()
-        self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.return_to_launch())
-
-        # Only disarm once landed
-        # async for drone_state in self.drone_system.telemetry.landed_state():
-        #     if drone_state == telemetry.LandedState.ON_GROUND:
-        #         break
-        # await self.drone_system.action.disarm()
-        #await drone.action.hold()
+        executor = ThreadPoolExecutor(max_workers=1)
+        self.async_loop.run_in_executor(executor, asyncio.run, self.drone_system.action.return_to_launch())
+        executor.shutdown(wait=True)
 
         time.sleep(10)
 
         self.get_logger().info("COMPLETE: Landing routine \n")
-
-
-    # Run hardcoded offboard control mission with ros or MAVLINK sending offboard control commands
-    async def run_hardcoded(self, method_ros=False):
-        # Start mission
-        await self.mission_start()
-
-        # Run mission
-        if method_ros:
-            await self.mission_offboard_ros()
-        else:
-            await self.mission_offboard_mav()
 
 
 async def main_async(args=None):
@@ -578,10 +475,7 @@ async def main_async(args=None):
     rclpy.shutdown()
 
 def main():
-    #loop = asyncio.get_event_loop()
-    #loop.run_until_complete(main_async())
     asyncio.run(main_async())
 
 if __name__ == '__main__':
     main()
-    #main_hardcoded()
