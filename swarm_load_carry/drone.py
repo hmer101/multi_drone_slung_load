@@ -28,7 +28,6 @@ DEFAULT_LOAD_ID=1
 
 # Node to encapsulate drone information and actions
 class Drone(Node):
-    WAIT_SEC_BETWEEN_COMMANDS=2
 
     ## Initialization
     def __init__(self, name, namespace):
@@ -343,15 +342,11 @@ class Drone(Node):
     async def mission_start(self):
         self.get_logger().info("STARTING: Takeoff routine")
 
-        takeoff_goal_pos = (self.vehicle_local_position[0], self.vehicle_local_position[1], self.vehicle_local_position[2] + self.takeoff_alt)
-
         # Start in hold mode
         #await self.drone_system.action.hold()
         executor = ThreadPoolExecutor(max_workers=1)
         self.async_loop.run_in_executor(executor, asyncio.run, self.drone_system.action.hold())
         executor.shutdown(wait=True)
-
-        #time.sleep(self.WAIT_SEC_BETWEEN_COMMANDS)
 
         # Arm drone and wait 2 sec
         self.get_logger().info("-- Arming")
@@ -360,24 +355,12 @@ class Drone(Node):
         self.async_loop.run_in_executor(executor, asyncio.run, self.drone_system.action.arm())
         executor.shutdown(wait=True)
 
-        #time.sleep(self.WAIT_SEC_BETWEEN_COMMANDS)
-
         # Get drone to take off
         self.get_logger().info("-- Taking off")
         #await self.drone_system.action.takeoff()
         executor = ThreadPoolExecutor(max_workers=1)
         self.async_loop.run_in_executor(executor, asyncio.run, self.drone_system.action.takeoff())
         executor.shutdown(wait=True)
-
-        # self.get_logger().info("Waiting for takeoff to finish")
-        # th = Thread(target = self.wait_for_pos, args=(takeoff_goal_pos, 0.1))
-        # th.start()
-        # # wait for the thread to finish
-        # self.get_logger().info("WAITING FOR THREAD TO FINISH")
-        #th.join()
-        #self.wait_for_pos(takeoff_goal_pos, 0.1)
-
-        time.sleep(5)
 
         self.get_logger().info("COMPLETE: Takeoff routine \n")
 
@@ -456,8 +439,6 @@ class Drone(Node):
         executor = ThreadPoolExecutor(max_workers=1)
         self.async_loop.run_in_executor(executor, asyncio.run, self.drone_system.action.return_to_launch())
         executor.shutdown(wait=True)
-
-        time.sleep(10)
 
         self.get_logger().info("COMPLETE: Landing routine \n")
 

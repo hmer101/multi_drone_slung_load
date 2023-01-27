@@ -29,7 +29,8 @@ setup(
     entry_points={
         'console_scripts': [
             'drone = swarm_load_carry.drone:main',
-            'gcs = swarm_load_carry.gcs:main',
+            'gcs_background = swarm_load_carry.gcs_background:main',
+            'gcs_user = swarm_load_carry.gcs_user:main',
             'load = swarm_load_carry.load:main',
         ],
     },
