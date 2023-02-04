@@ -68,6 +68,7 @@ class GCSUser(Node):
         for i in range(self.num_drones):
             rclpy.spin_until_future_complete(self, mode_future[i])
 
+
     # Take in user commands for the drones
     def user_commands(self):
         cmd = None
