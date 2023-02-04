@@ -29,7 +29,7 @@ DEFAULT_FIRST_DRONE_NUM=1
 DEFAULT_LOAD_ID=1
 
 FRAME_BASE='world'
-FRAME_LOCAL_REF='load1_init'
+#FRAME_LOCAL_REF='load1_init'
 
 # Node to encapsulate drone information and actions
 class Drone(Node):
@@ -52,8 +52,8 @@ class Drone(Node):
         self.vehicle_initial_global_position = np.array([0.0, 0.0, 0.0])        # In lat, long, alt (lla)
         self.vehicle_initial_global_attitude = qt.array([0.0, 0.0, 0.0, 1.0])   # ROS convention quaternion
         
-        self.vehicle_initial_local_position = np.array([0.0, 0.0, 0.0])         # In x,y,z ENU relative to initial load position
-        self.vehicle_initial_local_attitude = qt.array([0.0, 0.0, 0.0, 1.0])
+        # self.vehicle_initial_local_position = np.array([0.0, 0.0, 0.0])         # In x,y,z ENU relative to initial load position
+        # self.vehicle_initial_local_attitude = qt.array([0.0, 0.0, 0.0, 1.0])
         
 
         timer_period = 0.02  # seconds
@@ -194,6 +194,7 @@ class Drone(Node):
         
         # self.get_logger().info(f'Initial pos: {self.vehicle_initial_global_position}')
         # self.get_logger().info(f'Initial attitude: {self.vehicle_initial_attitude}')
+        utils.broadcast_tf(self.get_clock().now().to_msg(), FRAME_BASE, f'{self.get_name()}_init', self.vehicle_initial_global_position, self.vehicle_initial_global_attitude, self.tf_static_broadcaster_init_pose)
 
         # Log and return
         self.get_logger().info('DRONE NODE CONNECTED THROUGH MAVLINK')
@@ -211,13 +212,13 @@ class Drone(Node):
 
     def clbk_vehicle_attitude(self, msg):
         # TODO: handle NED->ENU transformation 
-        self.vehicle_local_attitude[0] = msg.q[1] #msg.q[0]
-        self.vehicle_local_attitude[1] = -msg.q[2] #msg.q[1]
-        self.vehicle_local_attitude[2] = -msg.q[3] #-msg.q[2]
-        self.vehicle_local_attitude[3] = msg.q[0] #-msg.q[3]
+        self.vehicle_local_attitude.x = msg.q[1] #msg.q[0]
+        self.vehicle_local_attitude.y = -msg.q[2] #msg.q[1]
+        self.vehicle_local_attitude.z = -msg.q[3] #-msg.q[2]
+        self.vehicle_local_attitude.w = msg.q[0] #-msg.q[3]
 
         # Update tf
-        #self.broadcast_tf()
+        utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', f'{self.get_name()}', self.vehicle_local_position, self.vehicle_local_attitude, self.tf_broadcaster)
 
     def clbk_vehicle_local_position(self, msg):
         # TODO: handle NED->ENU transformation 
@@ -229,17 +230,17 @@ class Drone(Node):
         self.vehicle_local_velocity[2] = -msg.vz
 
         # Update tf
-        #self.broadcast_tf()
+        utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', f'{self.get_name()}', self.vehicle_local_position, self.vehicle_local_attitude, self.tf_broadcaster)
  
     def clbk_send_global_init_pose(self, request, response):
         response.global_pos.lat = self.vehicle_initial_global_position[0]
         response.global_pos.lon = self.vehicle_initial_global_position[1]
         response.global_pos.alt = self.vehicle_initial_global_position[2]
 
-        response.att.q[0] = self.vehicle_initial_global_attitude.x
-        response.att.q[1] = self.vehicle_initial_global_attitude.y
-        response.att.q[2] = self.vehicle_initial_global_attitude.z
-        response.att.q[3] = self.vehicle_initial_global_attitude.w
+        response.global_att.q[0] = self.vehicle_initial_global_attitude.x
+        response.global_att.q[1] = self.vehicle_initial_global_attitude.y
+        response.global_att.q[2] = self.vehicle_initial_global_attitude.z
+        response.global_att.q[3] = self.vehicle_initial_global_attitude.w
 
         return response
 

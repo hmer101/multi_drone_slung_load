@@ -92,10 +92,10 @@ class Load(Node):
                 self.get_logger().info(f'Waiting for global initial pose service drone {i}')
 
             # Local initial poses
-            self.cli_set_drone_init_local_poses[i-self.first_drone_num] = self.create_client(SetLocalInitPose,f'/px4_{i}/local_initial_pose')
+            # self.cli_set_drone_init_local_poses[i-self.first_drone_num] = self.create_client(SetLocalInitPose,f'/px4_{i}/local_initial_pose')
 
-            while not self.cli_set_drone_init_local_poses[i-self.first_drone_num].wait_for_service(timeout_sec=1.0):
-                self.get_logger().info(f'Waiting for local initial pose service drone {i}')
+            # while not self.cli_set_drone_init_local_poses[i-self.first_drone_num].wait_for_service(timeout_sec=1.0):
+            #     self.get_logger().info(f'Waiting for local initial pose service drone {i}')
 
 
         ## TFS
