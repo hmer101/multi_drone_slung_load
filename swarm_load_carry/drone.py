@@ -18,8 +18,8 @@ from rclpy.task import Future
 from tf2_ros import TransformBroadcaster, StaticTransformBroadcaster
 
 from geometry_msgs.msg import Pose, Point, Quaternion, TransformStamped
-from px4_msgs.msg import VehicleAttitude, VehicleLocalPosition, OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand
-from swarm_load_carry_interfaces.srv import ModeChange, GetGlobalInitPose, SetLocalInitPose # Note must build workspace and restart IDE before custom packages are found by python
+from px4_msgs.msg import VehicleAttitude, VehicleLocalPosition, OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
+from swarm_load_carry_interfaces.srv import ModeChange, GetGlobalInitPose, SetLocalPose # Note must build workspace and restart IDE before custom packages are found by python
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -28,8 +28,8 @@ DEFAULT_DRONE_NUM=1
 DEFAULT_FIRST_DRONE_NUM=1
 DEFAULT_LOAD_ID=1
 
-FRAME_BASE='world'
-#FRAME_LOCAL_REF='load1_init'
+#FRAME_GLOBAL_BASE='world'
+#FRAME_LOCAL_BASE='load1_init'
 
 # Node to encapsulate drone information and actions
 class Drone(Node):
@@ -44,6 +44,7 @@ class Drone(Node):
         self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX
         self.mode = ModeChange.Request.MODE_UNASSIGNED
 
+        # Vehicle
         self.vehicle_local_attitude = qt.array([0.0, 0.0, 0.0, 1.0])    # Note: Using ROS convention (w last) rather than Pixhawk (w first)
         self.vehicle_local_position = np.array([0.0, 0.0, 0.0])         # Note: Using ROS convention ENU vs Pixhawk's NED
         self.vehicle_local_velocity = np.array([0.0, 0.0, 0.0])
@@ -52,9 +53,16 @@ class Drone(Node):
         self.vehicle_initial_global_position = np.array([0.0, 0.0, 0.0])        # In lat, long, alt (lla)
         self.vehicle_initial_global_attitude = qt.array([0.0, 0.0, 0.0, 1.0])   # ROS convention quaternion
         
-        # self.vehicle_initial_local_position = np.array([0.0, 0.0, 0.0])         # In x,y,z ENU relative to initial load position
-        # self.vehicle_initial_local_attitude = qt.array([0.0, 0.0, 0.0, 1.0])
+        self.vehicle_initial_local_position = np.array([0.0, 0.0, 0.0])         # In x,y,z ENU relative to initial load position
+        self.vehicle_initial_local_attitude = qt.array([0.0, 0.0, 0.0, 1.0])
         
+        self.vehicle_desired_attitude_rel_load = qt.array([0.0, 0.0, 0.0, 1.0])    # Note: Using ROS convention (w last) rather than Pixhawk (w first)
+        self.vehicle_desired_position_rel_load = np.array([0.0, 0.0, 0.0])         # Note: Using ROS convention ENU vs Pixhawk's NED
+
+        # Load
+        self.load_setpoint_local_position = np.array([0.0, 0.0, 0.0])           # ENU relative to starting pos
+        self.load_setpoint_local_attitude = qt.array([0.0, 0.0, 0.0, 1.0])      # ROS convention quaternion (ENU)
+
 
         timer_period = 0.02  # seconds
         self.dt = timer_period
@@ -119,31 +127,31 @@ class Drone(Node):
             qos_profile)  
 
         # Payload 
-        # self.sub_payload_attitude_desired = self.create_subscription(
+        # self.sub_payload_attitude = self.create_subscription(
         #     VehicleAttitude,
         #     f'load_{self.load_id}/out/attitude',
         #     self.clbk_load_attitude,
         #     qos_profile)
         
-        # self.sub_payload_position_desired = self.create_subscription(
+        # self.sub_payload_position = self.create_subscription(
         #     VehicleLocalPosition,
         #     f'load_{self.load_id}/out/local_position',
         #     self.clbk_load_local_position,
         #     qos_profile)
 
-        # self.sub_payload_attitude_desired = self.create_subscription(
-        #     VehicleAttitudeSetpoint,
-        #     f'load_{self.load_id}/in/desired_attitude',
-        #     self.clbk_load_desired_attitude,
-        #     qos_profile)
+        self.sub_payload_attitude_desired = self.create_subscription(
+            VehicleAttitudeSetpoint,
+            f'load_{self.load_id}/in/desired_attitude',
+            self.clbk_load_desired_attitude,
+            qos_profile)
         
-        # self.sub_payload_position_desired = self.create_subscription(
-        #     VehicleLocalPositionSetpoint,
-        #     f'load_{self.load_id}/in/desired_local_position',
-        #     self.clbk_load_desired_local_position,
-        #     qos_profile)
+        self.sub_payload_position_desired = self.create_subscription(
+            VehicleLocalPositionSetpoint,
+            f'load_{self.load_id}/in/desired_local_position',
+            self.clbk_load_desired_local_position,
+            qos_profile)
 
-        # TODO: Sub to other drones and load setpoints for distributed control!
+        # TODO: Sub to other drones for distributed control!
 
         ## SERVICES
         self.srv_mode_change = self.create_service(
@@ -156,10 +164,15 @@ class Drone(Node):
             f'{self.ns}/global_initial_pose',
             self.clbk_send_global_init_pose)
         
-        # self.srv_set_local_init_pose = self.create_service(
-        #     SetLocalInitPose,
-        #     f'{self.ns}/local_initial_pose',
-        #     self.clbk_set_local_init_pose)
+        self.srv_set_local_init_pose = self.create_service(
+            SetLocalPose,
+            f'{self.ns}/local_initial_pose',
+            self.clbk_set_local_init_pose)
+        
+        self.srv_set_pose_rel_load = self.create_service(
+            SetLocalPose,
+            f'{self.ns}/desired_pose_rel_load',
+            self.clbk_set_desired_pose_rel_load)
 
         ## CLIENTS
 
@@ -194,7 +207,7 @@ class Drone(Node):
         
         # self.get_logger().info(f'Initial pos: {self.vehicle_initial_global_position}')
         # self.get_logger().info(f'Initial attitude: {self.vehicle_initial_attitude}')
-        utils.broadcast_tf(self.get_clock().now().to_msg(), FRAME_BASE, f'{self.get_name()}_init', self.vehicle_initial_global_position, self.vehicle_initial_global_attitude, self.tf_static_broadcaster_init_pose)
+        #utils.broadcast_tf(self.get_clock().now().to_msg(), FRAME_GLOBAL_BASE, f'{self.get_name()}_init', self.vehicle_initial_global_position, self.vehicle_initial_global_attitude, self.tf_static_broadcaster_init_pose)
 
         # Log and return
         self.get_logger().info('DRONE NODE CONNECTED THROUGH MAVLINK')
@@ -231,7 +244,20 @@ class Drone(Node):
 
         # Update tf
         utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', f'{self.get_name()}', self.vehicle_local_position, self.vehicle_local_attitude, self.tf_broadcaster)
- 
+    
+
+    def clbk_load_desired_attitude(self, msg):
+        self.load_setpoint_local_attitude = qt.array([msg.q_d[0], msg.q_d[1], msg.q_d[2], msg.q_d[3]])
+
+
+    def clbk_load_desired_local_position(self, msg):
+        self.load_setpoint_local_position = np.array([msg.x, msg.y, msg.z])
+    
+
+    #def clbk_set_desired_pose_rel_load(self, msg):
+
+
+
     def clbk_send_global_init_pose(self, request, response):
         response.global_pos.lat = self.vehicle_initial_global_position[0]
         response.global_pos.lon = self.vehicle_initial_global_position[1]
@@ -244,31 +270,16 @@ class Drone(Node):
 
         return response
 
-    # def clbk_set_local_init_pose(self, request, response):
-    #     # Set local init pose (relative to load)
-    #     self.vehicle_initial_local_position = np.array([request.transform_stamped.transform.translation.x, request.transform_stamped.transform.translation.y, request.transform_stamped.transform.translation.z])
-    #     self.vehicle_initial_local_attitude = qt.array([request.transform_stamped.transform.rotation.x, request.transform_stamped.transform.rotation.y, request.transform_stamped.transform.rotation.z, request.transform_stamped.transform.rotation.w])
+    def clbk_set_local_init_pose(self, request, response):
+        # Set local init pose (relative to load)
+        self.vehicle_initial_local_position = np.array([request.transform_stamped.transform.translation.x, request.transform_stamped.transform.translation.y, request.transform_stamped.transform.translation.z])
+        self.vehicle_initial_local_attitude = qt.array([request.transform_stamped.transform.rotation.x, request.transform_stamped.transform.rotation.y, request.transform_stamped.transform.rotation.z, request.transform_stamped.transform.rotation.w])
         
-    #     # Publish static transform for init pose (relative to load init pose)
-    #     t = TransformStamped()
+        # Publish static transform for init pose (relative to load init pose)
+        utils.broadcast_tf(self.get_clock().now().to_msg(), request.transform_stamped.header.frame_id, f'{self.get_name()}_init', self.vehicle_initial_local_position, self.vehicle_initial_local_attitude, self.tf_static_broadcaster_init_pose)
 
-    #     t.header.stamp = self.get_clock().now().to_msg()
-    #     t.header.frame_id = request.transform_stamped.header.frame_id #FRAME_LOCAL_REF
-    #     t.child_frame_id = f'{self.get_name()}_init'
-
-    #     t.transform.translation.x = self.vehicle_initial_local_position[0]
-    #     t.transform.translation.y = self.vehicle_initial_local_position[1]
-    #     t.transform.translation.z = self.vehicle_initial_local_position[2]
-
-    #     t.transform.rotation.x = float(self.vehicle_initial_local_attitude.x)
-    #     t.transform.rotation.y = float(self.vehicle_initial_local_attitude.y)
-    #     t.transform.rotation.z = float(self.vehicle_initial_local_attitude.z)
-    #     t.transform.rotation.w = float(self.vehicle_initial_local_attitude.w)
-
-    #     self.tf_static_broadcaster_init_pose.sendTransform(t)
-
-    #     response.success = True
-    #     return response
+        response.success = True
+        return response
 
 
     async def clbk_change_mode(self, request, response):
@@ -334,7 +345,7 @@ class Drone(Node):
         match self.mode:
             case ModeChange.Request.MODE_OFFBOARD_ROS_START:
                 offboard_msg = OffboardControlMode()
-                offboard_msg.timestamp = int(Clock().now().nanoseconds / 1000)
+                offboard_msg.timestamp = int(self.get_clock().now().nanoseconds/1000) #int(Clock().now().nanoseconds / 1000)
                 offboard_msg.position=True
                 offboard_msg.velocity=False
                 offboard_msg.acceleration=False
@@ -353,24 +364,6 @@ class Drone(Node):
 
     
     ## HELPER FUNCTIONS
-    # def broadcast_tf(self):
-    #     # Broadcast frame transform
-    #     t = TransformStamped()
-
-    #     t.header.stamp = self.get_clock().now().to_msg()
-    #     t.header.frame_id = FRAME_BASE
-    #     t.child_frame_id = self.get_name()
-
-    #     t.transform.translation.x = self.vehicle_local_position[0]
-    #     t.transform.translation.y = self.vehicle_local_position[1]
-    #     t.transform.translation.z = self.vehicle_local_position[2]
-
-    #     t.transform.rotation.x = float(self.vehicle_local_attitude.x)
-    #     t.transform.rotation.y = float(self.vehicle_local_attitude.y)
-    #     t.transform.rotation.z = float(self.vehicle_local_attitude.z)
-    #     t.transform.rotation.w = float(self.vehicle_local_attitude.w)
-
-    #     self.tf_broadcaster.sendTransform(t)
 
 
     ### MAVLINK

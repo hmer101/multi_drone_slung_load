@@ -1,4 +1,7 @@
 from geometry_msgs.msg import TransformStamped
+from tf2_ros import TransformException
+
+## GEOMETRY
 
 # Find Euler distance between two points in 3D space
 # Inputs: points p1, p2 as 3-tuples
@@ -17,6 +20,8 @@ def within_radius_3D(p1, p2, rad):
     else:
         return False
     
+
+## TRANSFORMS
 
 # Build and send a tf
 # Inputs: time, names of parent and child frames, position (as np array x,y,z), attitude (as quaternionic array), broadcaster (static or dynamic broadcaster to send tf over)
@@ -41,3 +46,16 @@ def broadcast_tf(time, frame_parent, frame_child, pos, att, broadcaster):
     broadcaster.sendTransform(t)
 
 
+def lookup_tf(from_frame_rel, to_frame_rel, tf_buffer, time, logger):
+    t = None
+    
+    try:
+        t = tf_buffer.lookup_transform(
+            to_frame_rel,
+            from_frame_rel,
+            time)
+    except TransformException as ex:
+        logger.info(
+            f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
+    
+    return t

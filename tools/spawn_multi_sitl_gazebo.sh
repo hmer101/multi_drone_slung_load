@@ -73,6 +73,7 @@ spawn_drones
 sleep 2
 
 # Create multiple MAVSDK servers
+cd $SCRIPT_DIR
 gnome-terminal --tab -- bash -c "./multi_mavsdk_server.sh -n $NUM_DRONES"
 
 # Create ROS2 agent
