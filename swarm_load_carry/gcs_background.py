@@ -10,6 +10,8 @@ from rclpy.qos import QoSProfile
 import numpy as np
 from rclpy.node import Node
 
+from swarm_load_carry.state import State, CS_type
+
 from swarm_load_carry_interfaces.srv import ModeChange
 from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
 
@@ -22,24 +24,7 @@ class GCSBackground(Node):
     def __init__(self):
         super().__init__('gcs_background')
 
-        self.load_attitude = np.array([1.0, 0.0, 0.0, 0.0])
-        self.load_local_position = np.array([0.0, 0.0, 0.0])
-        #self.load_local_velocity = np.array([0.0, 0.0, 0.0])
-        self.load_setpoint_position = np.array([0.0, 0.0, 0.0])
-
-        timer_period = 0.02  # seconds
-        self.dt = timer_period
-        self.theta = 0.0
-        self.radius = 10
-        self.omega = 0.5
-
-        ## Print information
-        self.get_logger().info('GCS BACKGROUND NODE')
-        self.get_logger().info(f'Namespace: {self.get_namespace()}')
-        self.get_logger().info(f'Name: {self.get_name()}')
-
         ## PARAMETERS
-
         qos_profile = QoSProfile(
             reliability=qos.ReliabilityPolicy.BEST_EFFORT,
             durability=qos.DurabilityPolicy.TRANSIENT_LOCAL,
@@ -55,6 +40,21 @@ class GCSBackground(Node):
         self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
         self.load_id = self.get_parameter('load_id').get_parameter_value().integer_value
 
+        ## Print information
+        self.get_logger().info('GCS BACKGROUND NODE')
+        self.get_logger().info(f'Namespace: {self.get_namespace()}')
+        self.get_logger().info(f'Name: {self.get_name()}')
+
+        ## VARIABLES
+        #self.load_desired_state = State(f'{self.load_id}_init', CS_type.ENU)
+
+        timer_period = 0.02  # seconds
+        self.dt = timer_period
+        self.theta = 0.0
+        self.radius = 10
+        self.omega = 0.5
+
+        
         # Timers
         self.timer = self.create_timer(timer_period, self.clbk_send_load_setpoint)
 
