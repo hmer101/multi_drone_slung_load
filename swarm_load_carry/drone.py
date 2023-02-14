@@ -64,10 +64,10 @@ class Drone(Node):
         self.load_desired_state = State(f'{self.load_id}_init', CS_type.ENU)
 
         timer_period = 0.02  # seconds
-        self.dt = timer_period
-        self.theta = 0.0
-        self.radius = self.drone_id*5
-        self.omega = 0.5
+        # self.dt = timer_period
+        # self.theta = 0.0
+        # self.radius = self.drone_id*5
+        # self.omega = 0.5
 
         # For MAVLINK connection
         self.drone_system = None
@@ -239,6 +239,10 @@ class Drone(Node):
         self.vehicle_desired_state_rel_load.pos = np.array([request.transform_stamped.transform.translation.x, request.transform_stamped.transform.translation.y, request.transform_stamped.transform.translation.z])
         self.vehicle_desired_state_rel_load.att_q = qt.array([request.transform_stamped.transform.rotation.x, request.transform_stamped.transform.rotation.y, request.transform_stamped.transform.rotation.z, request.transform_stamped.transform.rotation.w])
         
+        response = True
+
+        return response
+
     def clbk_send_global_init_pose(self, request, response):
         response.global_pos.lat = self.vehicle_initial_global_state.pos[0]
         response.global_pos.lon = self.vehicle_initial_global_state.pos[1]
@@ -332,14 +336,15 @@ class Drone(Node):
 
                 # Publish waypoints if vehicle is actually in offboard mode
                 if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+                    # Call desired trajectory generation function
+                    #trajectory_msg = utils.gen_traj_msg_orbit(self.radius, self.theta, 5.0*self.drone_id)
+                    #self.theta = self.theta + self.omega * self.dt
 
-                    trajectory_msg = TrajectorySetpoint()
-                    trajectory_msg.position[0] = self.radius * np.cos(self.theta)
-                    trajectory_msg.position[1] = self.radius * np.sin(self.theta)
-                    trajectory_msg.position[2] = -5.0*self.drone_id
+                    trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_state, self.load_id, self.get_name(), self.tf_buffer, self.get_logger())
+
                     self.pub_trajectory.publish(trajectory_msg)
 
-                    self.theta = self.theta + self.omega * self.dt
+                    
 
     
     ## HELPER FUNCTIONS

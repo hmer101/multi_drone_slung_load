@@ -1,4 +1,9 @@
+import math
+import numpy as np
+import rclpy
+
 from geometry_msgs.msg import TransformStamped
+from px4_msgs.msg import TrajectorySetpoint
 from tf2_ros import TransformException
 
 ## GEOMETRY
@@ -20,6 +25,19 @@ def within_radius_3D(p1, p2, rad):
     else:
         return False
     
+
+# Generates a list of <X,Y,Z> co-ordinates to set drones equally spaced around a load on a circumscribing circle.
+# Input r is radius of circle circumscribing drone positions.
+# Input Z is a list (with num_drone elements) of Z heights above the load for the drones to fly 
+def generate_points_cylinder(num_points, r, z):
+    positions = []
+
+	# Use polar co-ordinate system to generate (x,y) points in circumscribing circle 
+    for i in range(num_points):
+        positions.append(tuple(r*math.cos(2*math.pi*i/num_points), r*math.sin(2*math.pi*i/num_points), z[i]))
+    
+    return positions
+
 
 ## TRANSFORMS
 
@@ -45,7 +63,7 @@ def broadcast_tf(time, frame_parent, frame_child, pos, att, broadcaster):
 
     broadcaster.sendTransform(t)
 
-
+# Looks up a co-ordinate frame transform 
 def lookup_tf(from_frame_rel, to_frame_rel, tf_buffer, time, logger):
     t = None
     
@@ -59,3 +77,40 @@ def lookup_tf(from_frame_rel, to_frame_rel, tf_buffer, time, logger):
             f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
     
     return t
+
+
+## TRAJECTORY GENERATION
+# Note trajectories sent to Pixhawk controller must be in NED co-ordinates relative to initial drone position. ENU -> NED and frame transformations handled here
+
+# Make drone orbit in a circle of radius r and height h
+def gen_traj_msg_orbit(r, theta, h):
+    trajectory_msg = TrajectorySetpoint()
+    trajectory_msg.position[0] = r * np.cos(theta)
+    trajectory_msg.position[1] = r * np.sin(theta)
+    trajectory_msg.position[2] = -h
+
+    return trajectory_msg
+
+# Make drone follow desired load position, at the desired location relative to the load
+def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_state, load_id, drone_name, tf_buffer, logger):
+    trajectory_msg = TrajectorySetpoint()
+
+    # Desired vehicle pos relative to load_init = desired vehicle pos relative to load + desired load rel to load_init
+    vehicle_desired_state_rel_load_init = [vehicle_desired_state_rel_load.pos[0] + load_desired_state.pos[0], 
+                                            vehicle_desired_state_rel_load.pos[1] + load_desired_state.pos[1],
+                                            vehicle_desired_state_rel_load.pos[2] + load_desired_state.pos[2]]
+    
+    # Need drone rel to drone_init (Pixhawk's frame). Add transforms from load_init to drone_init frames
+    t = lookup_tf(f'{load_id}_init', f'{drone_name}_init', tf_buffer, rclpy.time.Time(), logger)
+
+    if t != None:
+        trajectory_msg = TrajectorySetpoint()
+        trajectory_msg.position[0] = vehicle_desired_state_rel_load_init[0] + t.transform.translation.x
+        trajectory_msg.position[1] = vehicle_desired_state_rel_load_init[1] + t.transform.translation.y
+        trajectory_msg.position[2] = -(vehicle_desired_state_rel_load_init[2] + t.transform.translation.z)
+
+        # TODO: Handle yaw
+        # trajectory_msg.yaw = 
+        # drone_orientations[i, :] = [t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w]
+
+    return trajectory_msg

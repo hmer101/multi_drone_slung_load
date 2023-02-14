@@ -6,13 +6,14 @@
 import rclpy
 import rclpy.qos as qos
 from rclpy.qos import QoSProfile
+from rclpy.node import Node
 
 import numpy as np
-from rclpy.node import Node
+import utils
 
 from swarm_load_carry.state import State, CS_type
 
-from swarm_load_carry_interfaces.srv import ModeChange
+from swarm_load_carry_interfaces.srv import ModeChange, SetLocalPose
 from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
 
 DEFAULT_DRONE_NUM=1
@@ -66,12 +67,19 @@ class GCSBackground(Node):
         ## SERVICES
         ## CLIENTS
 
+        self.cli_set_drone_poses_rel_load = [None] * self.num_drones
+
+        for i in range(self.first_drone_num, self.num_drones+self.first_drone_num):
+            # Global initial poses
+            self.cli_set_drone_poses_rel_load[i-self.first_drone_num] = self.create_client(SetLocalPose,f'/px4_{i}/desired_pose_rel_load')
+
+            while not self.cli_set_drone_poses_rel_load[i-self.first_drone_num].wait_for_service(timeout_sec=1.0):
+                self.get_logger().info(f'Waiting for set pose rel load service: drone {i}')
+
         self.get_logger().info('Setup complete')
 
 
     ## CALLBACKS
-
-    ## MISSION CONTROL
     def clbk_send_load_setpoint(self):
         setpoint_msg = VehicleLocalPositionSetpoint()
         setpoint_msg.x = self.radius * np.cos(self.theta)
@@ -80,6 +88,19 @@ class GCSBackground(Node):
         self.pub_load_position_desired.publish(setpoint_msg)
 
         self.theta = self.theta + self.omega * self.dt
+
+    ## HELPERS
+    # TODO: Set drones to positions that minimizes sum of squared distance from drone start points to desired points
+    def set_drone_arrangement(self, r, z):
+        ref_points = utils.generate_points_cylinder(self.num_drones, r, z)
+
+        for i, next_cli_set_drone_pose in enumerate(self.cli_set_drone_poses_rel_load):
+
+
+        # HEREEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+
+
+
 
 
 def main(args=None):
