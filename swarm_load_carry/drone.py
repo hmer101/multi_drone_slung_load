@@ -67,10 +67,10 @@ class Drone(Node):
         self.load_desired_state = State(f'{self.load_name}_init', CS_type.ENU)
 
         timer_period = 0.02  # seconds
-        # self.dt = timer_period
-        # self.theta = 0.0
-        # self.radius = self.drone_id*5
-        # self.omega = 0.5
+        self.dt = timer_period
+        self.theta = 0.0
+        self.radius = self.drone_id*5
+        self.omega = 0.5
 
         # Transforms
         self.tf_buffer = Buffer()
@@ -345,10 +345,10 @@ class Drone(Node):
                 # Publish waypoints if vehicle is actually in offboard mode
                 if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
                     # Call desired trajectory generation function
-                    #trajectory_msg = utils.gen_traj_msg_orbit(self.radius, self.theta, 5.0*self.drone_id)
-                    #self.theta = self.theta + self.omega * self.dt
+                    trajectory_msg = utils.gen_traj_msg_orbit(self.radius, self.theta, 5.0*self.drone_id)
+                    self.theta = self.theta + self.omega * self.dt
 
-                    trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_state, f'{self.load_name}', self.get_name(), self.tf_buffer, self.get_logger())
+                    #trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_state, f'{self.load_name}', self.get_name(), self.tf_buffer, self.get_logger())
 
                     self.pub_trajectory.publish(trajectory_msg)
 
