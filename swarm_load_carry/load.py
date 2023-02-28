@@ -51,9 +51,9 @@ class Load(Node):
         )
 
         ## VARIABLES
-        self.load_desired_state = State(f'{self.load_id}_init', CS_type.ENU)
+        self.load_desired_state = State(f'{self.get_name()}_init', CS_type.ENU)
 
-        self.load_local_state = State(f'{self.load_id}_init', CS_type.ENU)
+        self.load_local_state = State(f'{self.get_name()}_init', CS_type.ENU)
 
         self.load_initial_global_state = State('world', CS_type.LLA)
 

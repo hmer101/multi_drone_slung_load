@@ -17,6 +17,8 @@ from rclpy.clock import Clock
 from rclpy.task import Future
 
 from tf2_ros import TransformBroadcaster, StaticTransformBroadcaster
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
 
 from geometry_msgs.msg import Pose, Point, Quaternion, TransformStamped
 from px4_msgs.msg import VehicleAttitude, VehicleLocalPosition, OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
@@ -51,23 +53,28 @@ class Drone(Node):
         self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
         self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
         self.load_id = self.get_parameter('load_id').get_parameter_value().integer_value
+        self.load_name = f'load{self.load_id}'
 
         # Vehicle
         self.vehicle_local_state = State(f'{self.get_name()}_init', CS_type.CART_INERTIAL)
 
         self.vehicle_initial_global_state = State('world', CS_type.LLA)
-        self.vehicle_initial_state_rel_load_init = State(f'{self.load_id}_init', CS_type.CART_INERTIAL)
+        self.vehicle_initial_state_rel_load_init = State(f'{self.load_name}_init', CS_type.CART_INERTIAL)
         
-        self.vehicle_desired_state_rel_load = State(f'{self.load_id}', CS_type.ENU)
+        self.vehicle_desired_state_rel_load = State(f'{self.load_name}', CS_type.ENU)
 
         # Load
-        self.load_desired_state = State(f'{self.load_id}_init', CS_type.ENU)
+        self.load_desired_state = State(f'{self.load_name}_init', CS_type.ENU)
 
         timer_period = 0.02  # seconds
         # self.dt = timer_period
         # self.theta = 0.0
         # self.radius = self.drone_id*5
         # self.omega = 0.5
+
+        # Transforms
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
 
         # For MAVLINK connection
         self.drone_system = None
@@ -202,8 +209,9 @@ class Drone(Node):
     ## CALLBACKS
     def clbk_vehicle_status(self, msg):
         # TODO: handle NED->ENU transformation
-        self.get_logger().info(f'NAV_STATUS: {msg.nav_state}')
-        self.get_logger().info(f'  - offboard status: {VehicleStatus.NAVIGATION_STATE_OFFBOARD}')
+        #self.get_logger().info(f'NAV_STATUS: {msg.nav_state}')
+        #self.get_logger().info(f'  - offboard status: {VehicleStatus.NAVIGATION_STATE_OFFBOARD}')
+        #self.get_logger().info(f'Desired pose relative to load: {self.vehicle_desired_state_rel_load.pos}, {self.vehicle_desired_state_rel_load.att_q}')
         self.nav_state = msg.nav_state
 
     def clbk_vehicle_attitude(self, msg):
@@ -239,7 +247,7 @@ class Drone(Node):
         self.vehicle_desired_state_rel_load.pos = np.array([request.transform_stamped.transform.translation.x, request.transform_stamped.transform.translation.y, request.transform_stamped.transform.translation.z])
         self.vehicle_desired_state_rel_load.att_q = qt.array([request.transform_stamped.transform.rotation.x, request.transform_stamped.transform.rotation.y, request.transform_stamped.transform.rotation.z, request.transform_stamped.transform.rotation.w])
         
-        response = True
+        response.success = True
 
         return response
 
@@ -340,7 +348,7 @@ class Drone(Node):
                     #trajectory_msg = utils.gen_traj_msg_orbit(self.radius, self.theta, 5.0*self.drone_id)
                     #self.theta = self.theta + self.omega * self.dt
 
-                    trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_state, self.load_id, self.get_name(), self.tf_buffer, self.get_logger())
+                    trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_state, f'{self.load_name}', self.get_name(), self.tf_buffer, self.get_logger())
 
                     self.pub_trajectory.publish(trajectory_msg)
 

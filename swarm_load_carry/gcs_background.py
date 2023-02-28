@@ -76,14 +76,17 @@ class GCSBackground(Node):
             while not self.cli_set_drone_poses_rel_load[i-self.first_drone_num].wait_for_service(timeout_sec=1.0):
                 self.get_logger().info(f'Waiting for set pose rel load service: drone {i}')
 
+        # Set drone arrangement around load
+        self.set_drone_arrangement(2, [2, 2, 2])
+
         self.get_logger().info('Setup complete')
 
 
     ## CALLBACKS
     def clbk_send_load_setpoint(self):
         setpoint_msg = VehicleLocalPositionSetpoint()
-        setpoint_msg.x = self.radius * np.cos(self.theta)
-        setpoint_msg.y = self.radius * np.sin(self.theta)
+        setpoint_msg.x = 10.0 #self.radius * np.cos(self.theta)
+        setpoint_msg.y = 0.0 #self.radius * np.sin(self.theta)
         setpoint_msg.z = -10.0
         self.pub_load_position_desired.publish(setpoint_msg)
 
@@ -93,13 +96,32 @@ class GCSBackground(Node):
     # TODO: Set drones to positions that minimizes sum of squared distance from drone start points to desired points
     def set_drone_arrangement(self, r, z):
         ref_points = utils.generate_points_cylinder(self.num_drones, r, z)
+        #print(f'REF POINTS: \n {ref_points}')
 
+        pos_req_future = [None] * self.num_drones
+
+        # Get current drone positions
+
+        # Set drone arrangements
         for i, next_cli_set_drone_pose in enumerate(self.cli_set_drone_poses_rel_load):
+            pos_req = SetLocalPose.Request()
+            pos_req.transform_stamped.header.frame_id = f'load{self.load_id}'
+            pos_req.transform_stamped.child_frame_id = f'drone{i}'
 
+            pos_req.transform_stamped.transform.translation.x = float(ref_points[i][0])
+            pos_req.transform_stamped.transform.translation.y = float(ref_points[i][1])
+            pos_req.transform_stamped.transform.translation.z = float(ref_points[i][2])
 
-        # HEREEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+            # pos_req.transform_stamped.transform.rotation.x = float(0)
+            # pos_req.transform_stamped.transform.rotation.y = float(0)
+            # pos_req.transform_stamped.transform.rotation.z = float(0)
+            # pos_req.transform_stamped.transform.rotation.w = float(1)
 
+            pos_req_future[i] = next_cli_set_drone_pose.call_async(pos_req)
 
+        # Wait for response
+        for i in range(self.num_drones):
+            rclpy.spin_until_future_complete(self, pos_req_future[i])
 
 
 
