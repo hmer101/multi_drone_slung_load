@@ -1,4 +1,5 @@
-# Contains the GCS (ground control station) class and related methods
+# Contains the GCS (ground control station) background class and related methods.
+# This class runs the commands to place the load and drones at the desired pose as determined by the gcs_user node.
 #
 # Author: Harvey Merton
 # Date: 01/06/2023
@@ -9,6 +10,7 @@ from rclpy.qos import QoSProfile
 from rclpy.node import Node
 
 import numpy as np
+import quaternionic as qt
 import utils
 
 from swarm_load_carry.state import State, CS_type
@@ -47,7 +49,7 @@ class GCSBackground(Node):
         self.get_logger().info(f'Name: {self.get_name()}')
 
         ## VARIABLES
-        #self.load_desired_state = State(f'{self.load_id}_init', CS_type.ENU)
+        self.load_desired_state = State(f'{self.load_id}_init', CS_type.ENU)
 
         timer_period = 0.02  # seconds
         self.dt = timer_period
@@ -84,13 +86,25 @@ class GCSBackground(Node):
 
     ## CALLBACKS
     def clbk_send_load_setpoint(self):
-        setpoint_msg = VehicleLocalPositionSetpoint()
-        setpoint_msg.x = 10.0 #self.radius * np.cos(self.theta)
-        setpoint_msg.y = 0.0 #self.radius * np.sin(self.theta)
-        setpoint_msg.z = -10.0
-        self.pub_load_position_desired.publish(setpoint_msg)
-
+        # Set desired pose
+        self.load_desired_state.pos = np.array([0.0, 10, 10]) #np.array([self.radius * np.cos(self.theta), self.radius * np.sin(self.theta), 5]) 
+        self.load_desired_state.att_q = qt.array([1.0, 0.0, 0.0, 0.0])
         self.theta = self.theta + self.omega * self.dt
+
+        # Send position setpoint
+        setpoint_msg_pos = VehicleLocalPositionSetpoint()
+        setpoint_msg_pos.x = self.load_desired_state.pos[0] #
+        setpoint_msg_pos.y = self.load_desired_state.pos[1] #
+        setpoint_msg_pos.z = self.load_desired_state.pos[2]
+        self.pub_load_position_desired.publish(setpoint_msg_pos)
+
+        # Send orientation setpoint
+        q_d = self.load_desired_state.att_q
+        setpoint_msg_att = VehicleAttitudeSetpoint()
+        setpoint_msg_att.q_d = [float(q_d.x), float(q_d.y), float(q_d.z), float(q_d.w)]
+        self.pub_load_attitude_desired.publish(setpoint_msg_att)
+
+        
 
     ## HELPERS
     # TODO: Set drones to positions that minimizes sum of squared distance from drone start points to desired points
@@ -112,10 +126,10 @@ class GCSBackground(Node):
             pos_req.transform_stamped.transform.translation.y = float(ref_points[i][1])
             pos_req.transform_stamped.transform.translation.z = float(ref_points[i][2])
 
-            # pos_req.transform_stamped.transform.rotation.x = float(0)
-            # pos_req.transform_stamped.transform.rotation.y = float(0)
-            # pos_req.transform_stamped.transform.rotation.z = float(0)
-            # pos_req.transform_stamped.transform.rotation.w = float(1)
+            pos_req.transform_stamped.transform.rotation.x = float(0)
+            pos_req.transform_stamped.transform.rotation.y = float(0)
+            pos_req.transform_stamped.transform.rotation.z = float(0)
+            pos_req.transform_stamped.transform.rotation.w = float(1)
 
             pos_req_future[i] = next_cli_set_drone_pose.call_async(pos_req)
 

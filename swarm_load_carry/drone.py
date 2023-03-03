@@ -56,21 +56,21 @@ class Drone(Node):
         self.load_name = f'load{self.load_id}'
 
         # Vehicle
-        self.vehicle_local_state = State(f'{self.get_name()}_init', CS_type.CART_INERTIAL)
+        self.vehicle_local_state = State(f'{self.get_name()}_init', CS_type.ENU)
 
-        self.vehicle_initial_global_state = State('world', CS_type.LLA)
-        self.vehicle_initial_state_rel_load_init = State(f'{self.load_name}_init', CS_type.CART_INERTIAL)
+        self.vehicle_initial_global_state = State('globe', CS_type.LLA)
+        self.vehicle_initial_state_rel_world = State('world', CS_type.ENU)
         
         self.vehicle_desired_state_rel_load = State(f'{self.load_name}', CS_type.ENU)
 
         # Load
-        self.load_desired_state = State(f'{self.load_name}_init', CS_type.ENU)
+        self.load_desired_state = State(f'world', CS_type.ENU)
 
         timer_period = 0.02  # seconds
-        self.dt = timer_period
-        self.theta = 0.0
-        self.radius = self.drone_id*5
-        self.omega = 0.5
+        # self.dt = timer_period
+        # self.theta = 0.0
+        # self.radius = self.drone_id*5
+        # self.omega = 0.5
 
         # Transforms
         self.tf_buffer = Buffer()
@@ -136,15 +136,16 @@ class Drone(Node):
 
         self.sub_payload_attitude_desired = self.create_subscription(
             VehicleAttitudeSetpoint,
-            f'load_{self.load_id}/in/desired_attitude',
+            f'/load_{self.load_id}/in/desired_attitude',
             self.clbk_load_desired_attitude,
             qos_profile)
         
         self.sub_payload_position_desired = self.create_subscription(
             VehicleLocalPositionSetpoint,
-            f'load_{self.load_id}/in/desired_local_position',
+            f'/load_{self.load_id}/in/desired_local_position',
             self.clbk_load_desired_local_position,
             qos_profile)
+    
 
         # TODO: Sub to other drones for distributed control!
 
@@ -192,13 +193,15 @@ class Drone(Node):
         # Set drone default parameters
         await self.set_params()
 
-        # Get initial position and orientation
+        # Get position where GPS co-ordinates are relative to
         initial_pos_lla = await self.drone_system.telemetry.get_gps_global_origin()
         self.vehicle_initial_global_state.pos = np.array([initial_pos_lla.latitude_deg, initial_pos_lla.longitude_deg, initial_pos_lla.altitude_m])
 
-        async for drone_att in self.drone_system.telemetry.attitude_quaternion():
-            self.vehicle_initial_global_state.att_q = qt.array([drone_att.x, drone_att.y, drone_att.z, drone_att.w])
-            break
+        # Note this only gets the drone's attitude when this is called so not useful
+        # Do not need initial orientation as using ENU/compass orientation 
+        # async for drone_att in self.drone_system.telemetry.attitude_quaternion():
+        #     self.vehicle_initial_global_state.att_q = qt.array([drone_att.x, drone_att.y, drone_att.z, drone_att.w])
+        #     break
         
         # Log and return
         self.get_logger().info('DRONE NODE CONNECTED THROUGH MAVLINK')
@@ -242,10 +245,15 @@ class Drone(Node):
 
     def clbk_load_desired_local_position(self, msg):
         self.load_desired_state.pos = np.array([msg.x, msg.y, msg.z])
+
+        #self.get_logger().info(f'load_desired_state.pos in drone: {[self.load_desired_state.pos[0], self.load_desired_state.pos[1], self.load_desired_state.pos[2]]}')
     
     def clbk_set_desired_pose_rel_load(self, request, response):
         self.vehicle_desired_state_rel_load.pos = np.array([request.transform_stamped.transform.translation.x, request.transform_stamped.transform.translation.y, request.transform_stamped.transform.translation.z])
-        self.vehicle_desired_state_rel_load.att_q = qt.array([request.transform_stamped.transform.rotation.x, request.transform_stamped.transform.rotation.y, request.transform_stamped.transform.rotation.z, request.transform_stamped.transform.rotation.w])
+        self.vehicle_desired_state_rel_load.att_q = qt.array([request.transform_stamped.transform.rotation.w, request.transform_stamped.transform.rotation.x, request.transform_stamped.transform.rotation.y, request.transform_stamped.transform.rotation.z])
+        
+        self.get_logger().info(f'vehicle_desired_state_rel_load.pos in drone: {[self.vehicle_desired_state_rel_load.pos[0], self.vehicle_desired_state_rel_load.pos[1], self.vehicle_desired_state_rel_load.pos[2]]}')
+        self.get_logger().info(f'vehicle_desired_state_rel_load.att_q in drone: {[self.vehicle_desired_state_rel_load.att_q.w, self.vehicle_desired_state_rel_load.att_q.x, self.vehicle_desired_state_rel_load.att_q.y, self.vehicle_desired_state_rel_load.att_q.z]}')
         
         response.success = True
 
@@ -256,20 +264,20 @@ class Drone(Node):
         response.global_pos.lon = self.vehicle_initial_global_state.pos[1]
         response.global_pos.alt = self.vehicle_initial_global_state.pos[2]
 
-        response.global_att.q[0] = self.vehicle_initial_global_state.att_q.x
-        response.global_att.q[1] = self.vehicle_initial_global_state.att_q.y
-        response.global_att.q[2] = self.vehicle_initial_global_state.att_q.z
-        response.global_att.q[3] = self.vehicle_initial_global_state.att_q.w
+        # response.global_att.q[0] = self.vehicle_initial_global_state.att_q.x
+        # response.global_att.q[1] = self.vehicle_initial_global_state.att_q.y
+        # response.global_att.q[2] = self.vehicle_initial_global_state.att_q.z
+        # response.global_att.q[3] = self.vehicle_initial_global_state.att_q.w
 
         return response
 
     def clbk_set_local_init_pose(self, request, response):
-        # Set local init pose (relative to load)
-        self.vehicle_initial_state_rel_load_init.pos = np.array([request.transform_stamped.transform.translation.x, request.transform_stamped.transform.translation.y, request.transform_stamped.transform.translation.z])
-        self.vehicle_initial_state_rel_load_init.att_q = qt.array([request.transform_stamped.transform.rotation.x, request.transform_stamped.transform.rotation.y, request.transform_stamped.transform.rotation.z, request.transform_stamped.transform.rotation.w])
+        # Set local init pose (relative to base CS)
+        self.vehicle_initial_state_rel_world.pos = np.array([request.transform_stamped.transform.translation.x, request.transform_stamped.transform.translation.y, request.transform_stamped.transform.translation.z])
+        self.vehicle_initial_state_rel_world.att_q = qt.array([request.transform_stamped.transform.rotation.w, request.transform_stamped.transform.rotation.x, request.transform_stamped.transform.rotation.y, request.transform_stamped.transform.rotation.z])
         
-        # Publish static transform for init pose (relative to load init pose)
-        utils.broadcast_tf(self.get_clock().now().to_msg(), request.transform_stamped.header.frame_id, f'{self.get_name()}_init', self.vehicle_initial_state_rel_load_init.pos, self.vehicle_initial_state_rel_load_init.att_q, self.tf_static_broadcaster_init_pose)
+        # Publish static transform for init pose (relative to world)
+        utils.broadcast_tf(self.get_clock().now().to_msg(), request.transform_stamped.header.frame_id, request.transform_stamped.child_frame_id, self.vehicle_initial_state_rel_world.pos, self.vehicle_initial_state_rel_world.att_q, self.tf_static_broadcaster_init_pose)
 
         response.success = True
         return response
@@ -345,11 +353,17 @@ class Drone(Node):
                 # Publish waypoints if vehicle is actually in offboard mode
                 if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
                     # Call desired trajectory generation function
-                    trajectory_msg = utils.gen_traj_msg_orbit(self.radius, self.theta, 5.0*self.drone_id)
-                    self.theta = self.theta + self.omega * self.dt
+                    #trajectory_msg = utils.gen_traj_msg_orbit(self.radius, self.theta, 5.0*self.drone_id)
+                    #self.theta = self.theta + self.omega * self.dt
 
-                    #trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_state, f'{self.load_name}', self.get_name(), self.tf_buffer, self.get_logger())
+                    trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_state, f'{self.load_name}', self.get_name(), self.tf_buffer, self.get_logger())
 
+
+                    # trajectory_msg = TrajectorySetpoint()
+                    # trajectory_msg.position[0] = 0
+                    # trajectory_msg.position[1] = -10
+                    # trajectory_msg.position[2] = -10
+                    # trajectory_msg.yaw = float(np.pi/2.0)
                     self.pub_trajectory.publish(trajectory_msg)
 
                     

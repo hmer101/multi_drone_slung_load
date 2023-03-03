@@ -51,11 +51,11 @@ class Load(Node):
         )
 
         ## VARIABLES
-        self.load_desired_state = State(f'{self.get_name()}_init', CS_type.ENU)
+        self.load_desired_state = State('world', CS_type.ENU)
 
-        self.load_local_state = State(f'{self.get_name()}_init', CS_type.ENU)
+        self.load_local_state = State('world', CS_type.ENU)
 
-        self.load_initial_global_state = State('world', CS_type.LLA)
+        #self.load_initial_global_state = State('world', CS_type.LLA)
 
         self.flag_tfs_set = False
         self.tf_buffer = Buffer()
@@ -113,26 +113,15 @@ class Load(Node):
         # Update stored setpoint
         self.load_desired_state.att_q = qt.array([msg.q_d[0], msg.q_d[1], msg.q_d[2], msg.q_d[3]])
 
-
         # TEMP: Assume load attitude moves directly to desired attitude (TODO: add dynamics or sensing/estimation. Publish actual attitude in timer clbk instead)
-        # load_attitude = VehicleAttitude()
-        # load_attitude.q = msg.q_d
 
-        # self.broadcast_load_local_attitude(load_attitude) 
 
     
     def clbk_desired_load_local_position(self, msg):
         # Update stored setpoint
         self.load_desired_state.pos = np.array([msg.x, msg.y, msg.z])
         
-
         # TEMP: Assume load position moves directly to desired position (TODO: add dynamics or sensing/estimation. Publish actual pos in timer clbk instead)
-        # load_position = VehicleLocalPosition()
-        # load_position.x = msg.x
-        # load_position.y = msg.y
-        # load_position.z = msg.z
-
-        # self.broadcast_load_local_position(load_position)   
 
 
     # Loop on timer to publish actual load pose
@@ -142,44 +131,40 @@ class Load(Node):
         drone_orientations = qt.array(np.zeros((self.num_drones, 4))) 
 
         if self.flag_tfs_set:
-            # Store position and orientation of each drone relative to load initial position
+            # Store position and orientation of each drone relative to world
             for i in range(self.num_drones):
-                from_frame_rel = f'{self.get_name()}_init'
+                from_frame_rel = 'world'
                 to_frame_rel = f'drone{i+self.first_drone_num}'
                     
                 t = utils.lookup_tf(from_frame_rel, to_frame_rel, self.tf_buffer, rclpy.time.Time(), self.get_logger())
 
                 if t != None:
                     drone_positions[i, :] = [t.transform.translation.x, t.transform.translation.y, t.transform.translation.z]
-                    drone_orientations[i, :] = [t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w]
+                    drone_orientations[i, :] = [t.transform.rotation.w, t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z]
 
             # Estimate load position as average of drone positions 
             self.load_local_state.pos  = np.average(drone_positions, axis=0)
 
             # Estimate load orientation #TODO: Better orientation estimation method
-            self.load_local_attitude = drone_orientations[1, :]
+            self.load_local_state.att_q = qt.array(drone_orientations[1, :])
 
             # Publish estimate load 
-            self.broadcast_load_local_attitude()
-            self.broadcast_load_local_position()
+            self.broadcast_load_local_state()
 
 
 
     ## HELPER FUNCTIONS
-    def broadcast_load_local_attitude(self):
+    def broadcast_load_local_state(self):
+        ## Attitude
         # Generate message
         msg = VehicleAttitude()
         msg.timestamp = int(self.get_clock().now().nanoseconds/1000)
-        msg.q = [float(self.load_local_attitude.x), float(self.load_local_attitude.y), float(self.load_local_attitude.z), float(self.load_local_attitude.w)]
+        msg.q = [float(self.load_local_state.att_q.w), float(self.load_local_state.att_q.x), float(self.load_local_state.att_q.y), float(self.load_local_state.att_q.z)]
 
         # Publish
         self.pub_load_attitude.publish(msg)
-        #self.get_logger().info(f'Load at att: {msg.q[0], msg.q[1], msg.q[2], msg.q[3]}')
 
-        # Update tf
-        utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', self.get_name(), self.load_local_state.pos, self.load_local_state.att_q, self.tf_broadcaster)
-
-    def broadcast_load_local_position(self):
+        ## Position
         # Generate message
         msg = VehicleLocalPosition()
         msg.timestamp = int(self.get_clock().now().nanoseconds/1000)
@@ -189,11 +174,11 @@ class Load(Node):
 
         # Publish
         self.pub_load_position.publish(msg)
-        #self.get_logger().info(f'Load at pos: {msg.x, msg.y, msg.z}')
 
         # Update tf
-        utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', self.get_name(), self.load_local_state.pos, self.load_local_state.att_q, self.tf_broadcaster)
+        utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', self.get_name(), self.load_local_state.pos, self.load_local_state.att_q, self.tf_broadcaster)
 
+    # Set initial drone poses relative to load
     def send_initial_pose_tfs(self):
         ## Get drone initial positions
         # Prepare request
@@ -212,24 +197,25 @@ class Load(Node):
             rclpy.spin_until_future_complete(self, next_future)
             drone_global_init_poses[i] = next_future.result()
 
-            # Position
-            self.load_initial_global_state.pos[0] += drone_global_init_poses[i].global_pos.lat
-            self.load_initial_global_state.pos[1] += drone_global_init_poses[i].global_pos.lon
-            self.load_initial_global_state.pos[2] += drone_global_init_poses[i].global_pos.alt
+        #     # Position
+        #     self.load_initial_global_state.pos[0] += drone_global_init_poses[i].global_pos.lat
+        #     self.load_initial_global_state.pos[1] += drone_global_init_poses[i].global_pos.lon
+        #     self.load_initial_global_state.pos[2] += drone_global_init_poses[i].global_pos.alt
 
-            # Orientation (currently simply take orientaiton of last drone as orientation of load) #TODO: Get better initial estimate of load orientation
-            self.load_initial_global_state.att_q.x = drone_global_init_poses[i].global_att.q[0]
-            self.load_initial_global_state.att_q.y = drone_global_init_poses[i].global_att.q[1]
-            self.load_initial_global_state.att_q.z = drone_global_init_poses[i].global_att.q[2]
-            self.load_initial_global_state.att_q.w = drone_global_init_poses[i].global_att.q[3]
+        #     # Orientation (currently simply take orientaiton of last drone as orientation of load) #TODO: Get better initial estimate of load orientation
+        #     self.load_initial_global_state.att_q.x = drone_global_init_poses[i].global_att.q[0]
+        #     self.load_initial_global_state.att_q.y = drone_global_init_poses[i].global_att.q[1]
+        #     self.load_initial_global_state.att_q.z = drone_global_init_poses[i].global_att.q[2]
+        #     self.load_initial_global_state.att_q.w = drone_global_init_poses[i].global_att.q[3]
 
 
-        ## Calculate load initial position and orientation
-        # Estimate load initial position (centre of circle) and inital orientation (average orentation of drones)
-        self.load_initial_global_state.pos = np.divide(self.load_initial_global_state.pos, self.num_drones)
-        #self.load_initial_global_attitude = np.divide(self.load_initial_global_attitude, self.num_drones)
+        # ## Calculate load initial position and orientation
+        # # Estimate load initial position (centre of circle) and inital orientation (average orentation of drones)
+        # self.load_initial_global_state.pos = np.divide(self.load_initial_global_state.pos, self.num_drones)
+        # self.get_logger().info(f'load_initial_global_state: [{self.load_initial_global_state.pos}],[{self.load_initial_global_state.att_q}] ')
 
-        ## Set drone local poses relative to load (allowing the drones to publish local tfs)       
+
+        ## Set drone local initial poses relative to world (allowing the drones to publish local tfs)       
         # Send request
         future_drone_init_local_pose = [None] * self.num_drones
 
@@ -237,22 +223,39 @@ class Load(Node):
             req = SetLocalPose.Request()
 
             req.transform_stamped.header.stamp = self.get_clock().now().to_msg()
-            req.transform_stamped.header.frame_id = f'{self.get_name()}_init' 
-            #req.child_frame_id
+            req.transform_stamped.header.frame_id = 'world'
+            req.transform_stamped.child_frame_id = f'drone{self.first_drone_num + i}_init'
 
-            # Drone translation relative to load
-            req.transform_stamped.transform.translation.x, req.transform_stamped.transform.translation.y, req.transform_stamped.transform.translation.z = pm.geodetic2enu(next_drone_init_pose.global_pos.lat, next_drone_init_pose.global_pos.lon, next_drone_init_pose.global_pos.alt, self.load_initial_global_state.pos[0], self.load_initial_global_state.pos[1], self.load_initial_global_state.pos[2]) 
+            # Drone initial translation relative to world
+            # World set at first drone init position
+            # if i == self.first_drone_num: 
+            #     req.transform_stamped.transform.translation.x = 0.0 
+            #     req.transform_stamped.transform.translation.y = 0.0 
+            #     req.transform_stamped.transform.translation.z = 0.0
 
-            # Drone orientation relative to load
-            q_drone_global_init = qt.array([next_drone_init_pose.global_att.q[0], next_drone_init_pose.global_att.q[1], next_drone_init_pose.global_att.q[2], next_drone_init_pose.global_att.q[3]])
-            q_load_global_init = qt.array([self.load_initial_global_state.att_q.x, self.load_initial_global_state.att_q.y, self.load_initial_global_state.att_q.z, self.load_initial_global_state.att_q.w])
+            # # Other drones set relative to first drone
+            # else:
+            req.transform_stamped.transform.translation.x, req.transform_stamped.transform.translation.y, req.transform_stamped.transform.translation.z = pm.geodetic2enu(next_drone_init_pose.global_pos.lat, next_drone_init_pose.global_pos.lon, next_drone_init_pose.global_pos.alt, drone_global_init_poses[0].global_pos.lat, drone_global_init_poses[0].global_pos.lon, drone_global_init_poses[0].global_pos.alt) 
+                
+                # Drone initial orientation relative to world
+                # q_drone_global_init = qt.array([next_drone_init_pose.global_att.q[0], next_drone_init_pose.global_att.q[1], next_drone_init_pose.global_att.q[2], next_drone_init_pose.global_att.q[3]])
+                # #q_load_global_init = qt.array([self.load_initial_global_state.att_q.x, self.load_initial_global_state.att_q.y, self.load_initial_global_state.att_q.z, self.load_initial_global_state.att_q.w])
 
-            q_drone_init_rel_load_init = q_drone_global_init*q_load_global_init.inverse
+                # q_drone_init_rel_load_init = q_drone_global_init*q_load_global_init.inverse
 
-            req.transform_stamped.transform.rotation.x = float(q_drone_init_rel_load_init.x)
-            req.transform_stamped.transform.rotation.y = float(q_drone_init_rel_load_init.y)
-            req.transform_stamped.transform.rotation.z = float(q_drone_init_rel_load_init.z)
-            req.transform_stamped.transform.rotation.w = float(q_drone_init_rel_load_init.w)
+                # req.transform_stamped.transform.rotation.x = float(q_drone_init_rel_load_init.x)
+                # req.transform_stamped.transform.rotation.y = float(q_drone_init_rel_load_init.y)
+                # req.transform_stamped.transform.rotation.z = float(q_drone_init_rel_load_init.z)
+                # req.transform_stamped.transform.rotation.w = float(q_drone_init_rel_load_init.w)
+                
+            # All in ENU co-ordinates so no relative orientation
+            req.transform_stamped.transform.rotation.x = 0.0
+            req.transform_stamped.transform.rotation.y = 0.0
+            req.transform_stamped.transform.rotation.z = 0.0
+            req.transform_stamped.transform.rotation.w = 1.0
+
+            self.get_logger().info(f'Drone {self.first_drone_num + i} translation relative to world: [{req.transform_stamped.transform.translation.x}, {req.transform_stamped.transform.translation.y}, {req.transform_stamped.transform.translation.z}]')
+            self.get_logger().info(f'Drone {self.first_drone_num + i} orientation relative to world: [{req.transform_stamped.transform.rotation.w}, {req.transform_stamped.transform.rotation.x}, {req.transform_stamped.transform.rotation.y}, {req.transform_stamped.transform.rotation.z}]')
 
             future_drone_init_local_pose[i] = self.cli_set_drone_init_local_poses[i].call_async(req)
 

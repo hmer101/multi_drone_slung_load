@@ -96,26 +96,28 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_state,
     trajectory_msg = TrajectorySetpoint()
 
     # Desired vehicle pos relative to load_init = desired vehicle pos relative to load + desired load rel to load_init
-    vehicle_desired_state_rel_load_init = [vehicle_desired_state_rel_load.pos[0] + load_desired_state.pos[0], 
+    vehicle_desired_state_rel_world = [vehicle_desired_state_rel_load.pos[0] + load_desired_state.pos[0], 
                                             vehicle_desired_state_rel_load.pos[1] + load_desired_state.pos[1],
                                             vehicle_desired_state_rel_load.pos[2] + load_desired_state.pos[2]]
     
-    logger.info(f'load_desired_state: {[load_desired_state.pos[0], load_desired_state.pos[1], load_desired_state.pos[2]]}')
+    #logger.info(f'load_desired_state.pos in utils: {[load_desired_state.pos[0], load_desired_state.pos[1], load_desired_state.pos[2]]}')
     #logger.info(f'vehicle_desired_state_rel_load: {[vehicle_desired_state_rel_load.pos[0], vehicle_desired_state_rel_load.pos[1], vehicle_desired_state_rel_load.pos[2]]}')
-    logger.info(f'vehicle_desired_state_rel_load_init: {vehicle_desired_state_rel_load_init}')
+    #logger.info(f'vehicle_desired_state_rel_world: {vehicle_desired_state_rel_load_init}')
 
 
-    # Need drone rel to drone_init (Pixhawk's frame). Add transforms from load_init to drone_init frames
-    t = lookup_tf(f'{load_name}_init', f'{drone_name}_init', tf_buffer, rclpy.time.Time(), logger)
+    # Need drone rel to drone_init (Pixhawk's frame). Add transforms from world to drone_init frames and convert from ENU to NED
+    t = lookup_tf('world', f'{drone_name}_init', tf_buffer, rclpy.time.Time(), logger)
 
     if t != None:
         trajectory_msg = TrajectorySetpoint()
-        trajectory_msg.position[0] = vehicle_desired_state_rel_load_init[0] + t.transform.translation.x
-        trajectory_msg.position[1] = vehicle_desired_state_rel_load_init[1] + t.transform.translation.y
-        trajectory_msg.position[2] = -(vehicle_desired_state_rel_load_init[2] + t.transform.translation.z)
+        trajectory_msg.position[0] = vehicle_desired_state_rel_world[1] + t.transform.translation.y
+        trajectory_msg.position[1] = vehicle_desired_state_rel_world[0] + t.transform.translation.x
+        trajectory_msg.position[2] = -(vehicle_desired_state_rel_world[2] + t.transform.translation.z)
 
         # TODO: Handle yaw
         # trajectory_msg.yaw = 
         # drone_orientations[i, :] = [t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w]
+
+        logger.info(f'Utils trajectory_msg: {trajectory_msg.position[0], trajectory_msg.position[1], trajectory_msg.position[2], trajectory_msg.yaw}')
 
     return trajectory_msg
