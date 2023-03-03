@@ -1,4 +1,5 @@
 import math
+import quaternionic
 import numpy as np
 import rclpy
 
@@ -92,18 +93,21 @@ def gen_traj_msg_orbit(r, theta, h):
     return trajectory_msg
 
 # Make drone follow desired load position, at the desired location relative to the load
-def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_state, load_name, drone_name, tf_buffer, logger):
+# TODO: Add interpolation (especially for rotation/yaw of swarm)
+def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_state, drone_name, tf_buffer, logger):
     trajectory_msg = TrajectorySetpoint()
 
-    # Desired vehicle pos relative to load_init = desired vehicle pos relative to load + desired load rel to load_init
-    vehicle_desired_state_rel_world = [vehicle_desired_state_rel_load.pos[0] + load_desired_state.pos[0], 
-                                            vehicle_desired_state_rel_load.pos[1] + load_desired_state.pos[1],
-                                            vehicle_desired_state_rel_load.pos[2] + load_desired_state.pos[2]]
+    # Add effect of desired load orientation (note different physical connections to load will require different algorithms)
+    vehicle_desired_pos_rel_load_rot = load_desired_state.att_q.rotate(vehicle_desired_state_rel_load.pos)
+
+    # Desired vehicle pos relative to world (in ENU)= desired vehicle pos relative to load + desired load pos rel to world 
+    vehicle_desired_state_rel_world = [vehicle_desired_pos_rel_load_rot[0] + load_desired_state.pos[0], 
+                                            vehicle_desired_pos_rel_load_rot[1] + load_desired_state.pos[1],
+                                            vehicle_desired_pos_rel_load_rot[2] + load_desired_state.pos[2]]
     
     #logger.info(f'load_desired_state.pos in utils: {[load_desired_state.pos[0], load_desired_state.pos[1], load_desired_state.pos[2]]}')
-    #logger.info(f'vehicle_desired_state_rel_load: {[vehicle_desired_state_rel_load.pos[0], vehicle_desired_state_rel_load.pos[1], vehicle_desired_state_rel_load.pos[2]]}')
-    #logger.info(f'vehicle_desired_state_rel_world: {vehicle_desired_state_rel_load_init}')
-
+    # logger.info(f'vehicle_desired_state_rel_load: {[vehicle_desired_state_rel_load.pos[0], vehicle_desired_state_rel_load.pos[1], vehicle_desired_state_rel_load.pos[2]]}')
+    # logger.info(f'vehicle_desired_state_rel_world: {vehicle_desired_state_rel_world}')
 
     # Need drone rel to drone_init (Pixhawk's frame). Add transforms from world to drone_init frames and convert from ENU to NED
     t = lookup_tf('world', f'{drone_name}_init', tf_buffer, rclpy.time.Time(), logger)

@@ -12,7 +12,7 @@ from enum import Enum
 class CS_type(Enum):
     LLA=0,         # Planetary co-ordinate system: Latitude, Longitude, Altitude. Frame can only be 'world'
     ENU=1,                  # Local tangent plane body CS: East, North, Up (ROS2 default) 
-    NED=2                   # Local tangent plane body CS: North, East, Down (Pixhawk default)
+    NED=2                   # Local tangent plane body CS: North, East, Down (PX4 default)
 
 # Class to store robot state. 
 # Like geometry_msgs/PoseStamped message but with different background datastructures allowing different co-ordinate system types and other calculations
@@ -22,7 +22,7 @@ class State():
         self.cs_type = cs_type
 
         self.pos = pos      # Position relative to frame in given co-ordinate system type
-        self.att_q = att    # Attitude relative to frame as a quaternion [x, y, z, w] (note this is ROS default but Pixhawk default has w first)
+        self.att_q = att    # Attitude relative to frame as a quaternion [w, x, y, z] (note quaternionic and PX4 default have w first. ROS quaternion msg doesn't have a vector - must specify .x,.y,.z,.w components)
         self.vel = vel      # Velocity relative to frame in given co-ordinate system type
 
        

@@ -105,7 +105,7 @@ class GCSBackground(Node):
     def clbk_send_load_setpoint(self):
         # Set desired pose
         self.load_desired_state.pos = np.array([0.0, 10, 10]) #np.array([self.radius * np.cos(self.theta), self.radius * np.sin(self.theta), 5]) 
-        self.load_desired_state.att_q = qt.array([1.0, 0.0, 0.0, 0.0])
+        self.load_desired_state.att_q = qt.array([.71, 0.0, 0.0, .71]) #qt.array([1.0, 0.0, 0.0, 0.0])
         self.theta = self.theta + self.omega * self.dt
 
         # Send position setpoint
@@ -118,7 +118,7 @@ class GCSBackground(Node):
         # Send orientation setpoint
         q_d = self.load_desired_state.att_q
         setpoint_msg_att = VehicleAttitudeSetpoint()
-        setpoint_msg_att.q_d = [float(q_d.x), float(q_d.y), float(q_d.z), float(q_d.w)]
+        setpoint_msg_att.q_d = [float(q_d.w), float(q_d.x), float(q_d.y), float(q_d.z)]
         self.pub_load_attitude_desired.publish(setpoint_msg_att)
 
         
@@ -171,7 +171,7 @@ class GCSBackground(Node):
             rclpy.spin_until_future_complete(self, next_future)
 
             self.get_logger().info(f'Local TF set for drone {i+1}')
-            
+
 
     # TODO: Set drones to positions that minimizes sum of squared distance from drone start points to desired points
     def set_drone_arrangement(self, r, z):

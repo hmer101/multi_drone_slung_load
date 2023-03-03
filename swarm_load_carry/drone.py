@@ -342,8 +342,8 @@ class Drone(Node):
                     #trajectory_msg = utils.gen_traj_msg_orbit(self.radius, self.theta, 5.0*self.drone_id)
                     #self.theta = self.theta + self.omega * self.dt
 
-                    trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_state, f'{self.load_name}', self.get_name(), self.tf_buffer, self.get_logger())
-
+                    # Move to position
+                    trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_state, self.get_name(), self.tf_buffer, self.get_logger())
 
                     # trajectory_msg = TrajectorySetpoint()
                     # trajectory_msg.position[0] = 0
