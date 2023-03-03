@@ -10,8 +10,6 @@ from enum import Enum
 
 # Co-ordinate system enum
 class CS_type(Enum):
-    #CART_INERTIAL=0,        # Inertial cartesian co-ordiante system (x, y, z)
-    #CART_NON_INERTIAL=1,    # Non-inertial cartesian co-ordinate system (x, y, z)
     LLA=0,         # Planetary co-ordinate system: Latitude, Longitude, Altitude. Frame can only be 'world'
     ENU=1,                  # Local tangent plane body CS: East, North, Up (ROS2 default) 
     NED=2                   # Local tangent plane body CS: North, East, Down (Pixhawk default)

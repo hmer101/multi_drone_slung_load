@@ -196,15 +196,11 @@ class Drone(Node):
         # Get position where GPS co-ordinates are relative to
         initial_pos_lla = await self.drone_system.telemetry.get_gps_global_origin()
         self.vehicle_initial_global_state.pos = np.array([initial_pos_lla.latitude_deg, initial_pos_lla.longitude_deg, initial_pos_lla.altitude_m])
-
-        # Note this only gets the drone's attitude when this is called so not useful
-        # Do not need initial orientation as using ENU/compass orientation 
-        # async for drone_att in self.drone_system.telemetry.attitude_quaternion():
-        #     self.vehicle_initial_global_state.att_q = qt.array([drone_att.x, drone_att.y, drone_att.z, drone_att.w])
-        #     break
         
         # Log and return
         self.get_logger().info('DRONE NODE CONNECTED THROUGH MAVLINK')
+
+        self.get_logger().info('Setup complete')
 
         return self
 
@@ -245,15 +241,10 @@ class Drone(Node):
 
     def clbk_load_desired_local_position(self, msg):
         self.load_desired_state.pos = np.array([msg.x, msg.y, msg.z])
-
-        #self.get_logger().info(f'load_desired_state.pos in drone: {[self.load_desired_state.pos[0], self.load_desired_state.pos[1], self.load_desired_state.pos[2]]}')
     
     def clbk_set_desired_pose_rel_load(self, request, response):
         self.vehicle_desired_state_rel_load.pos = np.array([request.transform_stamped.transform.translation.x, request.transform_stamped.transform.translation.y, request.transform_stamped.transform.translation.z])
         self.vehicle_desired_state_rel_load.att_q = qt.array([request.transform_stamped.transform.rotation.w, request.transform_stamped.transform.rotation.x, request.transform_stamped.transform.rotation.y, request.transform_stamped.transform.rotation.z])
-        
-        self.get_logger().info(f'vehicle_desired_state_rel_load.pos in drone: {[self.vehicle_desired_state_rel_load.pos[0], self.vehicle_desired_state_rel_load.pos[1], self.vehicle_desired_state_rel_load.pos[2]]}')
-        self.get_logger().info(f'vehicle_desired_state_rel_load.att_q in drone: {[self.vehicle_desired_state_rel_load.att_q.w, self.vehicle_desired_state_rel_load.att_q.x, self.vehicle_desired_state_rel_load.att_q.y, self.vehicle_desired_state_rel_load.att_q.z]}')
         
         response.success = True
 
@@ -263,11 +254,6 @@ class Drone(Node):
         response.global_pos.lat = self.vehicle_initial_global_state.pos[0]
         response.global_pos.lon = self.vehicle_initial_global_state.pos[1]
         response.global_pos.alt = self.vehicle_initial_global_state.pos[2]
-
-        # response.global_att.q[0] = self.vehicle_initial_global_state.att_q.x
-        # response.global_att.q[1] = self.vehicle_initial_global_state.att_q.y
-        # response.global_att.q[2] = self.vehicle_initial_global_state.att_q.z
-        # response.global_att.q[3] = self.vehicle_initial_global_state.att_q.w
 
         return response
 

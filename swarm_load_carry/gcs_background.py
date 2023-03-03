@@ -11,11 +11,12 @@ from rclpy.node import Node
 
 import numpy as np
 import quaternionic as qt
+import pymap3d as pm
 import utils
 
 from swarm_load_carry.state import State, CS_type
 
-from swarm_load_carry_interfaces.srv import ModeChange, SetLocalPose
+from swarm_load_carry_interfaces.srv import SetLocalPose, GetGlobalInitPose
 from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
 
 DEFAULT_DRONE_NUM=1
@@ -57,7 +58,6 @@ class GCSBackground(Node):
         self.radius = 10
         self.omega = 0.5
 
-        
         # Timers
         self.timer = self.create_timer(timer_period, self.clbk_send_load_setpoint)
 
@@ -68,15 +68,32 @@ class GCSBackground(Node):
         ## SUBSCRIBERS
         ## SERVICES
         ## CLIENTS
-
+        self.cli_get_drone_init_global_poses = [None] * self.num_drones
+        self.cli_set_drone_init_local_poses = [None] * self.num_drones
         self.cli_set_drone_poses_rel_load = [None] * self.num_drones
 
         for i in range(self.first_drone_num, self.num_drones+self.first_drone_num):
             # Global initial poses
+            self.cli_get_drone_init_global_poses[i-self.first_drone_num] = self.create_client(GetGlobalInitPose,f'/px4_{i}/global_initial_pose')
+
+            while not self.cli_get_drone_init_global_poses[i-self.first_drone_num].wait_for_service(timeout_sec=1.0):
+                self.get_logger().info(f'Waiting for global initial pose service drone {i}')
+
+            # Local initial poses
+            self.cli_set_drone_init_local_poses[i-self.first_drone_num] = self.create_client(SetLocalPose,f'/px4_{i}/local_initial_pose')
+
+            while not self.cli_set_drone_init_local_poses[i-self.first_drone_num].wait_for_service(timeout_sec=1.0):
+                self.get_logger().info(f'Waiting for local initial pose service drone {i}')
+
+            # Desired poses rel load
             self.cli_set_drone_poses_rel_load[i-self.first_drone_num] = self.create_client(SetLocalPose,f'/px4_{i}/desired_pose_rel_load')
 
             while not self.cli_set_drone_poses_rel_load[i-self.first_drone_num].wait_for_service(timeout_sec=1.0):
                 self.get_logger().info(f'Waiting for set pose rel load service: drone {i}')
+
+
+        # Send initial pose (relative to world) tfs
+        self.send_initial_pose_tfs()
 
         # Set drone arrangement around load
         self.set_drone_arrangement(2, [2, 2, 2])
@@ -107,6 +124,55 @@ class GCSBackground(Node):
         
 
     ## HELPERS
+     # Set initial drone poses relative to world
+    def send_initial_pose_tfs(self):
+        ## Get drone initial positions
+        # Prepare request
+        init_global_pose_req = GetGlobalInitPose.Request()
+
+        # Send request
+        init_global_pose_future = [None] * self.num_drones
+
+        for i in range(self.num_drones):
+            init_global_pose_future[i] = self.cli_get_drone_init_global_poses[i].call_async(init_global_pose_req)
+
+        # Wait for response and accumulate result
+        drone_global_init_poses = [None] * self.num_drones
+
+        for i, next_future in enumerate(init_global_pose_future):
+            rclpy.spin_until_future_complete(self, next_future)
+            drone_global_init_poses[i] = next_future.result()
+
+
+        ## Set drone local initial poses relative to world (allowing the drones to publish local tfs)       
+        # Send request
+        future_drone_init_local_pose = [None] * self.num_drones
+
+        for i, next_drone_init_pose in enumerate(drone_global_init_poses):
+            req = SetLocalPose.Request()
+
+            req.transform_stamped.header.stamp = self.get_clock().now().to_msg()
+            req.transform_stamped.header.frame_id = 'world'
+            req.transform_stamped.child_frame_id = f'drone{self.first_drone_num + i}_init'
+
+            req.transform_stamped.transform.translation.x, req.transform_stamped.transform.translation.y, req.transform_stamped.transform.translation.z = pm.geodetic2enu(next_drone_init_pose.global_pos.lat, next_drone_init_pose.global_pos.lon, next_drone_init_pose.global_pos.alt, drone_global_init_poses[0].global_pos.lat, drone_global_init_poses[0].global_pos.lon, drone_global_init_poses[0].global_pos.alt) 
+                
+            # All in ENU co-ordinates so no relative orientation
+            req.transform_stamped.transform.rotation.x = 0.0
+            req.transform_stamped.transform.rotation.y = 0.0
+            req.transform_stamped.transform.rotation.z = 0.0
+            req.transform_stamped.transform.rotation.w = 1.0
+
+            future_drone_init_local_pose[i] = self.cli_set_drone_init_local_poses[i].call_async(req)
+
+
+        # Wait for response 
+        for i, next_future in enumerate(future_drone_init_local_pose):
+            rclpy.spin_until_future_complete(self, next_future)
+
+            self.get_logger().info(f'Local TF set for drone {i+1}')
+            
+
     # TODO: Set drones to positions that minimizes sum of squared distance from drone start points to desired points
     def set_drone_arrangement(self, r, z):
         ref_points = utils.generate_points_cylinder(self.num_drones, r, z)

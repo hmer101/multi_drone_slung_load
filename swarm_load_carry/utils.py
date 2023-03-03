@@ -118,6 +118,4 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_state,
         # trajectory_msg.yaw = 
         # drone_orientations[i, :] = [t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w]
 
-        logger.info(f'Utils trajectory_msg: {trajectory_msg.position[0], trajectory_msg.position[1], trajectory_msg.position[2], trajectory_msg.yaw}')
-
     return trajectory_msg
