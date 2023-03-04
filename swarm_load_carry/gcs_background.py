@@ -105,7 +105,7 @@ class GCSBackground(Node):
     def clbk_send_load_setpoint(self):
         # Set desired pose
         self.load_desired_state.pos = np.array([0.0, 10, 10]) #np.array([self.radius * np.cos(self.theta), self.radius * np.sin(self.theta), 5]) 
-        self.load_desired_state.att_q = qt.array([.71, 0.0, 0.0, .71]) #qt.array([1.0, 0.0, 0.0, 0.0])
+        self.load_desired_state.att_q = qt.array([1.0, 0.0, 0.0, 0.0]) #qt.array([.71, 0.0, 0.0, .71]) #qt.array([1.0, 0.0, 0.0, 0.0])
         self.theta = self.theta + self.omega * self.dt
 
         # Send position setpoint

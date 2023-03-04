@@ -98,6 +98,7 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_state,
     trajectory_msg = TrajectorySetpoint()
 
     # Add effect of desired load orientation (note different physical connections to load will require different algorithms)
+    # TODO: Add switch statement for gimbal controlling yaw
     vehicle_desired_pos_rel_load_rot = load_desired_state.att_q.rotate(vehicle_desired_state_rel_load.pos)
 
     # Desired vehicle pos relative to world (in ENU)= desired vehicle pos relative to load + desired load pos rel to world 
