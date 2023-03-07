@@ -143,24 +143,124 @@
         <falloff>0</falloff>
       </spot>
     </light>
-    <include>
+
+    <!-- Note x500 drones must not be in nested models for PX4 to find -->
+    <model name="connected_group">
+      <include>
+        <uri>x500</uri>      
+        <name>x500_2</name>
+        <pose>-0.75 1.3 .24 0 0 0</pose>
+      </include>
+    </model>
+
+    <!-- <include>
       <uri>x500</uri>      
       <name>x500_1</name>
       <pose>1.5 0 .24 0 0 0</pose>
-    </include>
-    <include>
-      <uri>x500</uri>      
-      <name>x500_2</name>
-      <pose>-0.75 1.3 .24 0 0 0</pose>
-    </include>
-    <include>
-      <uri>x500</uri>      
-      <name>x500_3</name>
-      <pose>-0.75 -1.3 .24 0 0 0</pose>
-    </include>
-    <include>
-      <uri>load_generic</uri>      
-      <name>load</name>
-    </include>
+    </include> -->
+
+    <!-- <model name='swarm'>
+      <include>
+        <uri>x500</uri>      
+        <name>x500_1</name>
+        <pose>1.5 0 .24 0 0 0</pose>
+      </include>
+      
+      <include>
+        <uri>x500</uri>      
+        <name>x500_3</name>
+        <pose>-0.75 -1.3 .24 0 0 0</pose>
+      </include>
+
+      <include>
+        <uri>tether</uri>
+        <name>tether</name>
+      </include>
+
+      <joint name="joint_00" type="revolute">
+        <parent>x500_1::base_link</parent>
+        <child>tether::element_1</child>
+        <pose>0.0 0.0 0.0 0.0 0.0 0.0</pose>
+        <axis>
+          <xyz>1.0 0.0 0.0</xyz>
+        </axis>
+      </joint> 
+
+    </model>-->
+
+
+
+
+    <!-- HERERE - trying to connect tether to a drone -->
+    <!-- <model name="model_01">
+      <link name='element_1'>
+        <inertial>
+          <pose>0.3 0 0 0 1.5708 0</pose>
+          <mass>0.02</mass>
+          <inertia>
+            <ixx>0.0006005</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.0006005</iyy>
+            <iyz>0</iyz>
+            <izz>1e-06</izz>
+          </inertia>
+        </inertial>
+        <collision name='element_1_collision'>
+          <pose>0.3 0 0 0 1.5708 0</pose>
+          <geometry>
+            <cylinder>
+              <length>0.6</length>
+              <radius>0.01</radius>
+            </cylinder>
+          </geometry>
+        </collision>
+        <visual name='element_1_visual'>
+          <pose>0.3 0 0 0 1.5708 0</pose>
+          <geometry>
+            <cylinder>
+              <length>0.6</length>
+              <radius>0.01</radius>
+            </cylinder>
+          </geometry>
+        </visual>
+      </link>
+    </model>
+
+    <model name="model_02">
+      <link name='element_2'>
+        <inertial>
+          <pose>0.3 0 0 0 1.5708 0</pose>
+          <mass>0.02</mass>
+          <inertia>
+            <ixx>0.0006005</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.0006005</iyy>
+            <iyz>0</iyz>
+            <izz>1e-06</izz>
+          </inertia>
+        </inertial>
+        <collision name='element_2_collision'>
+          <pose>0.3 0 0 0 1.5708 0</pose>
+          <geometry>
+            <cylinder>
+              <length>0.6</length>
+              <radius>0.01</radius>
+            </cylinder>
+          </geometry>
+        </collision>
+        <visual name='element_2_visual'>
+          <pose>0.3 0 0 0 1.5708 0</pose>
+          <geometry>
+            <cylinder>
+              <length>0.6</length>
+              <radius>0.01</radius>
+            </cylinder>
+          </geometry>
+        </visual>
+      </link> 
+    </model> -->
+
   </world>
 </sdf>

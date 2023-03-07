@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sdf version='1.7'>
+  <model name='tether'>
+    <link name='element_1'>
+      <inertial>
+        <pose>0.3 0 0 0 1.5708 0</pose>
+        <mass>0.02</mass>
+        <inertia>
+          <ixx>0.0006005</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.0006005</iyy>
+          <iyz>0</iyz>
+          <izz>1e-06</izz>
+        </inertia>
+      </inertial>
+      <collision name='element_1_collision'>
+        <pose>0.3 0 0 0 1.5708 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.6</length>
+            <radius>0.01</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='element_1_visual'>
+        <pose>0.3 0 0 0 1.5708 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.6</length>
+            <radius>0.01</radius>
+          </cylinder>
+        </geometry>
+      </visual>
+    </link>
+    <joint name='joint_1_to_2' type='revolute'>
+      <pose relative_to='element_1'>0.6 0 0 0 -0 0</pose>
+      <parent>element_1</parent>
+      <child>element_2</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1e+16</lower>
+          <upper>1e+16</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='element_2'>
+      <pose relative_to='joint_1_to_2'>0 0 0 0 -0 0</pose>
+      <inertial>
+        <pose>0.3 0 0 0 1.5708 0</pose>
+        <mass>0.02</mass>
+        <inertia>
+          <ixx>0.0006005</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.0006005</iyy>
+          <iyz>0</iyz>
+          <izz>1e-06</izz>
+        </inertia>
+      </inertial>
+      <collision name='element_2_collision'>
+        <pose>0.3 0 0 0 1.5708 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.6</length>
+            <radius>0.01</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='element_2_visual'>
+        <pose>0.3 0 0 0 1.5708 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.6</length>
+            <radius>0.01</radius>
+          </cylinder>
+        </geometry>
+      </visual>
+    </link>
+    <joint name='joint_2_to_3' type='revolute'>
+      <pose relative_to='element_2'>0.6 0 0 0 -0 0</pose>
+      <parent>element_2</parent>
+      <child>element_3</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1e+16</lower>
+          <upper>1e+16</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='element_3'>
+      <pose relative_to='joint_2_to_3'>0 0 0 0 -0 0</pose>
+      <inertial>
+        <pose>0.3 0 0 0 1.5708 0</pose>
+        <mass>0.02</mass>
+        <inertia>
+          <ixx>0.0006005</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.0006005</iyy>
+          <iyz>0</iyz>
+          <izz>1e-06</izz>
+        </inertia>
+      </inertial>
+      <collision name='element_3_collision'>
+        <pose>0.3 0 0 0 1.5708 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.6</length>
+            <radius>0.01</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='element_3_visual'>
+        <pose>0.3 0 0 0 1.5708 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.6</length>
+            <radius>0.01</radius>
+          </cylinder>
+        </geometry>
+      </visual>
+    </link>
+    <joint name='joint_3_to_4' type='revolute'>
+      <pose relative_to='element_3'>0.6 0 0 0 -0 0</pose>
+      <parent>element_3</parent>
+      <child>element_4</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1e+16</lower>
+          <upper>1e+16</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='element_4'>
+      <pose relative_to='joint_3_to_4'>0 0 0 0 -0 0</pose>
+      <inertial>
+        <pose>0.3 0 0 0 1.5708 0</pose>
+        <mass>0.02</mass>
+        <inertia>
+          <ixx>0.0006005</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.0006005</iyy>
+          <iyz>0</iyz>
+          <izz>1e-06</izz>
+        </inertia>
+      </inertial>
+      <collision name='element_4_collision'>
+        <pose>0.3 0 0 0 1.5708 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.6</length>
+            <radius>0.01</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='element_4_visual'>
+        <pose>0.3 0 0 0 1.5708 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.6</length>
+            <radius>0.01</radius>
+          </cylinder>
+        </geometry>
+      </visual>
+    </link>
+    <joint name='joint_4_to_5' type='revolute'>
+      <pose relative_to='element_4'>0.6 0 0 0 -0 0</pose>
+      <parent>element_4</parent>
+      <child>element_5</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1e+16</lower>
+          <upper>1e+16</upper>
+        </limit>
+        <dynamics>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='element_5'>
+      <pose relative_to='joint_4_to_5'>0 0 0 0 -0 0</pose>
+      <inertial>
+        <pose>0.3 0 0 0 1.5708 0</pose>
+        <mass>0.02</mass>
+        <inertia>
+          <ixx>0.0006005</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.0006005</iyy>
+          <iyz>0</iyz>
+          <izz>1e-06</izz>
+        </inertia>
+      </inertial>
+      <collision name='element_5_collision'>
+        <pose>0.3 0 0 0 1.5708 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.6</length>
+            <radius>0.01</radius>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name='element_5_visual'>
+        <pose>0.3 0 0 0 1.5708 0</pose>
+        <geometry>
+          <cylinder>
+            <length>0.6</length>
+            <radius>0.01</radius>
+          </cylinder>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>
