@@ -20,10 +20,10 @@ PI=3.141592654
 
 # Parameters
 PX4_SYS_AUTOSTART=4001
-PX4_GZ_MODEL=connected_group/model/x500 #swarm/model/x500
+PX4_GZ_MODEL_NAME=x500 #connected_group/model/x500 #swarm/model/x500
 PX4_SIM_MODEL=x500
 
-NUM_DRONES=3
+NUM_DRONES=2
 START_DRONE_NUM=1
 
 
@@ -37,16 +37,17 @@ function cleanup() {
 
 # Run gazebo and launch the world 
 function gz_launch_world() {
-    cd $GZ_DIR
-    gnome-terminal --tab -- bash -c "ign gazebo -r ./world_multi_with_load.sdf"
+    # cd $GZ_DIR
+    # gnome-terminal --tab -- bash -c "gz sim ./world_multi_with_load.sdf"
+	gnome-terminal --tab -- bash -c "PX4_SYS_AUTOSTART=$PX4_SYS_AUTOSTART PX4_GZ_MODEL_POSE="0,0" PX4_GZ_MODEL=$PX4_GZ_MODEL $FIRMWARE_DIR/build/px4_sitl_default/bin/px4 -i 1"
 }
 
 # Create PX4 SITL instances and connect to models in the world
 function create_sitl_instances() {
 	# Spawn all drones numbering from first selected number
-	for (( i=$START_DRONE_NUM; i<$(($NUM_DRONES + $START_DRONE_NUM)); i++ )); do
-        MODEL_NAME="${PX4_GZ_MODEL}_${i}"
-		gnome-terminal --tab -- bash -c "PX4_SYS_AUTOSTART=$PX4_SYS_AUTOSTART PX4_GZ_MODEL_NAME=$MODEL_NAME PX4_SIM_MODEL=$PX4_SIM_MODEL $FIRMWARE_DIR/build/px4_sitl_default/bin/px4 -i $i"
+	for (( i=$(($START_DRONE_NUM + 1)); i<$(($NUM_DRONES + $START_DRONE_NUM + 1)); i++ )); do
+        MODEL_NAME="${PX4_GZ_MODEL_NAME}_${i}" 
+		gnome-terminal --tab -- bash -c "PX4_SYS_AUTOSTART=$PX4_SYS_AUTOSTART PX4_GZ_MODEL_NAME=$MODEL_NAME $FIRMWARE_DIR/build/px4_sitl_default/bin/px4 -i $i"
 	done
 }
 
@@ -61,7 +62,7 @@ sleep 2
 
 # Create multiple MAVSDK servers
 cd $SCRIPT_DIR
-gnome-terminal --tab -- bash -c "./multi_mavsdk_server.sh -n $NUM_DRONES"
+gnome-terminal --tab -- bash -c "./multi_mavsdk_server.sh -n $NUM_DRONES" #$(($NUM_DRONES+1))
 
 # Create ROS2 agent
 gnome-terminal --tab -- bash -c "cd ~/repos/PX4-Autopilot; micro-ros-agent udp4 --port 8888"
