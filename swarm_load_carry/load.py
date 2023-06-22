@@ -27,7 +27,7 @@ DEFAULT_FIRST_DRONE_NUM=1
 # Could make subclasses for different load types (e.g. camera etc.)
 class Load(Node):
     def __init__(self):
-        super().__init__('load')
+        super().__init__('load9')
 
         ## Print information
         self.load_id = int(str(self.get_name())[-1])
@@ -133,7 +133,7 @@ class Load(Node):
             self.load_local_state.pos  = np.average(drone_positions, axis=0)
 
             # Estimate load orientation #TODO: Better orientation estimation method
-            self.load_local_state.att_q = qt.array(drone_orientations[1, :])
+            self.load_local_state.att_q = qt.array(drone_orientations[0, :])
 
             # Publish estimate load 
             self.broadcast_load_local_state()

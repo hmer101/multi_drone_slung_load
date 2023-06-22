@@ -22,6 +22,7 @@ PI=3.141592654
 PX4_SYS_AUTOSTART=4001
 PX4_GZ_MODEL=x500
 PX4_GZ_MODEL_NAME=swarm/model/x500
+PX4_GZ_WORLD=default_tethered
 
 NUM_DRONES=3
 START_DRONE_NUM=1
@@ -40,7 +41,7 @@ function cleanup() {
 function gz_launch_world() {
     #cd $GZ_DIR
     # gnome-terminal --tab -- bash -c "gz sim ./world_multi_with_load.sdf" PX4_GZ_MODEL_POSE="-100,-100"
-	gnome-terminal --tab -- bash -c "PX4_SYS_AUTOSTART=$PX4_SYS_AUTOSTART PX4_GZ_MODEL=$PX4_GZ_MODEL PX4_GZ_MODEL_POSE="-50,-50" $FIRMWARE_DIR/build/px4_sitl_default/bin/px4 -i $DUMMY_DRONE_NUM"
+	gnome-terminal --tab -- bash -c "PX4_SYS_AUTOSTART=$PX4_SYS_AUTOSTART PX4_GZ_MODEL=$PX4_GZ_MODEL PX4_GZ_MODEL_POSE="-50,-50" $FIRMWARE_DIR/build/px4_sitl_default/bin/px4 -i $DUMMY_DRONE_NUM" #PX4_GZ_WORLD=$PX4_GZ_WORLD
 }
 
 # Create PX4 SITL instances and connect to models in the world
@@ -58,7 +59,7 @@ function create_sitl_instances() {
 #cleanup
 gz_launch_world
 
-sleep 7
+sleep 10
 create_sitl_instances
 sleep 2
 

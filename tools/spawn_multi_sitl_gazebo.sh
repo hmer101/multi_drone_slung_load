@@ -19,7 +19,7 @@ PI=3.141592654
 PX4_SYS_AUTOSTART=4001
 PX4_GZ_MODEL=x500
 
-NUM_DRONES=3
+NUM_DRONES=1 #3
 START_DRONE_NUM=1
 SPAWN_CENTER_X=0
 SPAWN_CENTER_Y=0
@@ -74,7 +74,7 @@ sleep 2
 
 # Create multiple MAVSDK servers
 cd $SCRIPT_DIR
-gnome-terminal --tab -- bash -c "./multi_mavsdk_server.sh -n $NUM_DRONES"
+#gnome-terminal --tab -- bash -c "./multi_mavsdk_server.sh -n $NUM_DRONES"
 
 # Create ROS2 agent
 gnome-terminal --tab -- bash -c "cd ~/repos/PX4-Autopilot; micro-ros-agent udp4 --port 8888"

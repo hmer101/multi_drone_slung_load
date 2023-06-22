@@ -68,7 +68,7 @@ class GCSBackground(Node):
         ## SUBSCRIBERS
         ## SERVICES
         ## CLIENTS
-        self.cli_get_drone_init_global_poses = [None] * self.num_drones
+        self.cli_get_drone_init_global_poses = [None] * self.num_drones # Get locations of all drones 
         self.cli_set_drone_init_local_poses = [None] * self.num_drones
         self.cli_set_drone_poses_rel_load = [None] * self.num_drones
 
@@ -110,8 +110,8 @@ class GCSBackground(Node):
 
         # Send position setpoint
         setpoint_msg_pos = VehicleLocalPositionSetpoint()
-        setpoint_msg_pos.x = self.load_desired_state.pos[0] #
-        setpoint_msg_pos.y = self.load_desired_state.pos[1] #
+        setpoint_msg_pos.x = self.load_desired_state.pos[0] 
+        setpoint_msg_pos.y = self.load_desired_state.pos[1] 
         setpoint_msg_pos.z = self.load_desired_state.pos[2]
         self.pub_load_position_desired.publish(setpoint_msg_pos)
 

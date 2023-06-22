@@ -123,4 +123,5 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_state,
         # trajectory_msg.yaw = 
         # drone_orientations[i, :] = [t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w]
 
+        # trajectory_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
     return trajectory_msg

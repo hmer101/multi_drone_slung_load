@@ -9,10 +9,13 @@ import quaternionic as qt
 from enum import Enum
 
 # Co-ordinate system enum
+# https://docs.px4.io/main/en/ros/ros2_comm.html#ros-2-px4-frame-conventions
 class CS_type(Enum):
     LLA=0,         # Planetary co-ordinate system: Latitude, Longitude, Altitude. Frame can only be 'world'
-    ENU=1,                  # Local tangent plane body CS: East, North, Up (ROS2 default) 
-    NED=2                   # Local tangent plane body CS: North, East, Down (PX4 default)
+    ENU=1,                  # (world) Local tangent plane body CS: East, North, Up (ROS2 default) 
+    NED=2,                  # (world) Local tangent plane body CS: North, East, Down (PX4 default)
+    # FLU=3,                  # (body) Body frame: Forward, Left, Up (ROS2 default) 
+    # FRD=4                   # (body) Body frame: Forward, Right, Down (PX4 default)
 
 # Class to store robot state. 
 # Like geometry_msgs/PoseStamped message but with different background datastructures allowing different co-ordinate system types and other calculations

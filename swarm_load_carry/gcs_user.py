@@ -74,15 +74,17 @@ class GCSUser(Node):
         cmd = None
 
         while cmd != 'q':
-            cmd = input('Enter command [t = takeoff, o = offboard control, r = return to home, h = hold, k = kill, q= quit]:')
+            cmd = input('Enter command [t = takeoff, m = mission start, l = land, r = return to home, h = hold, k = kill, q= quit]:')
 
             match(cmd):
                 case 't':
-                    self.mode_change(ModeChange.Request.MODE_TAKEOFF_MAV_START)
-                case 'o':
-                    self.mode_change(ModeChange.Request.MODE_OFFBOARD_ROS_START)
+                    self.mode_change(ModeChange.Request.MODE_TAKEOFF_START)
+                case 'm':
+                    self.mode_change(ModeChange.Request.MODE_MISSION_START)
+                case 'l':
+                    self.mode_change(ModeChange.Request.MODE_LAND_START)
                 case 'r':
-                    self.mode_change(ModeChange.Request.MODE_LAND_MAV_START)
+                    self.mode_change(ModeChange.Request.MODE_RTL_START)
                 case 'h':
                     self.mode_change(ModeChange.Request.MODE_HOLD)
                 case 'k':
@@ -97,7 +99,7 @@ def main(args=None):
     # Take in user commands (blocking)
     gcs_user.user_commands()
 
-    # # Destroy node
+    # Destroy node
     gcs_user.destroy_node()
     rclpy.shutdown()
 

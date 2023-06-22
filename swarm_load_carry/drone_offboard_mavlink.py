@@ -4,7 +4,6 @@
 # Date: 01/06/2023
 
 import asyncio, rclpy, utils # Note import utils needs additions to setup.py. See here: https://stackoverflow.com/questions/57426715/import-modules-in-package-in-ros2
-import swarm_load_carry.drone_offboard_ros as offboard_ros
 import numpy as np
 import quaternionic as qt
 from swarm_load_carry.state import State, CS_type
@@ -22,7 +21,7 @@ from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
 from geometry_msgs.msg import Pose, Point, Quaternion, TransformStamped
-from px4_msgs.msg import VehicleAttitude, VehicleLocalPosition, OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint, SensorGps
+from px4_msgs.msg import VehicleAttitude, VehicleLocalPosition, OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
 from swarm_load_carry_interfaces.srv import ModeChange, GetGlobalInitPose, SetLocalPose # Note must build workspace and restart IDE before custom packages are found by python
 
 from concurrent.futures import ThreadPoolExecutor
@@ -32,7 +31,6 @@ DEFAULT_DRONE_NUM=1
 DEFAULT_FIRST_DRONE_NUM=1
 DEFAULT_LOAD_ID=1
 
-TAKEOFF_HEIGHT_LOAD=2.0
 
 # Node to encapsulate drone information and actions
 class Drone(Node):
@@ -57,8 +55,6 @@ class Drone(Node):
         self.load_id = self.get_parameter('load_id').get_parameter_value().integer_value
         self.load_name = f'load{self.load_id}'
 
-        self.flag_gps_home_set = False # GPS home set when vehicle first armed
-
         # Vehicle
         self.vehicle_local_state = State(f'{self.get_name()}_init', CS_type.ENU)
 
@@ -69,6 +65,12 @@ class Drone(Node):
 
         # Load
         self.load_desired_state = State(f'world', CS_type.ENU)
+
+        timer_period = 0.02  # seconds
+        # self.dt = timer_period
+        # self.theta = 0.0
+        # self.radius = self.drone_id*5
+        # self.omega = 0.5
 
         # Transforms
         self.tf_buffer = Buffer()
@@ -81,9 +83,7 @@ class Drone(Node):
 
         
         ## TIMERS
-        timer_period = 0.1 #0.02  # seconds
         self.timer = self.create_timer(timer_period, self.clbk_cmdloop)
-        self.offboard_setpoint_counter = 0
 
         ### ROS2
         qos_profile = QoSProfile(
@@ -97,7 +97,6 @@ class Drone(Node):
         self.tf_static_broadcaster_init_pose = StaticTransformBroadcaster(self)
         self.tf_broadcaster = TransformBroadcaster(self)
 
-        
         ## PUBLISHERS
         # Local FMU inputs
         self.pub_offboard_mode = self.create_publisher(OffboardControlMode, f'{self.ns}/fmu/in/offboard_control_mode', qos_profile)
@@ -107,7 +106,6 @@ class Drone(Node):
 
         ## SUBSCRIBERS
         # Local FMU outputs
-        # See full available list here: https://github.com/PX4/PX4-Autopilot/blob/main/src/modules/uxrce_dds_client/dds_topics.yaml
         self.status_sub = self.create_subscription(
             VehicleStatus,
             f'{self.ns}/fmu/out/vehicle_status',
@@ -125,12 +123,6 @@ class Drone(Node):
             f'{self.ns}/fmu/out/vehicle_local_position',
             self.clbk_vehicle_local_position,
             qos_profile)  
-        
-        self.sub_home_position = self.create_subscription(
-            SensorGps,
-            f'{self.ns}/fmu/out/vehicle_gps_position',
-            self.clbk_gps_position,
-            qos_profile) 
 
         # Payload 
         # self.sub_payload_attitude = self.create_subscription(
@@ -164,7 +156,7 @@ class Drone(Node):
         self.srv_mode_change = self.create_service(
             ModeChange,
             f'{self.ns}/mode_change',
-            self.clbk_change_mode_ros)
+            self.clbk_change_mode)
         
         self.srv_get_global_init_pose = self.create_service(
             GetGlobalInitPose,
@@ -193,25 +185,23 @@ class Drone(Node):
 
     # Create a node with MAVLINK connections initialized
     @classmethod
-    def create(cls, node_name='drone9', namespace='px4_9', msg_future_return=None): #async
+    async def create(cls, node_name='drone9', namespace='px4_9', msg_future_return=None):
         # Create node without MAVLINK connections (i.e. only has ROS connections here)
         self = Drone(name=node_name, namespace=namespace)
         
-        
         # Connect MAVLINK
-        # await self.connect_mavlink()
-        # self.msg_future_return = msg_future_return
+        await self.connect_mavlink()
+        self.msg_future_return = msg_future_return
         
-        # # Set drone default parameters
-        # await self.set_params()
+        # Set drone default parameters
+        await self.set_params()
 
         # Get position where GPS co-ordinates are relative to
-        #initial_pos_lla = await self.drone_system.telemetry.get_gps_global_origin()
-        #self.vehicle_initial_global_state.pos = np.array([initial_pos_lla.latitude_deg, initial_pos_lla.longitude_deg, initial_pos_lla.altitude_m])
-        #self.flag_gps_home_set = True
-
+        initial_pos_lla = await self.drone_system.telemetry.get_gps_global_origin()
+        self.vehicle_initial_global_state.pos = np.array([initial_pos_lla.latitude_deg, initial_pos_lla.longitude_deg, initial_pos_lla.altitude_m])
+        
         # Log and return
-        #self.get_logger().info('DRONE NODE CONNECTED THROUGH MAVLINK')
+        self.get_logger().info('DRONE NODE CONNECTED THROUGH MAVLINK')
 
         self.get_logger().info('Setup complete')
 
@@ -248,11 +238,6 @@ class Drone(Node):
         # Update tf
         utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', f'{self.get_name()}', self.vehicle_local_state.pos, self.vehicle_local_state.att_q, self.tf_broadcaster)
     
-    def clbk_gps_position(self, msg):
-        # Update the GPS home position until it is set (at first arming)
-        if not self.flag_gps_home_set:
-            self.vehicle_initial_global_state = np.array([msg.lat, msg.lon, msg.alt])
-
 
     def clbk_load_desired_attitude(self, msg):
         self.load_desired_state.att_q = qt.array([msg.q_d[0], msg.q_d[1], msg.q_d[2], msg.q_d[3]])
@@ -288,51 +273,7 @@ class Drone(Node):
         return response
 
 
-    def clbk_change_mode_ros(self, request, response):
-        self.mode = request.mode
-
-        # Call helper functions if required
-        match self.mode:
-            case ModeChange.Request.MODE_TAKEOFF_START:
-                # Takeoff
-                self.mode=ModeChange.Request.MODE_TAKEOFF_START
-
-            # case ModeChange.Request.MODE_TAKEOFF_MAV_END:
-            #     self.mode=ModeChange.Request.MODE_TAKEOFF_MAV_END
-
-            case ModeChange.Request.MODE_OFFBOARD_START:
-                self.mode=ModeChange.Request.MODE_OFFBOARD_START
-            
-            # case ModeChange.Request.MODE_OFFBOARD_ROS_END:
-            #     self.mode=ModeChange.Request.MODE_OFFBOARD_ROS_END
-
-            #     # Switch to hold mode (doing nothing will leave hovering in offboard mode)
-            #     self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.hold())
-
-            case ModeChange.Request.MODE_LAND_START:
-                self.mode=ModeChange.Request.MODE_LAND_START
-
-            case ModeChange.Request.MODE_LAND_END:
-                self.mode=ModeChange.Request.MODE_LAND_END
-                #self.get_logger().info("In mode land end")
-
-            case ModeChange.Request.MODE_HOLD:
-                self.mode=ModeChange.Request.MODE_HOLD
-
-                #self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.hold())
-
-            case ModeChange.Request.MODE_KILL:
-                self.mode=ModeChange.Request.MODE_KILL
-
-                #self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.kill())
-
-
-        response.success = True
-        self.get_logger().info(f'Requested change to mode: {self.mode}')
-
-        return response
-
-    async def clbk_change_mode_mav_ros(self, request, response):
+    async def clbk_change_mode(self, request, response):
         self.mode = request.mode
 
         # Call helper functions if required
@@ -389,41 +330,25 @@ class Drone(Node):
 
 
     def clbk_cmdloop(self):
-        # Continually publish offboard mode heartbeat 
-        timestamp = int(self.get_clock().now().nanoseconds/1000)
-        offboard_ros.publish_offboard_control_heartbeat_signal(self.pub_offboard_mode, timestamp)
-        
-        # Perform actions depending on what mode is requested
+        # Publish offboard control modes if OFFBOARD_ROS_START is set
         match self.mode:
-            # Run takeoff
-            # Note that arming and taking off like this may not perform all pre-flight checks that MAVLINK does. 
-            # TODO: test if performs preflight checks. Perform manually if doesn't
-            case ModeChange.Request.MODE_TAKEOFF_START:
-                # Get load height feedback in world frame
-                t = utils.lookup_tf('world', 'load1', self.tf_buffer, rclpy.time.Time(), self.get_logger())
-                load_z = t.transform.translation.z
+            case ModeChange.Request.MODE_OFFBOARD_ROS_START:
+                ## Continually publish offboard mode heartbeat 
+                offboard_msg = OffboardControlMode()
+                offboard_msg.timestamp = int(self.get_clock().now().nanoseconds/1000) #int(Clock().now().nanoseconds / 1000)
+                
+                # Select where setpoints are injected in: https://docs.px4.io/main/en/flight_stack/controller_diagrams.html 
+                # Note that bipassed controllers are disabled
+                offboard_msg.position=True
+                offboard_msg.velocity=False
+                offboard_msg.acceleration=False
 
-                # Arm vehicle when offboard message has been published for long enough 
-                if self.offboard_setpoint_counter == 10:
-                    offboard_ros.engage_offboard_mode(self.pub_vehicle_command, timestamp)
-                    offboard_ros.arm(self.pub_vehicle_command, timestamp)
-                    self.flag_gps_home_set = True # TODO: This won't work if FMU is restarted but offboard is not
+                offboard_msg.attitude=False
+                offboard_msg.body_rate=False
 
-                elif self.offboard_setpoint_counter <10: 
-                    self.offboard_setpoint_counter += 1
+                offboard_msg.actuator=False
 
-                elif self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD and load_z < TAKEOFF_HEIGHT_LOAD:
-                    load_takeoff_state = State(f'world', CS_type.ENU)
-                    load_takeoff_state.pos[2] = TAKEOFF_HEIGHT_LOAD 
-
-                    trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, load_takeoff_state, self.get_name(), self.tf_buffer, self.get_logger())
-                    self.pub_trajectory.publish(trajectory_msg)
-
-                elif self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-                    self.mode = ModeChange.Request.MODE_TAKEOFF_END       
-
-            # Run main offboard mission
-            case ModeChange.Request.MODE_MISSION_START:
+                self.pub_offboard_mode.publish(offboard_msg)
 
                 # Publish setpoints if vehicle is actually in offboard mode
                 if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
@@ -433,39 +358,9 @@ class Drone(Node):
                     self.pub_trajectory.publish(trajectory_msg)
 
                     ## 
-                # elif  # Warn user if not yet in offboard mode
-                #     self.get_logger().warn('Drone not yet in offboard mode. Please takeoff first.')
 
-
-            # Run land 
-            case ModeChange.Request.MODE_LAND_START:
-                
-                self.mode = ModeChange.Request.MODE_LAND_END 
-            # Run RTL 
-            case ModeChange.Request.MODE_RTL_START:
-
-                self.mode = ModeChange.Request.MODE_RTL_END
-
-            # Hold 
-            case ModeChange.Request.MODE_HOLD:
-                pass
-
-            # Kill
-            case ModeChange.Request.MODE_KILL:
-                pass
                     
-    def clbk_cmdloop_old(self):
-        # Publish offboard control modes if OFFBOARD_ROS_START is set
-        match self.mode:
-            case ModeChange.Request.MODE_OFFBOARD_ROS_START:
-                timestamp = int(self.get_clock().now().nanoseconds/1000)
-                offboard_ros.publish_offboard_control_heartbeat_signal(self.pub_offboard_mode, timestamp)
-               
-                # Publish waypoints if vehicle is actually in offboard mode
-                if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-                    # Move to position
-                    trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_state, self.get_name(), self.tf_buffer, self.get_logger())
-                    self.pub_trajectory.publish(trajectory_msg)
+
     
     ## HELPER FUNCTIONS
 
@@ -640,16 +535,7 @@ async def main_async(args=None):
     rclpy.shutdown()
 
 def main():
-    #asyncio.run(main_async())
-
-    # Create node
-    rclpy.init()
-    drone = Drone.create(node_name='drone9', namespace='px4_9')
-    rclpy.spin(drone)
-
-    # Destroy node
-    drone.destroy_node()
-    rclpy.shutdown()
+    asyncio.run(main_async())
 
 if __name__ == '__main__':
     main()

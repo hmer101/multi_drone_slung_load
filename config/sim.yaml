@@ -1,6 +1,6 @@
 /**:
     ros__parameters:
       first_drone_num: 1
-      num_drones: 3
+      num_drones: 1 #3
       load_id: 1 #replace with swarm_num?
       
