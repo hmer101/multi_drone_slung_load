@@ -79,6 +79,14 @@ def engage_offboard_mode(pub_vehicle_command, timestamp):
                             pub_vehicle_command, timestamp, param1=1.0, param2=6.0)
     #self.get_logger().info("Switching to offboard mode")
 
+def takeoff(pub_vehicle_command, timestamp, takeoff_state_lla):
+    """Switch to takeoff mode."""
+    publish_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF, 
+                            pub_vehicle_command, timestamp, param1=0.0, param2=0.0, param4=0.0, 
+                            param5=takeoff_state_lla.pos[0], param6=takeoff_state_lla.pos[1], param7=takeoff_state_lla.pos[2])
+    # Takeoff from ground / hand |Minimum pitch (if airspeed sensor present), desired pitch without sensor| Empty| Empty| Yaw angle (if magnetometer present), ignored without magnetometer| Latitude| Longitude| Altitude|
+
+
 def land(pub_vehicle_command, timestamp):
     """Switch to land mode."""
     publish_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_LAND, 

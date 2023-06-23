@@ -88,7 +88,7 @@ def lookup_tf(from_frame_rel, to_frame_rel, tf_buffer, time, logger):
             from_frame_rel,
             time)
     except TransformException as ex:
-        logger.info(
+        logger.warn(
             f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
     
     return t

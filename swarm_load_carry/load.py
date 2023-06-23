@@ -64,8 +64,8 @@ class Load(Node):
         self.timer = self.create_timer(0.02, self.clbk_publoop)
 
         ## PUBLISHERS
-        self.pub_load_attitude = self.create_publisher(VehicleAttitude, f'load_{self.load_id}/out/attitude', qos_profile)
-        self.pub_load_position = self.create_publisher(VehicleLocalPosition, f'load_{self.load_id}/out/local_position', qos_profile)
+        #self.pub_load_attitude = self.create_publisher(VehicleAttitude, f'load_{self.load_id}/out/attitude', qos_profile)
+        #self.pub_load_position = self.create_publisher(VehicleLocalPosition, f'load_{self.load_id}/out/local_position', qos_profile)
         
         ## SUBSCRIBERS
         self.sub_load_attitude_desired = self.create_subscription(
@@ -126,6 +126,8 @@ class Load(Node):
                     drone_orientations[i, :] = [t.transform.rotation.w, t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z]
 
                     count_tf += 1
+            else:
+                self.get_logger().warn(f'Cannot transform from: {from_frame_rel} to {to_frame_rel}')
 
         # Only broadcast load position if all drone positions can be found to estimate it
         if count_tf == self.num_drones:
@@ -143,25 +145,26 @@ class Load(Node):
 
     ## HELPER FUNCTIONS
     def broadcast_load_local_state(self):
+        # The following is done by TFs and so doesn't require topics
         ## Attitude
         # Generate message
-        msg = VehicleAttitude()
-        msg.timestamp = int(self.get_clock().now().nanoseconds/1000)
-        msg.q = [float(self.load_local_state.att_q.w), float(self.load_local_state.att_q.x), float(self.load_local_state.att_q.y), float(self.load_local_state.att_q.z)]
+        # msg = VehicleAttitude()
+        # msg.timestamp = int(self.get_clock().now().nanoseconds/1000)
+        # msg.q = [float(self.load_local_state.att_q.w), float(self.load_local_state.att_q.x), float(self.load_local_state.att_q.y), float(self.load_local_state.att_q.z)]
 
-        # Publish
-        self.pub_load_attitude.publish(msg)
+        # # Publish
+        # self.pub_load_attitude.publish(msg)
 
-        ## Position
-        # Generate message
-        msg = VehicleLocalPosition()
-        msg.timestamp = int(self.get_clock().now().nanoseconds/1000)
-        msg.x = self.load_local_state.pos[0]
-        msg.y = self.load_local_state.pos[1]
-        msg.z = self.load_local_state.pos[2]
+        # ## Position
+        # # Generate message
+        # msg = VehicleLocalPosition()
+        # msg.timestamp = int(self.get_clock().now().nanoseconds/1000)
+        # msg.x = self.load_local_state.pos[0]
+        # msg.y = self.load_local_state.pos[1]
+        # msg.z = self.load_local_state.pos[2]
 
-        # Publish
-        self.pub_load_position.publish(msg)
+        # # Publish
+        # self.pub_load_position.publish(msg)
 
         # Update tf
         utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', self.get_name(), self.load_local_state.pos, self.load_local_state.att_q, self.tf_broadcaster)
