@@ -2,10 +2,24 @@ import math
 import quaternionic
 import numpy as np
 import rclpy
+#from std_msgs.msg import String
 
 from geometry_msgs.msg import TransformStamped
 from px4_msgs.msg import TrajectorySetpoint
 from tf2_ros import TransformException
+
+## STRING HANDLING 
+
+# Extract the an instance number from a ROS publisher/subscriber/client/service
+def extract_instance_from_connection(connection):
+    topic_name = connection.topic_name
+
+    namespace = topic_name.split('/')[1]
+    instance_num = namespace.split('_')[1]
+
+    return int(instance_num)
+
+
 
 ## GEOMETRY
 

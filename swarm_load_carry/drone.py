@@ -251,7 +251,7 @@ class Drone(Node):
     def clbk_gps_position(self, msg):
         # Update the GPS home position until it is set (at first arming)
         if not self.flag_gps_home_set:
-            self.vehicle_initial_global_state = np.array([msg.lat, msg.lon, msg.alt])
+            self.vehicle_initial_global_state.pos = np.array([msg.lat, msg.lon, msg.alt])
 
 
     def clbk_load_desired_attitude(self, msg):
@@ -270,9 +270,9 @@ class Drone(Node):
 
 
     def clbk_send_global_init_pose(self, request, response):
-        response.global_pos.lat = self.vehicle_initial_global_state.pos[0]
-        response.global_pos.lon = self.vehicle_initial_global_state.pos[1]
-        response.global_pos.alt = self.vehicle_initial_global_state.pos[2]
+        response.global_pos.lat = float(self.vehicle_initial_global_state.pos[0])
+        response.global_pos.lon = float(self.vehicle_initial_global_state.pos[1])
+        response.global_pos.alt = float(self.vehicle_initial_global_state.pos[2])
 
         return response
 
@@ -402,6 +402,7 @@ class Drone(Node):
                 # Get load height feedback in world frame
                 t = utils.lookup_tf('world', 'load1', self.tf_buffer, rclpy.time.Time(), self.get_logger())
                 load_z = t.transform.translation.z
+                self.get_logger().info(f'Height: {load_z}')
 
                 # Arm vehicle when offboard message has been published for long enough 
                 if self.offboard_setpoint_counter == 10:

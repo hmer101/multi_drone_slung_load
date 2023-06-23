@@ -2,6 +2,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleCommand, VehicleLocalPosition, VehicleStatus
+import utils
 
 
 NS='/px4_1'
@@ -47,9 +48,14 @@ class OffboardControl(Node):
         """Callback function for vehicle_local_position topic subscriber."""
         self.vehicle_local_position = vehicle_local_position
 
+        #self.get_logger().info(f'Local position updated. z = {vehicle_local_position.z}')
+
+
     def vehicle_status_callback(self, vehicle_status):
         """Callback function for vehicle_status topic subscriber."""
         self.vehicle_status = vehicle_status
+        # self.get_logger().info(f'STATUS CALLBACK')
+        # self.get_logger().info(f'NAV STATE: {self.vehicle_status.nav_state_user_intention}')
 
     def arm(self):
         """Send an arm command to the vehicle."""
@@ -105,7 +111,10 @@ class OffboardControl(Node):
         msg.param5 = params.get("param5", 0.0)
         msg.param6 = params.get("param6", 0.0)
         msg.param7 = params.get("param7", 0.0)
-        msg.target_system = 1
+
+        msg.target_system = utils.extract_instance_from_connection(self.vehicle_command_publisher, self.get_logger())+1 #2 #TODO: MAKE GENERIC
+        self.get_logger().info(f'Target system: {msg.target_system}')
+
         msg.target_component = 1
         msg.source_system = 1
         msg.source_component = 1
@@ -116,20 +125,29 @@ class OffboardControl(Node):
     def timer_callback(self) -> None:
         """Callback function for the timer."""
         self.publish_offboard_control_heartbeat_signal()
+        #self.publish_position_setpoint(0.0, 0.0, self.takeoff_height)
+        #self.get_logger().info('Heartbeat and setpoint published')
 
-        if self.offboard_setpoint_counter == 10:
+        if self.offboard_setpoint_counter == 20:
             self.engage_offboard_mode()
             self.arm()
+            self.get_logger().info('Engaged offboard mode')
+        # elif self.offboard_setpoint_counter == 25:
+        #     self.arm()
+        #     self.get_logger().info('Armed')
 
-        if self.vehicle_local_position.z > self.takeoff_height and self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+        if self.vehicle_local_position.z > (self.takeoff_height+0.5) and self.vehicle_status.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
             self.publish_position_setpoint(0.0, 0.0, self.takeoff_height)
+            #self.get_logger().info('Sending setpoint')
 
-        elif self.vehicle_local_position.z <= self.takeoff_height:
+        elif self.vehicle_local_position.z <= (self.takeoff_height+0.5):
             self.land()
+            self.get_logger().info('Landed')
             exit(0)
 
-        if self.offboard_setpoint_counter < 11:
+        if self.offboard_setpoint_counter < 30:
             self.offboard_setpoint_counter += 1
+            #self.get_logger().info(f'Setpoint counter: {self.offboard_setpoint_counter}')
 
 
 def main(args=None) -> None:

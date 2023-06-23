@@ -7,7 +7,7 @@
 
 import rclpy
 from px4_msgs.msg import OffboardControlMode, TrajectorySetpoint, VehicleCommand, VehicleLocalPosition, VehicleStatus
-
+import utils
 
 # class OffboardControl(Node):
 #     """Node for controlling a vehicle in offboard mode."""
@@ -112,6 +112,9 @@ def publish_offboard_control_heartbeat_signal(pub_offboard_mode, timestamp):
 
 def publish_vehicle_command(command, pub_vehicle_command, timestamp, **params) -> None:
     """Publish a vehicle command."""
+    instance_num = utils.extract_instance_from_connection(pub_vehicle_command)+1
+    
+    # Generate and publish the vehicle command
     msg = VehicleCommand()
     msg.command = command
     msg.param1 = params.get("param1", 0.0)
@@ -121,7 +124,7 @@ def publish_vehicle_command(command, pub_vehicle_command, timestamp, **params) -
     msg.param5 = params.get("param5", 0.0)
     msg.param6 = params.get("param6", 0.0)
     msg.param7 = params.get("param7", 0.0)
-    msg.target_system = 1
+    msg.target_system = instance_num # Target system must match the MAV_SYS_ID/UXRCE_DDS_KEY which is px4_instance+1: https://docs.px4.io/main/en/ros/ros2_multi_vehicle.html#adjusting-the-target-system-value
     msg.target_component = 1
     msg.source_system = 1
     msg.source_component = 1

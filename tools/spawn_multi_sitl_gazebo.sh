@@ -76,5 +76,5 @@ sleep 2
 cd $SCRIPT_DIR
 #gnome-terminal --tab -- bash -c "./multi_mavsdk_server.sh -n $NUM_DRONES"
 
-# Create ROS2 agent
-gnome-terminal --tab -- bash -c "cd ~/repos/PX4-Autopilot; micro-ros-agent udp4 --port 8888"
+# Create ROS2 agent (note must install first: sudo snap install micro-xrce-dds-agent --edge)
+gnome-terminal --tab -- bash -c "micro-xrce-dds-agent udp4 -p 8888" #"cd ~/repos/PX4-Autopilot; micro-ros-agent udp4 --port 8888"
