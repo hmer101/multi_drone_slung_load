@@ -398,7 +398,7 @@ class Drone(Node):
         # Continually publish offboard mode heartbeat 
         timestamp = int(self.get_clock().now().nanoseconds/1000)
         offboard_ros.publish_offboard_control_heartbeat_signal(self.pub_offboard_mode, timestamp)
-        offboard_ros.publish_position_setpoint(self.pub_trajectory, 0.0, 0.0, -2.5, timestamp)
+        offboard_ros.publish_position_setpoint(self.pub_trajectory, 0.0, 0.0, -25.0, timestamp)
 
         # Perform actions depending on what mode is requested
         match self.mode:
@@ -439,8 +439,8 @@ class Drone(Node):
                     #time.sleep(0.2)
 
                     # Set in takeoff mode
-                    offboard_ros.takeoff(self.pub_vehicle_command, timestamp, load_takeoff_state)
-                    #offboard_ros.engage_offboard_mode(self.pub_vehicle_command, timestamp)
+                    #offboard_ros.takeoff(self.pub_vehicle_command, timestamp, load_takeoff_state)
+                    offboard_ros.engage_offboard_mode(self.pub_vehicle_command, timestamp)
                     #self.get_logger().info(f'SENT OFFBOARD')
 
                     # Set in offboard mode
