@@ -64,8 +64,6 @@ class Load(Node):
         self.timer = self.create_timer(0.02, self.clbk_publoop)
 
         ## PUBLISHERS
-        #self.pub_load_attitude = self.create_publisher(VehicleAttitude, f'load_{self.load_id}/out/attitude', qos_profile)
-        #self.pub_load_position = self.create_publisher(VehicleLocalPosition, f'load_{self.load_id}/out/local_position', qos_profile)
         
         ## SUBSCRIBERS
         self.sub_load_attitude_desired = self.create_subscription(
@@ -97,7 +95,6 @@ class Load(Node):
         # TEMP: Assume load attitude moves directly to desired attitude (TODO: add dynamics or sensing/estimation. Publish actual attitude in timer clbk instead)
 
 
-    
     def clbk_desired_load_local_position(self, msg):
         # Update stored setpoint
         self.load_desired_state.pos = np.array([msg.x, msg.y, msg.z])
@@ -142,30 +139,8 @@ class Load(Node):
 
 
 
-
     ## HELPER FUNCTIONS
     def broadcast_load_local_state(self):
-        # The following is done by TFs and so doesn't require topics
-        ## Attitude
-        # Generate message
-        # msg = VehicleAttitude()
-        # msg.timestamp = int(self.get_clock().now().nanoseconds/1000)
-        # msg.q = [float(self.load_local_state.att_q.w), float(self.load_local_state.att_q.x), float(self.load_local_state.att_q.y), float(self.load_local_state.att_q.z)]
-
-        # # Publish
-        # self.pub_load_attitude.publish(msg)
-
-        # ## Position
-        # # Generate message
-        # msg = VehicleLocalPosition()
-        # msg.timestamp = int(self.get_clock().now().nanoseconds/1000)
-        # msg.x = self.load_local_state.pos[0]
-        # msg.y = self.load_local_state.pos[1]
-        # msg.z = self.load_local_state.pos[2]
-
-        # # Publish
-        # self.pub_load_position.publish(msg)
-
         # Update tf
         utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', self.get_name(), self.load_local_state.pos, self.load_local_state.att_q, self.tf_broadcaster)
         
