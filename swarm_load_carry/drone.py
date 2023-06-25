@@ -8,6 +8,8 @@ import swarm_load_carry.drone_offboard_ros as offboard_ros
 import numpy as np
 import pymap3d as pm
 import quaternionic as qt
+import time
+
 from swarm_load_carry.state import State, CS_type
 
 from mavsdk import System, offboard, telemetry
@@ -34,6 +36,7 @@ DEFAULT_FIRST_DRONE_NUM=1
 DEFAULT_LOAD_ID=1
 
 TAKEOFF_HEIGHT_LOAD=2.0
+TAKEOFF_CNT_THRESHOLD=10
 
 # Node to encapsulate drone information and actions
 class Drone(Node):
@@ -44,9 +47,6 @@ class Drone(Node):
 
         self.ns = self.get_namespace()
         self.drone_id = int(str(self.ns)[-1])
-
-        self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX     # Actual mode of the FMU
-        self.mode = ModeChange.Request.MODE_UNASSIGNED          # Desired mode
 
         # Parameters
         self.declare_parameter('num_drones', DEFAULT_DRONE_NUM)
@@ -59,6 +59,9 @@ class Drone(Node):
         self.load_name = f'load{self.load_id}'
 
         # Vehicle
+        self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX     # Actual mode of the FMU
+        self.mode = ModeChange.Request.MODE_UNASSIGNED          # Desired mode
+
         self.vehicle_local_state = State(f'{self.get_name()}_init', CS_type.ENU)
 
         self.vehicle_initial_global_state = State('globe', CS_type.LLA)
@@ -125,11 +128,11 @@ class Drone(Node):
             self.clbk_vehicle_local_position,
             qos_profile)  
         
-        self.sub_global_position = self.create_subscription(
-            VehicleGlobalPosition, #SensorGps,
-            f'{self.ns}/fmu/out/vehicle_global_position', #f'{self.ns}/fmu/out/vehicle_gps_position',
-            self.clbk_vehicle_global_position,
-            qos_profile) 
+        # self.sub_global_position = self.create_subscription(
+        #     VehicleGlobalPosition, #SensorGps,
+        #     f'{self.ns}/fmu/out/vehicle_global_position', #f'{self.ns}/fmu/out/vehicle_gps_position',
+        #     self.clbk_vehicle_global_position,
+        #     qos_profile) 
 
         # Payload 
         self.sub_payload_attitude_desired = self.create_subscription(
@@ -153,7 +156,10 @@ class Drone(Node):
             f'{self.ns}/mode_change',
             self.clbk_change_mode_ros)
         
-        self.srv_get_global_init_pose = False # Only create service once drone is ready to send global initial position 
+        self.srv_get_global_init_pose = self.create_service(
+            GetGlobalInitPose,
+            f'{self.ns}/global_initial_pose',
+            self.clbk_send_global_init_pose) #False # Only create service once drone is ready to send global initial position 
         
         # self.srv_set_local_init_pose = self.create_service(
         #     SetLocalPose,
@@ -224,19 +230,32 @@ class Drone(Node):
         self.vehicle_local_state.pos[0] = msg.x
         self.vehicle_local_state.pos[1] = -msg.y
         self.vehicle_local_state.pos[2] = -msg.z
-        self.vehicle_local_state.pos[0] = msg.vx
-        self.vehicle_local_state.pos[1] = -msg.vy
-        self.vehicle_local_state.pos[2] = -msg.vz
+        self.vehicle_local_state.vel[0] = msg.vx
+        self.vehicle_local_state.vel[1] = -msg.vy
+        self.vehicle_local_state.vel[2] = -msg.vz
 
         # Update tf
         utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', f'{self.get_name()}', self.vehicle_local_state.pos, self.vehicle_local_state.att_q, self.tf_broadcaster)
-        self.get_logger().info(f'vehicle_local_state.pos: {self.vehicle_local_state.pos[0], self.vehicle_local_state.pos[1], self.vehicle_local_state.pos[2]}')
+        #self.get_logger().info(f'ref: {msg.ref_lat, msg.ref_lon, msg.ref_alt}')
+        #self.get_logger().info(f'vehicle_local_state.pos: {self.vehicle_local_state.pos[0], self.vehicle_local_state.pos[1], self.vehicle_local_state.pos[2]}')
 
-
-    def clbk_vehicle_global_position(self, msg):
-        # Update the GPS home position until it is set (at first arming)
+        # Set GPS home 
         if not self.flag_gps_home_set:
-            self.vehicle_initial_global_state.pos = np.array([msg.lat, msg.lon, msg.alt])
+            self.vehicle_initial_global_state.pos[0] = msg.ref_lat
+            self.vehicle_initial_global_state.pos[1] = msg.ref_lon
+            self.vehicle_initial_global_state.pos[2] = msg.ref_alt
+
+            self.flag_gps_home_set = True
+
+
+    # def clbk_vehicle_global_position(self, msg):
+    #     # Update the GPS home position until it is set (at first arming)
+    #     if not self.flag_gps_home_set:
+    #         self.vehicle_initial_global_state.pos = np.array([msg.lat, msg.lon, msg.alt])
+
+    #     self.get_logger().info(f'global_pos: {msg.lat, msg.lon, msg.alt}')
+
+        
 
 
     def clbk_load_desired_attitude(self, msg):
@@ -379,71 +398,102 @@ class Drone(Node):
         # Continually publish offboard mode heartbeat 
         timestamp = int(self.get_clock().now().nanoseconds/1000)
         offboard_ros.publish_offboard_control_heartbeat_signal(self.pub_offboard_mode, timestamp)
-        
+        offboard_ros.publish_position_setpoint(self.pub_trajectory, 0.0, 0.0, -2.5, timestamp)
+
         # Perform actions depending on what mode is requested
         match self.mode:
             # Run takeoff
             # Note that arming and taking off like this may not perform all pre-flight checks that MAVLINK does. 
             # TODO: test if performs preflight checks. Perform manually if doesn't
             case ModeChange.Request.MODE_TAKEOFF_START:
+                #self.get_logger().info(f'nav_state: {self.nav_state}')
+
+                ## SET PARAMS FOR TAKEOFF
+                # Set desired takeoff state
+                load_takeoff_state = State(f'world', CS_type.LLA)
+                load_takeoff_state.pos = self.vehicle_initial_global_state.pos 
+                #load_takeoff_state.pos[2] += (TAKEOFF_HEIGHT_LOAD + self.vehicle_desired_state_rel_load.pos[2])
+
                 # Get load height feedback in world frame
-                from_frame_rel = 'world'
-                to_frame_rel = self.load_name
-                load_z = 0.0
+                # from_frame_rel = 'world'
+                # to_frame_rel = self.load_name
+                # load_z = 0.0
 
-                if self.tf_buffer.can_transform(from_frame_rel, to_frame_rel, rclpy.time.Time(), rclpy.duration.Duration(seconds=1)):
-                    t = utils.lookup_tf(from_frame_rel, to_frame_rel, self.tf_buffer, rclpy.time.Time(), self.get_logger())
+                # if self.tf_buffer.can_transform(from_frame_rel, to_frame_rel, rclpy.time.Time(), rclpy.duration.Duration(seconds=1)):
+                #     t = utils.lookup_tf(from_frame_rel, to_frame_rel, self.tf_buffer, rclpy.time.Time(), self.get_logger())
                 
-                    if t != None:
-                        load_z = t.transform.translation.z
-                else:
-                    self.get_logger().warn(f'Cannot transform from: {from_frame_rel} to {to_frame_rel}')
+                #     if t != None:
+                #         load_z = t.transform.translation.z
+                # else:
+                #     self.get_logger().warn(f'Cannot transform from: {from_frame_rel} to {to_frame_rel}')
 
-                self.get_logger().info(f'Height: {load_z}')
+                #TODO: Set takeoff height of FMU
+                    # LOAD_TAKEOFF_HEIGHT                
 
-                # Arm vehicle when offboard message has been published for long enough 
-                if self.offboard_setpoint_counter == 10:
-                    # Engage offboard mode and arm
-                    offboard_ros.engage_offboard_mode(self.pub_vehicle_command, timestamp)
+                # Arm vehicle when offboard message has been published for long enough (so can switch into offboard mode whenever)
+                if self.offboard_setpoint_counter == TAKEOFF_CNT_THRESHOLD:                   
+                    # Arm
                     offboard_ros.arm(self.pub_vehicle_command, timestamp)
-                    
-                    # Set global position and allow access through service
-                    self.flag_gps_home_set = True # TODO: This won't work if FMU is restarted but offboard is not
-                    
-                    #self.get_logger().info(f'vehicle_initial_global_state.pos: {self.vehicle_initial_global_state.pos[0], self.vehicle_initial_global_state.pos[1], self.vehicle_initial_global_state.pos[2]}')
+                    #offboard_ros.engage_offboard_mode(self.pub_vehicle_command, timestamp)
 
-                    self.srv_get_global_init_pose = self.create_service(
-                        GetGlobalInitPose,
-                        f'{self.ns}/global_initial_pose',
-                        self.clbk_send_global_init_pose)
+                    #time.sleep(0.2)
+
+                    # Set in takeoff mode
+                    offboard_ros.takeoff(self.pub_vehicle_command, timestamp, load_takeoff_state)
+                    #offboard_ros.engage_offboard_mode(self.pub_vehicle_command, timestamp)
+                    #self.get_logger().info(f'SENT OFFBOARD')
+
+                    # Set in offboard mode
+                    #offboard_ros.engage_offboard_mode(self.pub_vehicle_command, timestamp)
+                    
 
                 # Takeoff in progress
-                elif self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD and load_z < TAKEOFF_HEIGHT_LOAD:
-                    # Only takeoff once local initial pose and drone arrangements are set (note if this takes too long, vehicle will disarm)
-                    # TODO: This won't work if FMU is restarted but offboard is not
-                    if self.flag_local_init_pos_set and self.flag_desired_pos_rel_load_set:
-                        load_takeoff_state = State(f'world', CS_type.LLA)
-                        load_takeoff_state.pos = self.vehicle_initial_global_state.pos 
-                        load_takeoff_state.pos[2] += (TAKEOFF_HEIGHT_LOAD + self.vehicle_desired_state_rel_load.pos[2])
-
-                        # load_takeoff_state.pos[2] = TAKEOFF_HEIGHT_LOAD 
-                        #trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, load_takeoff_state, self.get_name(), self.tf_buffer, self.get_logger())
-                        #self.pub_trajectory.publish(trajectory_msg)
-
-                        offboard_ros.takeoff(self.pub_vehicle_command, timestamp, load_takeoff_state)
+                # elif self.offboard_setpoint_counter >= TAKEOFF_CNT_THRESHOLD and self.nav_state ==VehicleStatus.NAVIGATION_STATE_AUTO_TAKEOFF: #and load_z < TAKEOFF_HEIGHT_LOAD:
+                #     self.get_logger().info(f'TAKEOFF IN PROGRESS')
+                #     self.get_logger().info(f'PRE')
+                #     offboard_ros.takeoff(self.pub_vehicle_command, timestamp, load_takeoff_state)
+                #     self.get_logger().info(f'POST')
                         
-                        # TODO: Add some formation feedback
+                    # TODO: Add some formation feedback
+
+                # elif self.offboard_setpoint_counter >= TAKEOFF_CNT_THRESHOLD and self.nav_state ==VehicleStatus.NAVIGATION_STATE_OFFBOARD: #and load_z < TAKEOFF_HEIGHT_LOAD:
+                #     self.get_logger().info(f'TAKEOFF IN PROGRESS')
+                #     self.get_logger().info(f'PRE')
+                #     #offboard_ros.takeoff(self.pub_vehicle_command, timestamp, load_takeoff_state)
+                #     #offboard_ros.publish_position_setpoint(, x: float, y: float, z: float)
+                #     offboard_ros.publish_position_setpoint(self.pub_trajectory, 0.0, 0.0, -2.5, timestamp)
+
+                #     self.get_logger().info(f'POST')
+                        
+                    #TODO: Add some formation feedback
 
                 # Takeoff complete
-                elif self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-                    self.mode = ModeChange.Request.MODE_TAKEOFF_END     
+                # elif self.offboard_setpoint_counter >= TAKEOFF_CNT_THRESHOLD and self.nav_state == VehicleStatus.NAVIGATION_STATE_AUTO_LOITER: #VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+                #     self.mode = ModeChange.Request.MODE_TAKEOFF_END
+                #     self.offboard_setpoint_counter = 0     
+                #     self.get_logger().info(f'END')
+
+                # elif self.offboard_setpoint_counter >= TAKEOFF_CNT_THRESHOLD: 
+                #     offboard_ros.takeoff(self.pub_vehicle_command, timestamp, load_takeoff_state)
+                #     self.get_logger().info(f'SENDING TAKEOFF')
 
                 # Update counter for arm phase
-                if self.offboard_setpoint_counter <=10: 
+                if self.offboard_setpoint_counter <=TAKEOFF_CNT_THRESHOLD: 
                     self.offboard_setpoint_counter += 1
+                    #self.get_logger().info(f'offboard_setpoint_counter: {self.offboard_setpoint_counter}')
+
 
             # Run main offboard mission
             case ModeChange.Request.MODE_MISSION_START:
+                #offboard_ros.engage_offboard_mode(self.pub_vehicle_command, timestamp)
+                
+                # Only go into offboard once local initial pose and drone arrangements are set (note if this takes too long, vehicle will disarm)
+                # TODO: This won't work if FMU is restarted but offboard is not
+                # if self.flag_local_init_pos_set and self.flag_desired_pos_rel_load_set:
+                #     pass
+                    # load_takeoff_state.pos[2] = TAKEOFF_HEIGHT_LOAD 
+                    #trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, load_takeoff_state, self.get_name(), self.tf_buffer, self.get_logger())
+                    #self.pub_trajectory.publish(trajectory_msg)
 
                 # Publish setpoints if vehicle is actually in offboard mode
                 if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:

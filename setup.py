@@ -32,7 +32,7 @@ setup(
             'gcs_background = swarm_load_carry.gcs_background:main',
             'gcs_user = swarm_load_carry.gcs_user:main',
             'load = swarm_load_carry.load:main',
-            'offboard_test = swarm_load_carry.offboard_test:main',
+            #'offboard_test = swarm_load_carry.offboard_test:main',
         ],
     },
 )

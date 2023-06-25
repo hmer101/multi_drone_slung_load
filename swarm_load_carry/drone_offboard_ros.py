@@ -79,11 +79,12 @@ def engage_offboard_mode(pub_vehicle_command, timestamp):
                             pub_vehicle_command, timestamp, param1=1.0, param2=6.0)
     #self.get_logger().info("Switching to offboard mode")
 
+# TODO: Debug
 def takeoff(pub_vehicle_command, timestamp, takeoff_state_lla):
     """Switch to takeoff mode."""
     publish_vehicle_command(VehicleCommand.VEHICLE_CMD_NAV_TAKEOFF, 
                             pub_vehicle_command, timestamp, param1=0.0, param2=0.0, param4=0.0, 
-                            param5=takeoff_state_lla.pos[0], param6=takeoff_state_lla.pos[1], param7=takeoff_state_lla.pos[2])
+                            param5=takeoff_state_lla.pos[0], param6=takeoff_state_lla.pos[1], param7=takeoff_state_lla.pos[2]) #
     # Takeoff from ground / hand |Minimum pitch (if airspeed sensor present), desired pitch without sensor| Empty| Empty| Yaw angle (if magnetometer present), ignored without magnetometer| Latitude| Longitude| Altitude|
 
 
@@ -109,14 +110,14 @@ def publish_offboard_control_heartbeat_signal(pub_offboard_mode, timestamp):
     msg.timestamp = timestamp
     pub_offboard_mode.publish(msg)
 
-# def publish_position_setpoint(self, x: float, y: float, z: float):
-#     """Publish the trajectory setpoint."""
-#     msg = TrajectorySetpoint()
-#     msg.position = [x, y, z]
-#     msg.yaw = 1.57079  # (90 degree)
-#     msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
-#     self.trajectory_setpoint_publisher.publish(msg)
-#     self.get_logger().info(f"Publishing position setpoints {[x, y, z]}")
+def publish_position_setpoint(pub_trajectory, x: float, y: float, z: float, timestamp):
+    """Publish the trajectory setpoint."""
+    msg = TrajectorySetpoint()
+    msg.position = [x, y, z]
+    msg.yaw = 1.57079  # (90 degree)
+    msg.timestamp = timestamp #int(self.get_clock().now().nanoseconds / 1000)
+    pub_trajectory.publish(msg)
+    #self.get_logger().info(f"Publishing position setpoints {[x, y, z]}")
 
 def publish_vehicle_command(command, pub_vehicle_command, timestamp, **params) -> None:
     """Publish a vehicle command."""
