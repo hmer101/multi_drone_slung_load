@@ -130,11 +130,11 @@ class Drone(Node):
             self.clbk_vehicle_local_position,
             qos_profile)  
         
-        # self.sub_global_position = self.create_subscription(
-        #     VehicleGlobalPosition, #SensorGps,
-        #     f'{self.ns}/fmu/out/vehicle_global_position', #f'{self.ns}/fmu/out/vehicle_gps_position',
-        #     self.clbk_vehicle_global_position,
-        #     qos_profile) 
+        self.sub_global_position = self.create_subscription(
+            VehicleGlobalPosition, #SensorGps,
+            f'{self.ns}/fmu/out/vehicle_global_position', #f'{self.ns}/fmu/out/vehicle_gps_position',
+            self.clbk_vehicle_global_position,
+            qos_profile) 
 
         # Payload 
         self.sub_payload_attitude_desired = self.create_subscription(
@@ -186,19 +186,6 @@ class Drone(Node):
         self.flag_desired_pos_rel_load_set = False
 
         ## SETUP HELPERS
-        #self.set_local_init_pose() #TODO: Test for multi-drone
-        # Set this drone's initial position TF relative to 'world'
-        # self.get_logger().info(f'PRE SET LOCAL INIT POSE')
-
-        # # Wait for drone's first local position to be published 
-        # # (required to set the initial pose of all drones but the first)
-        # # while not self.flag_gps_home_set:
-        # #     pass 
-
-        # self.set_local_init_pose()
-        # self.get_logger().info(f'POST SET LOCAL INIT POSE')
-        # Call setup services
-
         # If drone is the first drone, this defines the 'world' co-ordinate system
         if self.drone_id == self.first_drone_num:
             self.vehicle_initial_state_rel_world.pos = np.array([0.0, 0.0, 0.0])
@@ -212,7 +199,6 @@ class Drone(Node):
                 self.get_logger().info(f'Waiting for global initial pose service drone {self.first_drone_num}')
 
             self.first_drone_init_global_pose_future = self.cli_get_first_drone_init_global_pose.call_async(GetGlobalInitPose.Request())
-            self.get_logger().info(f'REQUESTED')
 
 
         ## Print information
@@ -224,7 +210,7 @@ class Drone(Node):
 
     # Create a node with MAVLINK connections initialized
     @classmethod
-    def create(cls, node_name='drone9', namespace='px4_9', msg_future_return=None): #async
+    def create(cls, node_name='drone9', namespace='px4_9'):
         # Create node without MAVLINK connections (i.e. only has ROS connections here)
         self = Drone(name=node_name, namespace=namespace)
         self.get_logger().info('Setup complete')
@@ -250,6 +236,10 @@ class Drone(Node):
         # Update tf
         utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', f'{self.get_name()}', self.vehicle_local_state.pos, self.vehicle_local_state.att_q, self.tf_broadcaster)
 
+    def clbk_vehicle_global_position(self, msg):
+        pass
+        #self.get_logger().info(f'Global pos: {msg.lat}, {msg.lon}, {msg.alt}')
+
     def clbk_vehicle_local_position(self, msg):
         # TODO: handle NED->ENU transformation 
         self.vehicle_local_state.pos[0] = msg.x
@@ -266,9 +256,19 @@ class Drone(Node):
 
         # Set GPS home 
         if not self.flag_gps_home_set:
-            self.vehicle_initial_global_state.pos[0] = msg.ref_lat
-            self.vehicle_initial_global_state.pos[1] = msg.ref_lon
-            self.vehicle_initial_global_state.pos[2] = msg.ref_alt
+            self.vehicle_initial_global_state.pos[0] = float(msg.ref_lat)
+            self.vehicle_initial_global_state.pos[1] = float(msg.ref_lon)
+            self.vehicle_initial_global_state.pos[2] = float(msg.ref_alt)
+
+            #self.get_logger().info(f'Global ref A: {msg.ref_lat}, {msg.ref_lon}, {msg.ref_alt}')
+            self.get_logger().info(f'Global ref B: {self.vehicle_initial_global_state.pos[0]}, {self.vehicle_initial_global_state.pos[1]}, {self.vehicle_initial_global_state.pos[2]}')
+
+
+
+
+            # TODO: HEEEEEEEEEEEEEEEERRRRRRRRRRRRRRRRRRRRRRREEEEEEEEEEEEEEEEEEEEEEEEEEE - why does vehicle_initial_global_state not store global LLA properly??? conversion error???
+
+
 
             # Create global initial pose service to allow other nodes to receive this drone's initial pose
             self.srv_get_global_init_pose = self.create_service(
@@ -351,6 +351,8 @@ class Drone(Node):
         timestamp = int(self.get_clock().now().nanoseconds/1000)
         offboard_ros.publish_offboard_control_heartbeat_signal(self.pub_offboard_mode, timestamp)
 
+        #self.get_logger().info(f'IN LOOP Global LLA: {self.vehicle_initial_global_state.pos[0], self.vehicle_initial_global_state.pos[1], self.vehicle_initial_global_state.pos[2]}')
+
         # Run rest of setup when ready and not already setup
         if self.flag_gps_home_set and not self.flag_local_init_pos_set: #and (not self.drone_id == self.first_drone_num)
             self.get_logger().info(f'BEFORE CHECK FUTURE')
@@ -390,7 +392,7 @@ class Drone(Node):
                     # Send takeoff setpoint
                     offboard_ros.publish_position_setpoint(self.pub_trajectory, 0.0, 0.0, -TAKEOFF_HEIGHT_DRONE, 1.57079, timestamp)
                     #TODO: Add some formation feedback
-                    self.get_logger().info(f'Height TF: {tf_drone_rel_world.transform.translation.z}, \n LOCAL STATE: {self.vehicle_local_state.pos[2]}') 
+                    #self.get_logger().info(f'Height TF: {tf_drone_rel_world.transform.translation.z}, \n LOCAL STATE: {self.vehicle_local_state.pos[2]}') 
 
 
                 # Takeoff complete
@@ -467,11 +469,15 @@ class Drone(Node):
         ## Set initial pose relative to first drone's initial pose
         origin_lla = self.get_origin_pose()
 
+        # TODO: THESE SHOULD BE CLOSE BUT 
+        self.get_logger().info(f'Origin LLA: {origin_lla.pos[0], origin_lla.pos[1], origin_lla.pos[2]}')
+        self.get_logger().info(f'Global LLA: {self.vehicle_initial_global_state.pos[0], self.vehicle_initial_global_state.pos[1], self.vehicle_initial_global_state.pos[2]}')
+
         # Perform transformation
-        trans_x, trans_y, trans_z = pm.geodetic2enu(self.vehicle_initial_global_state.pos[0], self.vehicle_initial_global_state.pos[1], self.vehicle_initial_global_state.pos[2], origin_lla.pos[0], origin_lla.pos[1], origin_lla.pos[2]) 
+        trans_E, trans_N, trans_U = pm.geodetic2enu(self.vehicle_initial_global_state.pos[0], self.vehicle_initial_global_state.pos[1], self.vehicle_initial_global_state.pos[2], origin_lla.pos[0], origin_lla.pos[1], origin_lla.pos[2]) 
 
         # Set local init pose (relative to base CS)
-        self.vehicle_initial_state_rel_world.pos = np.array([trans_x, trans_y, trans_z])
+        self.vehicle_initial_state_rel_world.pos = np.array([trans_E, trans_N, trans_U])
         self.vehicle_initial_state_rel_world.att_q = qt.array([1.0, 0.0, 0.0, 0.0]) #TODO: Set proper relative orientations
         
         # Broadcast tf
