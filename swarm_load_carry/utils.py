@@ -79,17 +79,17 @@ def broadcast_tf(time, frame_parent, frame_child, pos, att, broadcaster):
     broadcaster.sendTransform(t)
 
 # Looks up a co-ordinate frame transform 
-def lookup_tf(from_frame_rel, to_frame_rel, tf_buffer, time, logger):
+def lookup_tf(target_frame, source_frame, tf_buffer, time, logger):
     t = None
     
     try:
         t = tf_buffer.lookup_transform(
-            to_frame_rel,
-            from_frame_rel,
+            target_frame,
+            source_frame,
             time)
     except TransformException as ex:
         logger.warn(
-            f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
+            f'Could not transform {source_frame} to {target_frame}: {ex}')
     
     return t
 
@@ -125,7 +125,7 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_state,
     # logger.info(f'vehicle_desired_state_rel_world: {vehicle_desired_state_rel_world}')
 
     # Need drone rel to drone_init (Pixhawk's frame). Add transforms from world to drone_init frames and convert from ENU to NED
-    t = lookup_tf('world', f'{drone_name}_init', tf_buffer, rclpy.time.Time(), logger)
+    t = lookup_tf(f'{drone_name}_init', 'world', tf_buffer, rclpy.time.Time(), logger)
 
     if t != None:
         trajectory_msg = TrajectorySetpoint()

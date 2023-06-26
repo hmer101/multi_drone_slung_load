@@ -38,6 +38,7 @@ DEFAULT_LOAD_ID=1
 #TAKEOFF_HEIGHT_LOAD=2.0
 TAKEOFF_HEIGHT_DRONE=5.0
 TAKEOFF_CNT_THRESHOLD=10
+TAKEOFF_POS_THRESHOLD=0.1
 
 # Node to encapsulate drone information and actions
 class Drone(Node):
@@ -402,7 +403,7 @@ class Drone(Node):
 
         # Get actual position feedback 
         # Start with drone position (TODO: incorporate load position feedback later)
-        tf_drone_rel_world = utils.lookup_tf('world', self.get_name(), self.tf_buffer, timestamp, self.get_logger())
+        tf_drone_rel_world = utils.lookup_tf('world', self.get_name(), self.tf_buffer, rclpy.time.Time(), self.get_logger())
 
 
         # Perform actions depending on what mode is requested
@@ -411,14 +412,12 @@ class Drone(Node):
             # Note that arming and taking off like this may not perform all pre-flight checks that MAVLINK does. 
             # TODO: test if performs preflight checks. Perform manually if doesn't
             case ModeChange.Request.MODE_TAKEOFF_START:
-                # Send takeoff setpoint
-                offboard_ros.publish_position_setpoint(self.pub_trajectory, 0.0, 0.0, -TAKEOFF_HEIGHT_DRONE, 0.0, timestamp)
-                #TODO: Add some formation feedback
-
                 # Update counter for arm phase
                 if self.offboard_setpoint_counter <=TAKEOFF_CNT_THRESHOLD: 
+                    # Send takeoff setpoint
+                    offboard_ros.publish_position_setpoint(self.pub_trajectory, 0.0, 0.0, -TAKEOFF_HEIGHT_DRONE, 0.0, timestamp)
+
                     self.offboard_setpoint_counter += 1
-                    #self.get_logger().info(f'offboard_setpoint_counter: {self.offboard_setpoint_counter}')
 
                 # Arm vehicle when offboard message has been published for long enough
                 if self.offboard_setpoint_counter == TAKEOFF_CNT_THRESHOLD:                   
@@ -428,11 +427,16 @@ class Drone(Node):
                     # Set in offboard mode
                     offboard_ros.engage_offboard_mode(self.pub_vehicle_command, timestamp)
 
+                # Continue to send setpoint whilst taking off
+                elif self.nav_state ==VehicleStatus.NAVIGATION_STATE_OFFBOARD and tf_drone_rel_world.transform.translation.z<(TAKEOFF_HEIGHT_DRONE-TAKEOFF_POS_THRESHOLD):
+                    # Send takeoff setpoint
+                    offboard_ros.publish_position_setpoint(self.pub_trajectory, 0.0, 0.0, -TAKEOFF_HEIGHT_DRONE, 1.57079, timestamp)
+                    #TODO: Add some formation feedback
+
                 # Takeoff complete
-                elif self.nav_state ==VehicleStatus.NAVIGATION_STATE_OFFBOARD and tf_drone_rel_world.transform.z>=TAKEOFF_HEIGHT_DRONE:
+                elif self.nav_state ==VehicleStatus.NAVIGATION_STATE_OFFBOARD:
                     self.mode = ModeChange.Request.MODE_TAKEOFF_END
                     self.offboard_setpoint_counter = 0     
-                    self.get_logger().info(f'Takeoff complete')
 
 
             # Run main offboard mission
