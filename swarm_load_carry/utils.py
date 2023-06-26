@@ -2,7 +2,6 @@ import math
 import quaternionic
 import numpy as np
 import rclpy
-#from std_msgs.msg import String
 
 from geometry_msgs.msg import TransformStamped
 from px4_msgs.msg import TrajectorySetpoint

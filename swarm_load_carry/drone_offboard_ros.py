@@ -59,7 +59,7 @@ def publish_position_setpoint(pub_trajectory, x: float, y: float, z: float, yaw:
     """Publish the trajectory setpoint."""
     msg = TrajectorySetpoint()
     msg.position = [x, y, z]
-    msg.yaw = yaw #1.57079  # (90 degree)
+    msg.yaw = yaw
     msg.timestamp = timestamp
     pub_trajectory.publish(msg)
 
