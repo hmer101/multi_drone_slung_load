@@ -20,12 +20,20 @@ class CS_type(Enum):
 # Class to store robot state. 
 # Like geometry_msgs/PoseStamped message but with different background datastructures allowing different co-ordinate system types and other calculations
 class State():
-    def __init__(self, frame, cs_type, pos=np.array([0.0, 0.0, 0.0]), att=qt.array([1.0, 0.0, 0.0, 0.0]), vel=np.array([0.0, 0.0, 0.0])):
+    def __init__(self, frame, cs_type, pos=np.array([0.0, 0.0, 0.0]), lat=0.0, lon=0.0, alt=0.0, att=qt.array([1.0, 0.0, 0.0, 0.0]), vel=np.array([0.0, 0.0, 0.0])):
         self.frame = frame
         self.cs_type = cs_type
 
-        self.pos = pos      # Position relative to frame in given co-ordinate system type
+        if cs_type == CS_type.LLA:
+            # Individual variables for LLA to prevent unit conversion errors
+            self.lat = lat 
+            self.lon = lon
+            self.alt = alt
+        else:
+            self.pos = pos      # Position relative to frame in given co-ordinate system type
+        
         self.att_q = att    # Attitude relative to frame as a quaternion [w, x, y, z] (note quaternionic and PX4 default have w first. ROS quaternion msg doesn't have a vector - must specify .x,.y,.z,.w components)
         self.vel = vel      # Velocity relative to frame in given co-ordinate system type
 
+        
        

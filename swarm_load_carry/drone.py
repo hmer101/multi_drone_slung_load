@@ -71,6 +71,12 @@ class Drone(Node):
         
         self.vehicle_desired_state_rel_load = State(f'{self.load_name}', CS_type.ENU)
 
+
+        # self.vehicle_initial_global_lat = 0.0
+        # self.vehicle_initial_global_lon = 0.0 
+        # self.vehicle_initial_global_alt = 0.0
+
+
         # Load
         self.load_desired_state = State(f'world', CS_type.ENU)
 
@@ -256,12 +262,23 @@ class Drone(Node):
 
         # Set GPS home 
         if not self.flag_gps_home_set:
-            self.vehicle_initial_global_state.pos[0] = float(msg.ref_lat)
-            self.vehicle_initial_global_state.pos[1] = float(msg.ref_lon)
-            self.vehicle_initial_global_state.pos[2] = float(msg.ref_alt)
+            # TODO: HERE LIKELY CAUSE
+            # self.vehicle_initial_global_state.pos[0] = np.double(msg.ref_lat) #float(msg.ref_lat)
+            # self.vehicle_initial_global_state.pos[1] = np.double(msg.ref_lon) #float(msg.ref_lon)
+            # self.vehicle_initial_global_state.pos[2] = np.double(msg.ref_alt) #float(msg.ref_alt)
+
+            # self.vehicle_initial_global_lat = msg.ref_lat
+            # self.vehicle_initial_global_lon = msg.ref_lon
+            # self.vehicle_initial_global_alt = msg.ref_alt
+
+            self.vehicle_initial_global_state.lat = msg.ref_lat #float(msg.ref_lat)
+            self.vehicle_initial_global_state.lon = msg.ref_lon #float(msg.ref_lon)
+            self.vehicle_initial_global_state.alt = msg.ref_alt #float(msg.ref_alt)
 
             #self.get_logger().info(f'Global ref A: {msg.ref_lat}, {msg.ref_lon}, {msg.ref_alt}')
-            self.get_logger().info(f'Global ref B: {self.vehicle_initial_global_state.pos[0]}, {self.vehicle_initial_global_state.pos[1]}, {self.vehicle_initial_global_state.pos[2]}')
+            #self.get_logger().info(f'Global ref B: {self.vehicle_initial_global_state.pos[0]}, {self.vehicle_initial_global_state.pos[1]}, {self.vehicle_initial_global_state.pos[2]}')
+            #self.get_logger().info(f'Global ref C: {self.vehicle_initial_global_lat}, {self.vehicle_initial_global_lon}, {self.vehicle_initial_global_alt}')
+            self.get_logger().info(f'Global ref D: {self.vehicle_initial_global_state.lat}, {self.vehicle_initial_global_state.lon}, {self.vehicle_initial_global_state.alt}')
 
 
 
@@ -296,9 +313,17 @@ class Drone(Node):
 
 
     def clbk_send_global_init_pose(self, request, response):
-        response.global_pos.lat = float(self.vehicle_initial_global_state.pos[0])
-        response.global_pos.lon = float(self.vehicle_initial_global_state.pos[1])
-        response.global_pos.alt = float(self.vehicle_initial_global_state.pos[2])
+        # response.global_pos.lat = float(self.vehicle_initial_global_state.pos[0])
+        # response.global_pos.lon = float(self.vehicle_initial_global_state.pos[1])
+        # response.global_pos.alt = float(self.vehicle_initial_global_state.pos[2])
+
+        # response.global_pos.lat = float(self.vehicle_initial_global_lat)
+        # response.global_pos.lon = float(self.vehicle_initial_global_lon)
+        # response.global_pos.alt = float(self.vehicle_initial_global_alt)
+
+        response.global_pos.lat = float(self.vehicle_initial_global_state.lat)
+        response.global_pos.lon = float(self.vehicle_initial_global_state.lon)
+        response.global_pos.alt = float(self.vehicle_initial_global_state.alt)
 
         response.global_att.q[0] = self.vehicle_initial_global_state.att_q.w
         response.global_att.q[1] = self.vehicle_initial_global_state.att_q.x
@@ -460,7 +485,11 @@ class Drone(Node):
         global_origin_pose = self.first_drone_init_global_pose_future.result()
         global_origin_state = State('globe', CS_type.LLA)
 
-        global_origin_state.pos = np.array([global_origin_pose.global_pos.lat, global_origin_pose.global_pos.lon, global_origin_pose.global_pos.alt])
+        #global_origin_state.pos = np.array([global_origin_pose.global_pos.lat, global_origin_pose.global_pos.lon, global_origin_pose.global_pos.alt])
+        global_origin_state.lat = global_origin_pose.global_pos.lat
+        global_origin_state.lon = global_origin_pose.global_pos.lon 
+        global_origin_state.alt = global_origin_pose.global_pos.alt
+        
         global_origin_state.att_q = qt.array([global_origin_pose.global_att.q[0], global_origin_pose.global_att.q[1], global_origin_pose.global_att.q[2], global_origin_pose.global_att.q[3]])
 
         return global_origin_state
@@ -470,11 +499,16 @@ class Drone(Node):
         origin_lla = self.get_origin_pose()
 
         # TODO: THESE SHOULD BE CLOSE BUT 
-        self.get_logger().info(f'Origin LLA: {origin_lla.pos[0], origin_lla.pos[1], origin_lla.pos[2]}')
-        self.get_logger().info(f'Global LLA: {self.vehicle_initial_global_state.pos[0], self.vehicle_initial_global_state.pos[1], self.vehicle_initial_global_state.pos[2]}')
+        #self.get_logger().info(f'Origin LLA: {origin_lla.pos[0], origin_lla.pos[1], origin_lla.pos[2]}')
+        self.get_logger().info(f'Origin LLA: {origin_lla.lat, origin_lla.lon, origin_lla.alt}')
+        #self.get_logger().info(f'Global LLA: {self.vehicle_initial_global_state.pos[0], self.vehicle_initial_global_state.pos[1], self.vehicle_initial_global_state.pos[2]}')
+        self.get_logger().info(f'Global LLA: {self.vehicle_initial_global_state.lat, self.vehicle_initial_global_state.lon, self.vehicle_initial_global_state.alt}')
 
         # Perform transformation
-        trans_E, trans_N, trans_U = pm.geodetic2enu(self.vehicle_initial_global_state.pos[0], self.vehicle_initial_global_state.pos[1], self.vehicle_initial_global_state.pos[2], origin_lla.pos[0], origin_lla.pos[1], origin_lla.pos[2]) 
+        #trans_E, trans_N, trans_U = pm.geodetic2enu(self.vehicle_initial_global_state.pos[0], self.vehicle_initial_global_state.pos[1], self.vehicle_initial_global_state.pos[2], origin_lla.pos[0], origin_lla.pos[1], origin_lla.pos[2]) 
+        #trans_E, trans_N, trans_U = pm.geodetic2enu(self.vehicle_initial_global_lat, self.vehicle_initial_global_lon, self.vehicle_initial_global_alt, origin_lla.pos[0], origin_lla.pos[1], origin_lla.pos[2]) 
+        trans_E, trans_N, trans_U = pm.geodetic2enu(self.vehicle_initial_global_state.lat, self.vehicle_initial_global_state.lon, self.vehicle_initial_global_state.alt, origin_lla.lat, origin_lla.lon, origin_lla.alt) 
+        
 
         # Set local init pose (relative to base CS)
         self.vehicle_initial_state_rel_world.pos = np.array([trans_E, trans_N, trans_U])
