@@ -65,7 +65,7 @@ sleep 2
 
 # Create multiple MAVSDK servers
 cd $SCRIPT_DIR
-gnome-terminal --tab -- bash -c "./multi_mavsdk_server.sh -n $(($NUM_DRONES+1))"
+#gnome-terminal --tab -- bash -c "./multi_mavsdk_server.sh -n $(($NUM_DRONES+1))"
 
 # Create ROS2 agent
 gnome-terminal --tab -- bash -c "cd ~/repos/PX4-Autopilot; micro-ros-agent udp4 --port 8888"
