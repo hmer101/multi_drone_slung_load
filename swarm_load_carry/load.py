@@ -4,7 +4,6 @@
 # Date: 01/26/2023
 
 import numpy as np
-# import pymap3d as pm
 import quaternionic as qt
 import utils
 import rclpy
@@ -12,13 +11,12 @@ import rclpy.qos as qos
 from rclpy.qos import QoSProfile
 from rclpy.node import Node
 
-from tf2_ros import TransformBroadcaster, StaticTransformBroadcaster, TransformException
+from tf2_ros import TransformBroadcaster
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
-from px4_msgs.msg import VehicleAttitude, VehicleAttitudeSetpoint, VehicleLocalPosition, VehicleLocalPositionSetpoint
+from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
 
-from swarm_load_carry_interfaces.srv import GetGlobalInitPose, SetLocalPose
 from swarm_load_carry.state import State, CS_type
 
 DEFAULT_DRONE_NUM=1
