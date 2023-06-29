@@ -112,16 +112,16 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_state,
 
     # Add effect of desired load orientation (note different physical connections to load will require different algorithms)
     # TODO: Add switch statement for gimbal controlling yaw
-    vehicle_desired_pos_rel_load_rot = load_desired_state.att_q.rotate(vehicle_desired_state_rel_load.pos)
+    vehicle_desired_pos_rel_load_rot =  load_desired_state.att_q.rotate(vehicle_desired_state_rel_load.pos) #np.copy(vehicle_desired_state_rel_load.pos) #
 
     # Desired vehicle pos relative to world (in ENU)= desired vehicle pos relative to load + desired load pos rel to world 
     vehicle_desired_state_rel_world = [vehicle_desired_pos_rel_load_rot[0] + load_desired_state.pos[0], 
                                             vehicle_desired_pos_rel_load_rot[1] + load_desired_state.pos[1],
                                             vehicle_desired_pos_rel_load_rot[2] + load_desired_state.pos[2]]
     
-    #logger.info(f'load_desired_state.pos in utils: {[load_desired_state.pos[0], load_desired_state.pos[1], load_desired_state.pos[2]]}')
-    # logger.info(f'vehicle_desired_state_rel_load: {[vehicle_desired_state_rel_load.pos[0], vehicle_desired_state_rel_load.pos[1], vehicle_desired_state_rel_load.pos[2]]}')
-    # logger.info(f'vehicle_desired_state_rel_world: {vehicle_desired_state_rel_world}')
+    # logger.info(f'UTILS: load_desired_state.pos: {[load_desired_state.pos[0], load_desired_state.pos[1], load_desired_state.pos[2]]}')
+    # logger.info(f'UTILS: vehicle_desired_state_rel_load: {[vehicle_desired_state_rel_load.pos[0], vehicle_desired_state_rel_load.pos[1], vehicle_desired_state_rel_load.pos[2]]}')
+    # logger.info(f'UTILS: vehicle_desired_state_rel_world: {vehicle_desired_state_rel_world}')
 
     # Need drone rel to drone_init (Pixhawk's frame). Add transforms from world to drone_init frames and convert from ENU to NED
     t = lookup_tf(f'{drone_name}_init', 'world', tf_buffer, rclpy.time.Time(), logger)
@@ -137,4 +137,23 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_state,
         # drone_orientations[i, :] = [t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w]
 
         # trajectory_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+
+    # logger.info(f'UTILS: traj_msg.pos: {[trajectory_msg.position[0], trajectory_msg.position[1], trajectory_msg.position[2]]}')
+
+
+    return trajectory_msg
+
+# Make drone travel at set velocity
+def gen_traj_msg_vel(desired_velocity):
+    trajectory_msg = TrajectorySetpoint()
+
+    trajectory_msg.position[0] = None
+    trajectory_msg.position[1] = None
+    trajectory_msg.position[2] = None
+
+    # Convert ENU-> NED
+    trajectory_msg.velocity[0] = desired_velocity[1]
+    trajectory_msg.velocity[1] = desired_velocity[0]
+    trajectory_msg.velocity[2] = -desired_velocity[2]
+
     return trajectory_msg

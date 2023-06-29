@@ -26,7 +26,9 @@ DEFAULT_DRONE_NUM=1
 DEFAULT_FIRST_DRONE_NUM=1
 DEFAULT_LOAD_ID=1
 
-TAKEOFF_HEIGHT_DRONE=5.0
+#TAKEOFF_HEIGHT_DRONE=5.0
+TAKEOFF_HEIGHT_LOAD=3.0 #0.0 #3.0
+TAKEOFF_HEIGHT_DRONE_REL_LOAD=1.082
 TAKEOFF_CNT_THRESHOLD=10
 TAKEOFF_POS_THRESHOLD=0.1
 
@@ -76,7 +78,7 @@ class Drone(Node):
 
         
         ## TIMERS
-        timer_period = 0.1 #0.02  # seconds
+        timer_period = 0.05 #0.02  # seconds
         self.timer = self.create_timer(timer_period, self.clbk_cmdloop)
         self.offboard_setpoint_counter = 0
 
@@ -275,10 +277,10 @@ class Drone(Node):
 
 
     def clbk_change_mode_ros(self, request, response):
-        self.mode = request.mode
+        #self.mode = request.mode
 
         # Call helper functions if required
-        match self.mode:
+        match request.mode:
             case ModeChange.Request.MODE_TAKEOFF_START:
                 # Takeoff
                 self.mode=ModeChange.Request.MODE_TAKEOFF_START
@@ -289,8 +291,8 @@ class Drone(Node):
             case ModeChange.Request.MODE_LAND_START:
                 self.mode=ModeChange.Request.MODE_LAND_START
 
-            case ModeChange.Request.MODE_LAND_END:
-                self.mode=ModeChange.Request.MODE_LAND_END
+            # case ModeChange.Request.MODE_LAND_END:
+            #     self.mode=ModeChange.Request.MODE_LAND_END
 
             case ModeChange.Request.MODE_HOLD:
                 self.mode=ModeChange.Request.MODE_HOLD
@@ -313,7 +315,7 @@ class Drone(Node):
     def clbk_cmdloop(self):       
         # Continually publish offboard mode heartbeat (note need setpoint published too to stay in offboard mode)
         timestamp = int(self.get_clock().now().nanoseconds/1000)
-        offboard_ros.publish_offboard_control_heartbeat_signal(self.pub_offboard_mode, timestamp)
+        offboard_ros.publish_offboard_control_heartbeat_signal(self.pub_offboard_mode, 'pos', timestamp)
 
         # Run rest of setup when ready and not already setup
         if self.flag_gps_home_set and not self.flag_local_init_pos_set:
@@ -327,6 +329,20 @@ class Drone(Node):
             # Start with drone position (TODO: incorporate load position feedback later)
             tf_drone_rel_world = utils.lookup_tf('world', self.get_name(), self.tf_buffer, rclpy.time.Time(), self.get_logger())
 
+        # Generate desired drone positions
+        # load_takeoff_state = State('world', CS_type.ENU)
+        # load_takeoff_state.pos[0] = -1.5
+        # load_takeoff_state.pos[2] = TAKEOFF_HEIGHT_LOAD
+        # trajectory_msg_circle_load_takeoff = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, load_takeoff_state, self.get_name(), self.tf_buffer, self.get_logger())
+
+        load_takeoff_state = State('world', CS_type.ENU)
+        load_takeoff_state.pos[0] = -1.5
+        load_takeoff_state.pos[2] = TAKEOFF_HEIGHT_LOAD
+        trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, load_takeoff_state, self.get_name(), self.tf_buffer, self.get_logger())
+
+
+        #trajectory_msg = utils.gen_traj_msg_vel(np.array([0.0, 0.0, 0.5]))
+
         # Perform actions depending on what mode is requested
         match self.mode:
             # Run takeoff
@@ -336,7 +352,8 @@ class Drone(Node):
                 # Update counter for arm phase
                 if self.offboard_setpoint_counter <=TAKEOFF_CNT_THRESHOLD: 
                     # Send takeoff setpoint
-                    offboard_ros.publish_position_setpoint(self.pub_trajectory, 0.0, 0.0, -TAKEOFF_HEIGHT_DRONE, 1.57079, timestamp)
+                    #offboard_ros.publish_position_setpoint(self.pub_trajectory, 0.0, 0.0, -TAKEOFF_HEIGHT_DRONE, 1.57079, timestamp)
+                    self.pub_trajectory.publish(trajectory_msg)
 
                     self.offboard_setpoint_counter += 1
 
@@ -348,22 +365,25 @@ class Drone(Node):
                     # Set in offboard mode
                     offboard_ros.engage_offboard_mode(self.pub_vehicle_command, timestamp)
 
-                # Continue to send setpoint whilst taking off
-                elif self.nav_state ==VehicleStatus.NAVIGATION_STATE_OFFBOARD and tf_drone_rel_world.transform.translation.z<(TAKEOFF_HEIGHT_DRONE-TAKEOFF_POS_THRESHOLD):
+                # Continue to send setpoint whilst taking off #TODO: Make this load feedback here?
+                elif self.nav_state ==VehicleStatus.NAVIGATION_STATE_OFFBOARD and tf_drone_rel_world.transform.translation.z<((TAKEOFF_HEIGHT_LOAD+TAKEOFF_HEIGHT_DRONE_REL_LOAD)-TAKEOFF_POS_THRESHOLD): 
                     # Send takeoff setpoint
-                    offboard_ros.publish_position_setpoint(self.pub_trajectory, 0.0, 0.0, -TAKEOFF_HEIGHT_DRONE, 1.57079, timestamp)
+                    #offboard_ros.publish_position_setpoint(self.pub_trajectory, 0.0, 0.0, -TAKEOFF_HEIGHT_DRONE, 1.57079, timestamp)
+                    self.pub_trajectory.publish(trajectory_msg)
                     #TODO: Add some formation feedback
 
                 # Takeoff complete
                 elif self.nav_state ==VehicleStatus.NAVIGATION_STATE_OFFBOARD:
                     self.mode = ModeChange.Request.MODE_TAKEOFF_END
                     self.offboard_setpoint_counter = 0     
+                    self.pub_trajectory.publish(trajectory_msg)
                     self.get_logger().info(f'Takeoff complete')
 
 
             # Takeoff complete - hover at takeoff end location
             case ModeChange.Request.MODE_TAKEOFF_END:
-                offboard_ros.publish_position_setpoint(self.pub_trajectory, 0.0, 0.0, -TAKEOFF_HEIGHT_DRONE, 1.57079, timestamp)
+                #offboard_ros.publish_position_setpoint(self.pub_trajectory, 0.0, 0.0, -TAKEOFF_HEIGHT_DRONE, 1.57079, timestamp)
+                self.pub_trajectory.publish(trajectory_msg)
 
                 # tf_drone_rel_init = utils.lookup_tf(f'drone{self.drone_id}_init', self.get_name(), self.tf_buffer, rclpy.time.Time(), self.get_logger())
                 
@@ -385,10 +405,11 @@ class Drone(Node):
 
                 # Publish setpoints if vehicle is actually in offboard mode
                 if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+                    pass
                     ## Trajectory setpoint - input to PID position controller (can set position, velocity and acceleration)
                     # Move to position
-                    trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_state, self.get_name(), self.tf_buffer, self.get_logger())
-                    self.pub_trajectory.publish(trajectory_msg)
+                    # trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_state, self.get_name(), self.tf_buffer, self.get_logger())
+                    # self.pub_trajectory.publish(trajectory_msg)
 
                 # TODO: Add some formation feedback
 

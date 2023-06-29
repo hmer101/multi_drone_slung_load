@@ -78,7 +78,7 @@ class GCSBackground(Node):
                 self.get_logger().info(f'Waiting for set pose rel load service: drone {i}')
 
         # Set drone arrangement around load
-        self.set_drone_arrangement(2, [2, 2, 2])
+        self.set_drone_arrangement(1, [1.082, 1.082, 1.082])
 
         self.get_logger().info('Setup complete')
 
@@ -112,7 +112,7 @@ class GCSBackground(Node):
 
         pos_req_future = [None] * self.num_drones
 
-        # Get current drone positions
+        # Get current drone positions 
 
         # Set drone arrangements
         for i, next_cli_set_drone_pose in enumerate(self.cli_set_drone_poses_rel_load):

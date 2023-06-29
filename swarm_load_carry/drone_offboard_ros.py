@@ -39,18 +39,26 @@ def engage_offboard_mode(pub_vehicle_command, timestamp):
     publish_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_MODE, 
                             pub_vehicle_command, timestamp, param1=1.0, param2=6.0)
 
-def publish_offboard_control_heartbeat_signal(pub_offboard_mode, timestamp):
+def publish_offboard_control_heartbeat_signal(pub_offboard_mode, what_control, timestamp):
     """Publish the offboard control mode."""
     msg = OffboardControlMode()
 
     # Select where setpoints are injected in: https://docs.px4.io/main/en/flight_stack/controller_diagrams.html 
     # Note that bipassed controllers are disabled
-    msg.position = True
+    msg.position = False
     msg.velocity = False
     msg.acceleration = False
     msg.attitude = False
     msg.body_rate = False
     msg.actuator = False
+
+    match what_control:
+        case 'pos':
+            msg.position = True
+        case 'vel':
+            msg.velocity = True
+        case 'accel':
+            msg.acceleration = True
 
     msg.timestamp = timestamp
     pub_offboard_mode.publish(msg)
