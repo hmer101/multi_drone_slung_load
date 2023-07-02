@@ -27,13 +27,13 @@ class State():
 
         if cs_type == CS_type.LLA:
             # Individual variables for LLA to prevent unit conversion errors
-            self.lat = lat 
+            self.lat = lat
             self.lon = lon
             self.alt = alt
         else:
             self.pos = np.copy(pos)      # Position relative to frame in given co-ordinate system type
         
-        self.att_q = qt.array([att.w, att.x, att.y, att.z])   # Attitude relative to frame as a quaternion [w, x, y, z] (note quaternionic and PX4 default have w first. ROS quaternion msg doesn't have a vector - must specify .x,.y,.z,.w components)
+        self.att_q = att.copy() #qt.array([att.w, att.x, att.y, att.z])   # Attitude relative to frame as a quaternion [w, x, y, z] (note quaternionic and PX4 default have w first. ROS quaternion msg doesn't have a vector - must specify .x,.y,.z,.w components)
         self.vel = np.copy(vel)                               # Velocity relative to frame in given co-ordinate system type
 
         

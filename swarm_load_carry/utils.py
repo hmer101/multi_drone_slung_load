@@ -93,6 +93,16 @@ def lookup_tf(target_frame, source_frame, tf_buffer, time, logger):
     return t
 
 
+# Converts a quaternion to XYZ Tait-Bryan angles (roll, pitch, yaw) measured in the intrinsic CS
+def quaternion_to_rpy(q):
+    rpy = np.array([0.0, 0.0, 0.0])
+
+    rpy[0] = np.atan2(2 * (q.w*q.x + q.y*q.z), 1 - 2 * (q.x^2 + q.y^2))
+    rpy[1] = np.asin(2 * (q.w*q.y - q.z*q.x))
+    rpy[2] = np.atan2(2 * (q.w*q.z + q.x*q.y), 1 - 2 * (q.y^2 + q.z^2))
+
+    return rpy
+
 ## TRAJECTORY GENERATION
 # Note trajectories sent to Pixhawk controller must be in NED co-ordinates relative to initial drone position. ENU -> NED and frame transformations handled here
 
@@ -142,6 +152,20 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_state,
 
 
     return trajectory_msg
+
+def gen_traj_msg_straight_up(takeoff_height, takeoff_yaw):
+    trajectory_msg = TrajectorySetpoint()
+
+    # Set position straight up
+    trajectory_msg.position[0] = 0.0
+    trajectory_msg.position[1] = 0.0
+    trajectory_msg.position[2] = -takeoff_height
+
+    trajectory_msg.yaw = takeoff_yaw
+
+    return trajectory_msg
+
+
 
 # Make drone travel at set velocity
 def gen_traj_msg_vel(desired_velocity):
