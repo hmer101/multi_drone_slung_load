@@ -97,9 +97,9 @@ def lookup_tf(target_frame, source_frame, tf_buffer, time, logger):
 def quaternion_to_rpy(q):
     rpy = np.array([0.0, 0.0, 0.0])
 
-    rpy[0] = np.atan2(2 * (q.w*q.x + q.y*q.z), 1 - 2 * (q.x^2 + q.y^2))
-    rpy[1] = np.asin(2 * (q.w*q.y - q.z*q.x))
-    rpy[2] = np.atan2(2 * (q.w*q.z + q.x*q.y), 1 - 2 * (q.y^2 + q.z^2))
+    rpy[0] = np.arctan2(2 * (q.w*q.x + q.y*q.z), 1 - 2 * (q.x**2 + q.y**2))
+    rpy[1] = np.arcsin(2 * (q.w*q.y - q.z*q.x))
+    rpy[2] = np.arctan2(2 * (q.w*q.z + q.x*q.y), 1 - 2 * (q.y**2 + q.z**2))
 
     return rpy
 
