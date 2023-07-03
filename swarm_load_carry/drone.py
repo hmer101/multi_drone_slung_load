@@ -208,15 +208,13 @@ class Drone(Node):
         # Original q from FRD->NED
         # Handles FRD->NED to FLU->ENU transformation 
         q_px4 = utils.q_to_normalized_np(qt.array([msg.q[0], msg.q[1], msg.q[2], msg.q[3]]))
-
         q_ros = ft.px4_to_ros_orientation(q_px4)
 
-        self.vehicle_local_state.att_q.w = q_ros[0]    #msg.q[0]
-        self.vehicle_local_state.att_q.x = q_ros[1]    #msg.q[1] 
-        self.vehicle_local_state.att_q.y = q_ros[2]    #-msg.q[2] 
-        self.vehicle_local_state.att_q.z = q_ros[3]    #-msg.q[3] 
+        self.vehicle_local_state.att_q.w = q_ros[0]
+        self.vehicle_local_state.att_q.x = q_ros[1] 
+        self.vehicle_local_state.att_q.y = q_ros[2]   
+        self.vehicle_local_state.att_q.z = q_ros[3] 
         
-        #self.get_logger().info(f'ATTITUDE: {[self.vehicle_local_state.att_q.w, self.vehicle_local_state.att_q.x, self.vehicle_local_state.att_q.y, self.vehicle_local_state.att_q.z]}')
 
         if not self.flag_gps_home_set:
             # Set the initial attitude as the current attitude
