@@ -13,6 +13,8 @@ from rclpy.node import Node
 from swarm_load_carry_interfaces.srv import ModeChange
 from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
 
+import example
+
 DEFAULT_DRONE_NUM=1
 DEFAULT_FIRST_DRONE_NUM=1
 DEFAULT_LOAD_ID=1
@@ -47,6 +49,10 @@ class GCSUser(Node):
                 self.get_logger().info(f'Waiting for offboard ROS start service {i}')
 
         self.get_logger().info('Setup complete')
+
+
+
+        self.get_logger().info(f'ADD: {example.add(1,2)}')
 
 
     ## CALLBACKS

@@ -1,7 +1,9 @@
 import math
-import quaternionic
+import quaternionic as qt
 import numpy as np
 import rclpy
+
+import frame_transforms as ft
 
 from geometry_msgs.msg import TransformStamped
 from px4_msgs.msg import TrajectorySetpoint
@@ -18,6 +20,12 @@ def extract_instance_from_connection(connection):
 
     return int(instance_num)
 
+## CONVERSIONS
+# Normalize a quaternion and return the equivalent numpy representation
+def q_to_normalized_np(q: qt.array):
+    q_norm = q.normalized
+
+    return np.array([q_norm.w, q_norm.x, q_norm.y, q_norm.z])
 
 
 ## GEOMETRY
@@ -94,14 +102,14 @@ def lookup_tf(target_frame, source_frame, tf_buffer, time, logger):
 
 
 # Converts a quaternion to XYZ Tait-Bryan angles (roll, pitch, yaw) measured in the intrinsic CS
-def quaternion_to_rpy(q):
-    rpy = np.array([0.0, 0.0, 0.0])
+# def quaternion_to_rpy(q):
+#     rpy = np.array([0.0, 0.0, 0.0])
 
-    rpy[0] = np.arctan2(2 * (q.w*q.x + q.y*q.z), 1 - 2 * (q.x**2 + q.y**2))
-    rpy[1] = np.arcsin(2 * (q.w*q.y - q.z*q.x))
-    rpy[2] = np.arctan2(2 * (q.w*q.z + q.x*q.y), 1 - 2 * (q.y**2 + q.z**2))
+#     rpy[0] = np.arctan2(2 * (q.w*q.x + q.y*q.z), 1 - 2 * (q.x**2 + q.y**2))
+#     rpy[1] = np.arcsin(2 * (q.w*q.y - q.z*q.x))
+#     rpy[2] = np.arctan2(2 * (q.w*q.z + q.x*q.y), 1 - 2 * (q.y**2 + q.z**2))
 
-    return rpy
+#     return rpy
 
 ## TRAJECTORY GENERATION
 # Note trajectories sent to Pixhawk controller must be in NED co-ordinates relative to initial drone position. ENU -> NED and frame transformations handled here
@@ -138,6 +146,8 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_state,
 
     if t != None:
         trajectory_msg = TrajectorySetpoint()
+
+        # Converts ENU-> NED
         trajectory_msg.position[0] = vehicle_desired_state_rel_world[1] + t.transform.translation.y
         trajectory_msg.position[1] = vehicle_desired_state_rel_world[0] + t.transform.translation.x
         trajectory_msg.position[2] = -(vehicle_desired_state_rel_world[2] + t.transform.translation.z)
@@ -153,7 +163,8 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_state,
 
     return trajectory_msg
 
-def gen_traj_msg_straight_up(takeoff_height, takeoff_yaw):
+# Generate trajectory message that gives setpoint at a specific height and orientation
+def gen_traj_msg_straight_up(takeoff_height, takeoff_q):
     trajectory_msg = TrajectorySetpoint()
 
     # Set position straight up
@@ -161,10 +172,11 @@ def gen_traj_msg_straight_up(takeoff_height, takeoff_yaw):
     trajectory_msg.position[1] = 0.0
     trajectory_msg.position[2] = -takeoff_height
 
-    trajectory_msg.yaw = takeoff_yaw
+    # Get yaw in NED from takeoff_q
+    q_NED = ft.ros_to_px4_orientation(q_to_normalized_np(takeoff_q))
+    trajectory_msg.yaw = ft.quaternion_get_yaw(q_NED)
 
     return trajectory_msg
-
 
 
 # Make drone travel at set velocity

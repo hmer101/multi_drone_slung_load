@@ -9,6 +9,8 @@ import numpy as np
 import pymap3d as pm
 import quaternionic as qt
 
+import frame_transforms as ft
+
 from swarm_load_carry.state import State, CS_type
 
 import rclpy.qos as qos
@@ -203,16 +205,22 @@ class Drone(Node):
         self.arm_state = msg.arming_state
 
     def clbk_vehicle_attitude(self, msg):
-        # Handles NED->ENU transformation 
-        self.vehicle_local_state.att_q.x = msg.q[1] #msg.q[0]
-        self.vehicle_local_state.att_q.y = -msg.q[2] #msg.q[1]
-        self.vehicle_local_state.att_q.z = -msg.q[3] #-msg.q[2]
-        self.vehicle_local_state.att_q.w = msg.q[0] #-msg.q[3]
+        # Original q from FRD->NED
+        # Handles FRD->NED to FLU->ENU transformation 
+        q_px4 = utils.q_to_normalized_np(qt.array([msg.q[0], msg.q[1], msg.q[2], msg.q[3]]))
 
-        if not self.flag_gps_home_set: #and (self.offboard_setpoint_counter > 1): # and (self.offboard_setpoint_counter<TAKEOFF_CNT_THRESHOLD):#(round(TAKEOFF_CNT_THRESHOLD/2))):
+        q_ros = ft.px4_to_ros_orientation(q_px4)
+
+        self.vehicle_local_state.att_q.w = q_ros[0]    #msg.q[0]
+        self.vehicle_local_state.att_q.x = q_ros[1]    #msg.q[1] 
+        self.vehicle_local_state.att_q.y = q_ros[2]    #-msg.q[2] 
+        self.vehicle_local_state.att_q.z = q_ros[3]    #-msg.q[3] 
+        
+        #self.get_logger().info(f'ATTITUDE: {[self.vehicle_local_state.att_q.w, self.vehicle_local_state.att_q.x, self.vehicle_local_state.att_q.y, self.vehicle_local_state.att_q.z]}')
+
+        if not self.flag_gps_home_set:
             # Set the initial attitude as the current attitude
             self.vehicle_initial_global_state.att_q = self.vehicle_local_state.att_q.copy()
-            # self.vehicle_initial_state_rel_world.att_q = self.vehicle_local_state.att_q.copy()
 
         # Update tf
         if not (np.isnan(self.vehicle_local_state.pos[0])):
@@ -235,19 +243,13 @@ class Drone(Node):
 
     def clbk_vehicle_global_position(self, msg):
         # Set GPS/location home immediately prior to first arming/takeoff
-        if not self.flag_gps_home_set and (self.offboard_setpoint_counter > 1): #TAKEOFF_CNT_THRESHOLD): #==(round(TAKEOFF_CNT_THRESHOLD/2))):            
+        if not self.flag_gps_home_set and (self.offboard_setpoint_counter > 1):          
             # Set the initial position as the current global position
             self.vehicle_initial_global_state.lat = msg.lat
             self.vehicle_initial_global_state.lon = msg.lon 
             self.vehicle_initial_global_state.alt = msg.alt
 
             offboard_ros.set_origin(self.pub_vehicle_command, msg.lat, msg.lon, msg.alt, int(self.get_clock().now().nanoseconds/1000))
-
-            # Create global initial pose service to allow other nodes to receive this drone's initial pose
-            # self.srv_get_global_init_pose = self.create_service(
-            #                                     GetGlobalInitPose,
-            #                                     f'{self.ns}/global_initial_pose',
-            #                                     self.clbk_send_global_init_pose)
 
             self.flag_gps_home_set = True   
 
@@ -348,7 +350,9 @@ class Drone(Node):
 
         #trajectory_msg = utils.gen_traj_msg_vel(np.array([0.0, 0.0, 0.5]))
         #takeoff_rpy = utils.quaternion_to_rpy(self.vehicle_local_state.att_q)
-        trajectory_msg = utils.gen_traj_msg_straight_up(TAKEOFF_HEIGHT_LOAD + TAKEOFF_HEIGHT_DRONE_REL_LOAD, 0.0)#takeoff_rpy[2])
+
+        # init_yaw_ENU = ft.quaternion_get_yaw(utils.q_to_normalized_np(self.vehicle_initial_state_rel_world.att_q))
+        trajectory_msg = utils.gen_traj_msg_straight_up(TAKEOFF_HEIGHT_LOAD + TAKEOFF_HEIGHT_DRONE_REL_LOAD, self.vehicle_initial_state_rel_world.att_q) #takeoff_rpy[2])
 
 
         # Perform actions depending on what mode is requested
@@ -360,7 +364,6 @@ class Drone(Node):
                 # Update counter for arm phase
                 if self.offboard_setpoint_counter <=TAKEOFF_CNT_THRESHOLD: 
                     # Send takeoff setpoint
-                    #offboard_ros.publish_position_setpoint(self.pub_trajectory, 0.0, 0.0, -TAKEOFF_HEIGHT_DRONE, 1.57079, timestamp)
                     self.pub_trajectory.publish(trajectory_msg)
 
                     self.offboard_setpoint_counter += 1
@@ -386,31 +389,17 @@ class Drone(Node):
                         #TODO: Add some formation feedback
                         
                     # Send takeoff setpoint
-                    self.pub_trajectory.publish(trajectory_msg) #offboard_ros.publish_position_setpoint(self.pub_trajectory, 0.0, 0.0, -TAKEOFF_HEIGHT_DRONE, 1.57079, timestamp)
+                    self.pub_trajectory.publish(trajectory_msg)
 
 
             # Takeoff complete - hover at takeoff end location
             case ModeChange.Request.MODE_TAKEOFF_END:
-                #offboard_ros.publish_position_setpoint(self.pub_trajectory, 0.0, 0.0, -TAKEOFF_HEIGHT_DRONE, 1.57079, timestamp)
                 self.pub_trajectory.publish(trajectory_msg)
 
-                # tf_drone_rel_init = utils.lookup_tf(f'drone{self.drone_id}_init', self.get_name(), self.tf_buffer, rclpy.time.Time(), self.get_logger())
-                
-                # self.get_logger().info(f'TF rel world: {tf_drone_rel_world.transform.translation.x}, {tf_drone_rel_world.transform.translation.y}, {tf_drone_rel_world.transform.translation.z} \n')
-                # self.get_logger().info(f'TF rel drone_init: {tf_drone_rel_init.transform.translation.x}, {tf_drone_rel_init.transform.translation.y}, {tf_drone_rel_init.transform.translation.z} \n')
-                # self.get_logger().info(f'vehicle_local_state: {self.vehicle_local_state.pos[0]}, {self.vehicle_local_state.pos[1]}, {self.vehicle_local_state.pos[2]}')
 
             # Run main offboard mission
             case ModeChange.Request.MODE_MISSION_START:
-                #offboard_ros.engage_offboard_mode(self.pub_vehicle_command, timestamp)
-                
-                # Only go into offboard once local initial pose and drone arrangements are set (note if this takes too long, vehicle will disarm)
-                # TODO: This won't work if FMU is restarted but offboard is not
-                # if self.flag_local_init_pos_set and self.flag_desired_pos_rel_load_set:
-                #     pass
-                    # load_takeoff_state.pos[2] = TAKEOFF_HEIGHT_LOAD 
-                    #trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, load_takeoff_state, self.get_name(), self.tf_buffer, self.get_logger())
-                    #self.pub_trajectory.publish(trajectory_msg)
+
 
                 # Publish setpoints if vehicle is actually in offboard mode
                 if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
@@ -483,7 +472,7 @@ class Drone(Node):
         
         # Set local init pose (relative to base CS)
         self.vehicle_initial_state_rel_world.pos = np.array([trans_E, trans_N, trans_U])
-        self.vehicle_initial_state_rel_world.att_q = self.vehicle_initial_global_state.att_q #TODO: If required to set relative to world, need extra flag to ensure inital att is set before sending global init pose
+        self.vehicle_initial_state_rel_world.att_q = self.vehicle_initial_global_state.att_q.copy() #TODO: If required to set relative to world, need extra flag to ensure inital att is set before sending global init pose
         #(1/self.vehicle_initial_global_state.att_q) * origin_state_lla.att_q #  #qt.distance.rotation.intrinsic() # #qt.array([1.0, 0.0, 0.0, 0.0]) 
 
         # Broadcast tf

@@ -13,6 +13,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('lib/' + package_name, [package_name+'/utils.py']),
+        ('lib/' + package_name, glob(package_name + '/*.so')),
         (os.path.join('share', package_name, 'launch'), 
          glob(os.path.join('launch', '*.launch.py'))),
         (os.path.join('share', package_name, 'config'),
@@ -32,7 +33,7 @@ setup(
             'gcs_background = swarm_load_carry.gcs_background:main',
             'gcs_user = swarm_load_carry.gcs_user:main',
             'load = swarm_load_carry.load:main',
-            #'offboard_test = swarm_load_carry.offboard_test:main',
+            'test = swarm_load_carry.test:main'
         ],
     },
 )
