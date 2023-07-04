@@ -337,20 +337,25 @@ class Drone(Node):
             # Start with drone position (TODO: incorporate load position feedback later)
             tf_drone_rel_world = utils.lookup_tf('world', self.get_name(), self.tf_buffer, rclpy.time.Time(), self.get_logger())
 
-        # Generate desired drone positions
-        # load_takeoff_state = State('world', CS_type.ENU)
-        # load_takeoff_state.pos[0] = -1.5
-        # load_takeoff_state.pos[1] = 0.0
-        # load_takeoff_state.pos[2] = TAKEOFF_HEIGHT_LOAD
-        # trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, load_takeoff_state, self.get_name(), self.tf_buffer, self.get_logger())
+        # Generate desired drone positions - takeoff
+        load_takeoff_state = State('world', CS_type.ENU)
+        load_takeoff_state.pos[0] = -1.5
+        load_takeoff_state.pos[1] = 0.0
+        load_takeoff_state.pos[2] = TAKEOFF_HEIGHT_LOAD
+
+        takeoff_q = qt.array([self.vehicle_initial_state_rel_world.att_q.w, self.vehicle_initial_state_rel_world.att_q.x, self.vehicle_initial_state_rel_world.att_q.y, self.vehicle_initial_state_rel_world.att_q.z])
+        takeoff_q = qt.array([1.0, 0.0, 0.0, 0.0])*takeoff_q # [0.0, 0.0, 0.0, -1.0] Rotate load by 180deg cw           [0.71, 0.0, 0.0, 0.71]  90 deg acw
+
+        load_takeoff_state.att_q.w = takeoff_q.w
+        load_takeoff_state.att_q.x = takeoff_q.x
+        load_takeoff_state.att_q.y = takeoff_q.y
+        load_takeoff_state.att_q.z = takeoff_q.z
+
+        trajectory_msg_takeoff = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, load_takeoff_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger())
 
         #self.get_logger().info(f'load_takeoff_state ATT: {load_takeoff_state.att_q.w}, {load_takeoff_state.att_q.x}, {load_takeoff_state.att_q.y}, {load_takeoff_state.att_q.z}')
 
-        #trajectory_msg = utils.gen_traj_msg_vel(np.array([0.0, 0.0, 0.5]))
-        #takeoff_rpy = utils.quaternion_to_rpy(self.vehicle_local_state.att_q)
-
-        # init_yaw_ENU = ft.quaternion_get_yaw(utils.q_to_normalized_np(self.vehicle_initial_state_rel_world.att_q))
-        trajectory_msg = utils.gen_traj_msg_straight_up(TAKEOFF_HEIGHT_LOAD + TAKEOFF_HEIGHT_DRONE_REL_LOAD, self.vehicle_initial_state_rel_world.att_q) #takeoff_rpy[2])
+        #trajectory_msg = utils.gen_traj_msg_straight_up(TAKEOFF_HEIGHT_LOAD + TAKEOFF_HEIGHT_DRONE_REL_LOAD, self.vehicle_initial_state_rel_world.att_q) #takeoff_rpy[2])
 
 
         # Perform actions depending on what mode is requested
@@ -362,7 +367,7 @@ class Drone(Node):
                 # Update counter for arm phase
                 if self.offboard_setpoint_counter <=TAKEOFF_CNT_THRESHOLD: 
                     # Send takeoff setpoint
-                    self.pub_trajectory.publish(trajectory_msg)
+                    self.pub_trajectory.publish(trajectory_msg_takeoff)
 
                     self.offboard_setpoint_counter += 1
 
@@ -387,12 +392,12 @@ class Drone(Node):
                         #TODO: Add some formation feedback
                         
                     # Send takeoff setpoint
-                    self.pub_trajectory.publish(trajectory_msg)
+                    self.pub_trajectory.publish(trajectory_msg_takeoff)
 
 
             # Takeoff complete - hover at takeoff end location
             case ModeChange.Request.MODE_TAKEOFF_END:
-                self.pub_trajectory.publish(trajectory_msg)
+                self.pub_trajectory.publish(trajectory_msg_takeoff)
 
 
             # Run main offboard mission

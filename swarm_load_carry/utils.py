@@ -104,52 +104,42 @@ def lookup_tf(target_frame, source_frame, tf_buffer, time, logger):
 ## TRAJECTORY GENERATION
 # Note trajectories sent to Pixhawk controller must be in NED co-ordinates relative to initial drone position. ENU -> NED and frame transformations handled here
 
-# Make drone orbit in a circle of radius r and height h
-def gen_traj_msg_orbit(r, theta, h):
-    trajectory_msg = TrajectorySetpoint()
-    trajectory_msg.position[0] = r * np.cos(theta)
-    trajectory_msg.position[1] = r * np.sin(theta)
-    trajectory_msg.position[2] = -h
-
-    return trajectory_msg
-
 # Make drone follow desired load position, at the desired location relative to the load
 # TODO: Add interpolation (especially for rotation/yaw of swarm)
-def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_state, drone_name, tf_buffer, logger):
+def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_state, drone_name, tf_buffer, timestamp, logger):
     trajectory_msg = TrajectorySetpoint()
 
     # Add effect of desired load orientation (note different physical connections to load will require different algorithms)
     # TODO: Add switch statement for gimbal controlling yaw
-    vehicle_desired_pos_rel_load_rot =  load_desired_state.att_q.rotate(vehicle_desired_state_rel_load.pos) #np.copy(vehicle_desired_state_rel_load.pos) #
+    vehicle_desired_pos_rel_load_rot = load_desired_state.att_q.rotate(vehicle_desired_state_rel_load.pos) #vehicle_desired_state_rel_load.pos
 
     # Desired vehicle pos relative to world (in ENU)= desired vehicle pos relative to load + desired load pos rel to world 
     vehicle_desired_state_rel_world = [vehicle_desired_pos_rel_load_rot[0] + load_desired_state.pos[0], 
                                             vehicle_desired_pos_rel_load_rot[1] + load_desired_state.pos[1],
                                             vehicle_desired_pos_rel_load_rot[2] + load_desired_state.pos[2]]
-    
-    # logger.info(f'UTILS: load_desired_state.pos: {[load_desired_state.pos[0], load_desired_state.pos[1], load_desired_state.pos[2]]}')
-    # logger.info(f'UTILS: vehicle_desired_state_rel_load: {[vehicle_desired_state_rel_load.pos[0], vehicle_desired_state_rel_load.pos[1], vehicle_desired_state_rel_load.pos[2]]}')
-    # logger.info(f'UTILS: vehicle_desired_state_rel_world: {vehicle_desired_state_rel_world}')
 
     # Need drone rel to drone_init (Pixhawk's frame). Add transforms from world to drone_init frames and convert from ENU to NED
     t = lookup_tf(f'{drone_name}_init', 'world', tf_buffer, rclpy.time.Time(), logger)
 
     if t != None:
-        trajectory_msg = TrajectorySetpoint()
-
-        # Converts ENU-> NED
+        # Transforms from world frame to drone_init frame and converts ENU-> NED 
+        # #TODO: Use frame_transforms helpers
+        # Position
         trajectory_msg.position[0] = vehicle_desired_state_rel_world[1] + t.transform.translation.y
         trajectory_msg.position[1] = vehicle_desired_state_rel_world[0] + t.transform.translation.x
         trajectory_msg.position[2] = -(vehicle_desired_state_rel_world[2] + t.transform.translation.z)
 
-        # TODO: Handle yaw
-        # trajectory_msg.yaw = 
-        # drone_orientations[i, :] = [t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w]
+        # Orientation
+        q_drone_desired_ros_rel_world = vehicle_desired_state_rel_load.att_q*load_desired_state.att_q
+        
+        q_init_rel_world = qt.array([t.transform.rotation.w, t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z])
+        q_drone_desired_ros_rel_init =  q_drone_desired_ros_rel_world*(1/q_init_rel_world)     #(1/q_init_rel_world)*q_drone_desired_ros_rel_world #TODO: TEST
 
-        # trajectory_msg.timestamp = int(self.get_clock().now().nanoseconds / 1000)
+        q_drone_desired_px4 = ft.ros_to_px4_orientation(q_to_normalized_np(q_drone_desired_ros_rel_init))
 
-    # logger.info(f'UTILS: traj_msg.pos: {[trajectory_msg.position[0], trajectory_msg.position[1], trajectory_msg.position[2]]}')
+        trajectory_msg.yaw = ft.quaternion_get_yaw(q_drone_desired_px4)
 
+        trajectory_msg.timestamp = timestamp
 
     return trajectory_msg
 
@@ -163,11 +153,19 @@ def gen_traj_msg_straight_up(takeoff_height, takeoff_q):
     trajectory_msg.position[2] = -takeoff_height
 
     # Get yaw in NED from takeoff_q
-    q_NED = ft.ros_to_px4_orientation(q_to_normalized_np(takeoff_q))
-    trajectory_msg.yaw = ft.quaternion_get_yaw(q_NED)
+    q_px4 = ft.ros_to_px4_orientation(q_to_normalized_np(takeoff_q))
+    trajectory_msg.yaw = ft.quaternion_get_yaw(q_px4)
 
     return trajectory_msg
 
+# Make drone orbit in a circle of radius r and height h
+def gen_traj_msg_orbit(r, theta, h):
+    trajectory_msg = TrajectorySetpoint()
+    trajectory_msg.position[0] = r * np.cos(theta)
+    trajectory_msg.position[1] = r * np.sin(theta)
+    trajectory_msg.position[2] = -h
+
+    return trajectory_msg
 
 # Make drone travel at set velocity
 def gen_traj_msg_vel(desired_velocity):
