@@ -10,7 +10,8 @@ from rclpy.qos import QoSProfile
 import numpy as np
 from rclpy.node import Node
 
-from swarm_load_carry_interfaces.srv import ModeChange
+from swarm_load_carry_interfaces.srv import PhaseChange
+from swarm_load_carry_interfaces.msg import Phase
 from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
 
 DEFAULT_DRONE_NUM=1
@@ -39,11 +40,11 @@ class GCSUser(Node):
         ## SERVICES
 
         ## CLIENTS
-        self.cli_mode_change = [None] * self.num_drones
+        self.cli_phase_change = [None] * self.num_drones
 
         for i in range(self.first_drone_num, self.num_drones+self.first_drone_num):
-            self.cli_mode_change[i-self.first_drone_num] = self.create_client(ModeChange,f'/px4_{i}/mode_change')
-            while not self.cli_mode_change[i-self.first_drone_num].wait_for_service(timeout_sec=1.0):
+            self.cli_phase_change[i-self.first_drone_num] = self.create_client(PhaseChange,f'/px4_{i}/phase_change')
+            while not self.cli_phase_change[i-self.first_drone_num].wait_for_service(timeout_sec=1.0):
                 self.get_logger().info(f'Waiting for offboard ROS start service {i}')
 
         self.get_logger().info('Setup complete')
@@ -52,21 +53,21 @@ class GCSUser(Node):
     ## CALLBACKS
 
     ## MISSION CONTROL
-    # Change the mode of all drones
-    def mode_change(self, mode_desired):
+    # Change the phase of all drones
+    def phase_change(self, phase_desired):
         # Prepare request
-        mode_req = ModeChange.Request()
-        mode_req.mode = mode_desired
-
+        phase_req = PhaseChange.Request()
+        phase_req.phase_request.phase = phase_desired
+        
         # Send request
-        mode_future = [None] * self.num_drones
+        phase_future = [None] * self.num_drones
 
         for i in range(self.num_drones):
-            mode_future[i] = self.cli_mode_change[i].call_async(mode_req)
+            phase_future[i] = self.cli_phase_change[i].call_async(phase_req)
 
         # Wait for response
         for i in range(self.num_drones):
-            rclpy.spin_until_future_complete(self, mode_future[i])
+            rclpy.spin_until_future_complete(self, phase_future[i])
 
 
     # Take in user commands for the drones
@@ -78,17 +79,17 @@ class GCSUser(Node):
 
             match(cmd):
                 case 't':
-                    self.mode_change(ModeChange.Request.MODE_TAKEOFF_START)
+                    self.phase_change(Phase.PHASE_TAKEOFF_START)
                 case 'm':
-                    self.mode_change(ModeChange.Request.MODE_MISSION_START)
+                    self.phase_change(Phase.PHASE_MISSION_START)
                 case 'l':
-                    self.mode_change(ModeChange.Request.MODE_LAND_START)
+                    self.phase_change(Phase.PHASE_LAND_START)
                 case 'r':
-                    self.mode_change(ModeChange.Request.MODE_RTL_START)
+                    self.phase_change(Phase.PHASE_RTL_START)
                 case 'h':
-                    self.mode_change(ModeChange.Request.MODE_HOLD)
+                    self.phase_change(Phase.PHASE_HOLD)
                 case 'k':
-                    self.mode_change(ModeChange.Request.MODE_KILL)
+                    self.phase_change(Phase.PHASE_KILL)
 
 
 def main(args=None):

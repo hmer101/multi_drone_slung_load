@@ -17,11 +17,17 @@ import utils
 from swarm_load_carry.state import State, CS_type
 
 from swarm_load_carry_interfaces.srv import SetLocalPose, GetGlobalInitPose
+from swarm_load_carry_interfaces.msg import Phase
+
 from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
 
 DEFAULT_DRONE_NUM=1
 DEFAULT_FIRST_DRONE_NUM=1
 DEFAULT_LOAD_ID=1
+
+TAKEOFF_HEIGHT_LOAD_PRE_TENSION=-0.2 # m
+
+MAIN_TIMER_PERIOD=0.02 # s
 
 class GCSBackground(Node):
 
@@ -52,20 +58,37 @@ class GCSBackground(Node):
         ## VARIABLES
         self.load_desired_state = State(f'{self.load_id}_init', CS_type.ENU)
 
-        timer_period = 0.02  # seconds
-        self.dt = timer_period
-        self.theta = 0.0
-        self.radius = 10
-        self.omega = 0.5
+        self.drone_phases = np.array([-1] * self.num_drones) #[-1] * self.num_drones
+
+        # dt = timer_period
+        # vz = 0.5 # 0.5 m/s takeoff
+        # self.step_size_z = vz*dt 
+
+        # self.theta = 0.0
+        # self.radius = 10
+        # self.omega = 0.5
 
         # Timers
-        self.timer = self.create_timer(timer_period, self.clbk_send_load_setpoint)
+        self.timer = self.create_timer(MAIN_TIMER_PERIOD, self.clbk_cmdloop)
 
         ## PUBLISHERS
         self.pub_load_attitude_desired = self.create_publisher(VehicleAttitudeSetpoint, f'load_{self.load_id}/in/desired_attitude', qos_profile)
         self.pub_load_position_desired = self.create_publisher(VehicleLocalPositionSetpoint, f'load_{self.load_id}/in/desired_local_position', qos_profile)
 
         ## SUBSCRIBERS
+        # Drone current phases
+        self.sub_drone_phases = [None] * self.num_drones
+
+        for i in range(self.first_drone_num, self.num_drones+self.first_drone_num):
+            callback = lambda msg, drone_ind=(i-self.first_drone_num): self.clbk_update_phase(msg, drone_ind)
+        
+            self.sub_drone_phases[i-self.first_drone_num] = self.create_subscription(
+                Phase,
+                f'/px4_{i}/out/current_phase',
+                callback,
+                qos_profile)
+            
+
         ## SERVICES
         ## CLIENTS
         self.cli_set_drone_poses_rel_load = [None] * self.num_drones
@@ -84,11 +107,44 @@ class GCSBackground(Node):
 
 
     ## CALLBACKS
-    def clbk_send_load_setpoint(self):
+    def clbk_cmdloop(self):
         # Set desired pose
-        self.load_desired_state.pos = np.array([0.0, 10, 10]) 
-        self.load_desired_state.att_q = qt.array([1.0, 0.0, 0.0, 0.0]) 
-        self.theta = self.theta + self.omega * self.dt
+        # self.load_desired_state.pos = np.array([0.0, 10, 10]) 
+        # self.load_desired_state.att_q = qt.array([1.0, 0.0, 0.0, 0.0]) 
+        # self.theta = self.theta + self.omega * self.dt
+        #self.theta = self.theta + self.omega * self.dt
+
+
+        #dt = timer_period
+        # vz = 0.5 # 0.5 m/s takeoff
+        # self.step_size_z = vz*dt 
+
+        #self.get_logger().info(f'Drone 1 phase in loop: {self.drone_phases[0]}')
+
+        #test = (self.drone_phases[0] == int(Phase.PHASE_TAKEOFF_START)) #np.any
+        # test = (self.drone_phases == int(Phase.PHASE_TAKEOFF_START))
+        
+        # self.get_logger().info(f'Dtype: {self.drone_phases.dtype}')
+        # self.get_logger().info(f'Phase takeoff start: {Phase.PHASE_TAKEOFF_START}')
+        # self.get_logger().info(f'Drone_phases: {self.drone_phases}')
+        # self.get_logger().info(f'Test: {test}')
+
+        # Publish different setpoints depending on what phase the drones are in. 
+        # If drones phases don't match, simply hold position
+        # TODO: Perhaps consolodate if and elif
+        if np.all(self.drone_phases == Phase.PHASE_TAKEOFF_START):
+            # Rise to point before tension is engaged
+            self.load_desired_state.pos = np.array([0.0, 0.0, TAKEOFF_HEIGHT_LOAD_PRE_TENSION])
+            self.load_desired_state.att_q = qt.array([1.0, 0.0, 0.0, 0.0])
+
+        elif np.all(self.drone_phases == Phase.PHASE_TAKEOFF_POST_TENSION):
+            # Rise slowly - tension will engage
+            self.load_desired_state.pos = np.array([0.0, 0.0, self.load_desired_state.pos[2] + 0.1*MAIN_TIMER_PERIOD])
+
+        else:
+            # Waiting for pre tension time, takeoff complete or drones not in same phase. Keep same setpoint as previous
+            pass
+        
 
         # Send position setpoint
         setpoint_msg_pos = VehicleLocalPositionSetpoint()
@@ -103,7 +159,11 @@ class GCSBackground(Node):
         setpoint_msg_att.q_d = [float(q_d.w), float(q_d.x), float(q_d.y), float(q_d.z)]
         self.pub_load_attitude_desired.publish(setpoint_msg_att)
 
-        
+    def clbk_update_phase(self, msg, drone_ind):
+        self.drone_phases[drone_ind] = msg.phase
+
+        #self.get_logger().info(f'Drone {drone_ind+1}, phase: {self.drone_phases[drone_ind]}')
+
 
     ## HELPERS
     # TODO: Set drones to positions that minimizes sum of squared distance from drone start points to desired points

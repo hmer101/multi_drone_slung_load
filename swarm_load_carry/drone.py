@@ -22,7 +22,8 @@ from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
 from px4_msgs.msg import VehicleAttitude, VehicleLocalPosition, OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint, VehicleGlobalPosition
-from swarm_load_carry_interfaces.srv import ModeChange, GetGlobalInitPose, SetLocalPose # Note must build workspace and restart IDE before custom packages are found by python
+from swarm_load_carry_interfaces.srv import PhaseChange, GetGlobalInitPose, SetLocalPose # Note must build workspace and restart IDE before custom packages are found by python
+from swarm_load_carry_interfaces.msg import Phase
 
 DEFAULT_DRONE_NUM=1
 DEFAULT_FIRST_DRONE_NUM=1
@@ -30,10 +31,12 @@ DEFAULT_LOAD_ID=1
 
 MAIN_TIMER_PERIOD=0.02
 
-#TAKEOFF_HEIGHT_DRONE=5.0
+TAKEOFF_HEIGHT_LOAD_PRE_TENSION=-0.2
 TAKEOFF_HEIGHT_LOAD=3.0 #0.0 #3.0
 TAKEOFF_HEIGHT_DRONE_REL_LOAD=1.082
-TAKEOFF_CNT_THRESHOLD=2/MAIN_TIMER_PERIOD
+
+TAKEOFF_START_CNT_THRESHOLD=2/MAIN_TIMER_PERIOD
+TAKEOFF_PRE_TENSION_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
 TAKEOFF_POS_THRESHOLD=0.1
 
 # Node to encapsulate drone information and actions
@@ -59,7 +62,7 @@ class Drone(Node):
         # Vehicle
         self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX     # Actual mode of the FMU
         self.arm_state = VehicleStatus.ARMING_STATE_MAX         # Actual arming state of FMU
-        self.mode = ModeChange.Request.MODE_UNASSIGNED          # Desired mode
+        self.phase = Phase.PHASE_UNASSIGNED        # Desired phase (action to perform when in offboard mode. Use 'phase' to differentiate from 'mode' of the FMU)
 
         self.vehicle_local_state = State(f'{self.get_name()}_init', CS_type.ENU)
 
@@ -68,7 +71,6 @@ class Drone(Node):
         
         self.vehicle_desired_state_rel_load = State(f'{self.load_name}', CS_type.ENU)
 
-
         # Load
         self.load_desired_state = State(f'world', CS_type.ENU)
 
@@ -76,16 +78,11 @@ class Drone(Node):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
-        # For MAVLINK connection
-        self.drone_system = None
-        self.msg_future_return = None
-        self.async_loop = asyncio.get_event_loop()
-
         
         ## TIMERS
         timer_period = MAIN_TIMER_PERIOD #0.02 #0.02  # seconds
         self.timer = self.create_timer(timer_period, self.clbk_cmdloop)
-        self.offboard_setpoint_counter = 0
+        self.cnt_phase_ticks = 0
 
         ### ROS2
         qos_profile = QoSProfile(
@@ -105,6 +102,9 @@ class Drone(Node):
         self.pub_offboard_mode = self.create_publisher(OffboardControlMode, f'{self.ns}/fmu/in/offboard_control_mode', qos_profile)
         self.pub_trajectory = self.create_publisher(TrajectorySetpoint, f'{self.ns}/fmu/in/trajectory_setpoint', qos_profile)
         self.pub_vehicle_command = self.create_publisher(VehicleCommand, f'{self.ns}/fmu/in/vehicle_command', qos_profile)
+
+        # To drone system
+        self.pub_current_phase = self.create_publisher(Phase, f'{self.ns}/out/current_phase', qos_profile)
 
 
         ## SUBSCRIBERS
@@ -148,10 +148,10 @@ class Drone(Node):
             qos_profile)
 
         ## SERVICES
-        self.srv_mode_change = self.create_service(
-            ModeChange,
-            f'{self.ns}/mode_change',
-            self.clbk_change_mode_ros)
+        self.srv_phase_change = self.create_service(
+            PhaseChange,
+            f'{self.ns}/phase_change',
+            self.clbk_change_phase)
         
         self.srv_get_global_init_pose = False # Only create service once drone is ready to send global initial position (i.e. has set global initial pose)
         
@@ -241,7 +241,7 @@ class Drone(Node):
 
     def clbk_vehicle_global_position(self, msg):
         # Set GPS/location home immediately prior to first arming/takeoff
-        if not self.flag_gps_home_set and (self.offboard_setpoint_counter > 1):          
+        if not self.flag_gps_home_set and (self.cnt_phase_ticks > 1):          
             # Set the initial position as the current global position
             self.vehicle_initial_global_state.lat = msg.lat
             self.vehicle_initial_global_state.lon = msg.lon 
@@ -280,40 +280,35 @@ class Drone(Node):
         return response
 
 
-    def clbk_change_mode_ros(self, request, response):
-        #self.mode = request.mode
+    def clbk_change_phase(self, request, response):
 
         # Call helper functions if required
-        match request.mode:
-            case ModeChange.Request.MODE_TAKEOFF_START:
+        match request.phase_request.phase:
+            case Phase.PHASE_TAKEOFF_START:
                 # Takeoff
-                self.mode=ModeChange.Request.MODE_TAKEOFF_START
+                self.phase=Phase.PHASE_TAKEOFF_START
 
-            case ModeChange.Request.MODE_MISSION_START:
-                self.mode=ModeChange.Request.MODE_MISSION_START
+            case Phase.PHASE_MISSION_START:
+                self.phase=Phase.PHASE_MISSION_START
             
-            case ModeChange.Request.MODE_LAND_START:
-                self.mode=ModeChange.Request.MODE_LAND_START
+            case Phase.PHASE_LAND_START:
+                self.phase=Phase.PHASE_LAND_START
 
-            # case ModeChange.Request.MODE_LAND_END:
-            #     self.mode=ModeChange.Request.MODE_LAND_END
-
-            case ModeChange.Request.MODE_HOLD:
-                self.mode=ModeChange.Request.MODE_HOLD
+            case Phase.PHASE_HOLD:
+                self.phase=Phase.PHASE_HOLD
 
                 #self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.hold())
 
-            case ModeChange.Request.MODE_KILL:
-                self.mode=ModeChange.Request.MODE_KILL
+            case Phase.PHASE_KILL:
+                self.phase=Phase.PHASE_KILL
 
                 #self.async_loop.run_in_executor(ThreadPoolExecutor(), asyncio.run, self.drone_system.action.kill())
 
 
         response.success = True
-        self.get_logger().info(f'Requested change to mode: {self.mode}')
+        self.get_logger().info(f'Requested change to phase: {self.phase}')
 
         return response
-
 
 
     def clbk_cmdloop(self):       
@@ -338,20 +333,25 @@ class Drone(Node):
             tf_drone_rel_world = utils.lookup_tf('world', self.get_name(), self.tf_buffer, rclpy.time.Time(), self.get_logger())
 
         # Generate desired drone positions - takeoff
-        load_takeoff_state = State('world', CS_type.ENU)
-        load_takeoff_state.pos[0] = -1.5
-        load_takeoff_state.pos[1] = 0.0
-        load_takeoff_state.pos[2] = TAKEOFF_HEIGHT_LOAD
+        # load_takeoff_state = State('world', CS_type.ENU)
+        # load_takeoff_state.pos[0] = -1.5
+        # load_takeoff_state.pos[1] = 0.0
+        # load_takeoff_state.pos[2] = TAKEOFF_HEIGHT_LOAD
 
-        takeoff_q = qt.array([self.vehicle_initial_state_rel_world.att_q.w, self.vehicle_initial_state_rel_world.att_q.x, self.vehicle_initial_state_rel_world.att_q.y, self.vehicle_initial_state_rel_world.att_q.z])
-        takeoff_q = qt.array([1.0, 0.0, 0.0, 0.0])*takeoff_q # [0.0, 0.0, 0.0, -1.0] Rotate load by 180deg cw           [0.71, 0.0, 0.0, 0.71]  90 deg acw
+        # takeoff_q = qt.array([self.vehicle_initial_state_rel_world.att_q.w, self.vehicle_initial_state_rel_world.att_q.x, self.vehicle_initial_state_rel_world.att_q.y, self.vehicle_initial_state_rel_world.att_q.z])
+        # takeoff_q = qt.array([1.0, 0.0, 0.0, 0.0])*takeoff_q # [0.0, 0.0, 0.0, -1.0] Rotate load by 180deg cw           [0.71, 0.0, 0.0, 0.71]  90 deg acw
 
-        load_takeoff_state.att_q.w = takeoff_q.w
-        load_takeoff_state.att_q.x = takeoff_q.x
-        load_takeoff_state.att_q.y = takeoff_q.y
-        load_takeoff_state.att_q.z = takeoff_q.z
+        # load_takeoff_state.att_q.w = takeoff_q.w
+        # load_takeoff_state.att_q.x = takeoff_q.x
+        # load_takeoff_state.att_q.y = takeoff_q.y
+        # load_takeoff_state.att_q.z = takeoff_q.z
 
-        trajectory_msg_takeoff = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, load_takeoff_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger())
+        #self.get_logger().info(f'DES state rel load z: {self.vehicle_desired_state_rel_load.pos[2]}')
+        #self.get_logger().info(f'Load des state: {self.load_desired_state.pos[2]}')
+
+        trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger()) #load_takeoff_state
+
+        # self.get_logger().info(f'Traj msg: {trajectory_msg_takeoff.position[2]}')
 
         #self.get_logger().info(f'load_takeoff_state ATT: {load_takeoff_state.att_q.w}, {load_takeoff_state.att_q.x}, {load_takeoff_state.att_q.y}, {load_takeoff_state.att_q.z}')
 
@@ -359,20 +359,20 @@ class Drone(Node):
 
 
         # Perform actions depending on what mode is requested
-        match self.mode:
+        match self.phase:
             # Run takeoff
             # Note that arming and taking off like this may not perform all pre-flight checks that MAVLINK does. 
             # TODO: test if performs preflight checks. Perform manually if doesn't
-            case ModeChange.Request.MODE_TAKEOFF_START:
+            case Phase.PHASE_TAKEOFF_START:
                 # Update counter for arm phase
-                if self.offboard_setpoint_counter <=TAKEOFF_CNT_THRESHOLD: 
+                if self.cnt_phase_ticks <=TAKEOFF_START_CNT_THRESHOLD: 
                     # Send takeoff setpoint
-                    self.pub_trajectory.publish(trajectory_msg_takeoff)
+                    self.pub_trajectory.publish(trajectory_msg)
 
-                    self.offboard_setpoint_counter += 1
+                    self.cnt_phase_ticks += 1
 
                 # Arm vehicle when offboard message has been published for long enough
-                if self.offboard_setpoint_counter == TAKEOFF_CNT_THRESHOLD:                   
+                if self.cnt_phase_ticks == TAKEOFF_START_CNT_THRESHOLD:                   
                     # Arm
                     offboard_ros.arm(self.pub_vehicle_command, timestamp)
 
@@ -381,27 +381,51 @@ class Drone(Node):
 
                 # Continue to send setpoint whilst taking off #TODO: Make this load feedback here?
                 elif self.nav_state ==VehicleStatus.NAVIGATION_STATE_OFFBOARD and self.arm_state==VehicleStatus.ARMING_STATE_ARMED: 
-                    # Takeoff complete
-                    if tf_drone_rel_world.transform.translation.z>=((TAKEOFF_HEIGHT_LOAD+TAKEOFF_HEIGHT_DRONE_REL_LOAD)-TAKEOFF_POS_THRESHOLD):
-                        self.mode = ModeChange.Request.MODE_TAKEOFF_END
-                        self.offboard_setpoint_counter = 0     
-                        
-                        self.get_logger().info(f'Takeoff complete')
+                    # Takeoff to pre-tension level
+
+                    if tf_drone_rel_world.transform.translation.z>=(TAKEOFF_HEIGHT_LOAD_PRE_TENSION+TAKEOFF_HEIGHT_DRONE_REL_LOAD-TAKEOFF_POS_THRESHOLD):     
+                        self.phase = Phase.PHASE_TAKEOFF_PRE_TENSION
+                        self.cnt_phase_ticks = 0  
+                        self.get_logger().info(f'PRE_TENSION LEVEL REACHED')   
                         
                     #else:
                         #TODO: Add some formation feedback
                         
                     # Send takeoff setpoint
-                    self.pub_trajectory.publish(trajectory_msg_takeoff)
+                    self.pub_trajectory.publish(trajectory_msg)
 
+
+            case Phase.PHASE_TAKEOFF_PRE_TENSION:
+                # Wait before attempt to pick up load
+                if self.cnt_phase_ticks < TAKEOFF_PRE_TENSION_CNT_THRESHOLD:
+                    self.cnt_phase_ticks += 1
+                else:
+                    self.phase = Phase.PHASE_TAKEOFF_POST_TENSION
+                    self.cnt_phase_ticks = 0
+                    self.get_logger().info(f'PRE_TENSION LEVEL COMPLETE') 
+                
+                # Send takeoff setpoint
+                self.pub_trajectory.publish(trajectory_msg)
+            
+
+            case Phase.PHASE_TAKEOFF_POST_TENSION:
+                #Takeoff complete
+                if tf_drone_rel_world.transform.translation.z>=(TAKEOFF_HEIGHT_LOAD+TAKEOFF_HEIGHT_DRONE_REL_LOAD-TAKEOFF_POS_THRESHOLD):     
+                    self.phase = Phase.PHASE_TAKEOFF_END 
+                    
+                    self.get_logger().info(f'Takeoff complete')
+
+                # Send takeoff setpoint
+                self.pub_trajectory.publish(trajectory_msg)
 
             # Takeoff complete - hover at takeoff end location
-            case ModeChange.Request.MODE_TAKEOFF_END:
-                self.pub_trajectory.publish(trajectory_msg_takeoff)
+            case Phase.PHASE_TAKEOFF_END:
+                self.pub_trajectory.publish(trajectory_msg)
+                self.cnt_phase_ticks = 0
 
 
             # Run main offboard mission
-            case ModeChange.Request.MODE_MISSION_START:
+            case Phase.PHASE_MISSION_START:
 
 
                 # Publish setpoints if vehicle is actually in offboard mode
@@ -416,28 +440,35 @@ class Drone(Node):
 
 
             # Run land 
-            case ModeChange.Request.MODE_LAND_START:
+            case Phase.PHASE_LAND_START:
                 
-                self.mode = ModeChange.Request.MODE_LAND_END 
+                self.phase = Phase.PHASE_LAND_END 
 
                 # TODO: Add some formation feedback
 
             # Run RTL 
-            case ModeChange.Request.MODE_RTL_START:
+            case Phase.PHASE_RTL_START:
 
-                self.mode = ModeChange.Request.MODE_RTL_END
+                self.phase = Phase.PHASE_RTL_END
 
                 # TODO: Add some formation feedback
 
             # Hold 
-            case ModeChange.Request.MODE_HOLD:
+            case Phase.PHASE_HOLD:
                 pass
 
             # Kill
-            case ModeChange.Request.MODE_KILL:
+            case Phase.PHASE_KILL:
                 pass
-                    
+
+        # Publish the phase the drone is currently in 
+        msg_current_phase = Phase()
+        msg_current_phase.phase = self.phase
+        self.pub_current_phase.publish(msg_current_phase)
+
+        #self.get_logger().info(f'Phase: {self.phase}')
     
+
     ## HELPER FUNCTIONS
     def update_first_drone_init_pose(self):
         # Request updated init pose of first drone
