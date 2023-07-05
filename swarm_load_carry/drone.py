@@ -341,6 +341,9 @@ class Drone(Node):
             # TODO: test if performs preflight checks. Perform manually if doesn't
             # TODO: Add some formation feedback to all phases (especially mission)
             case Phase.PHASE_TAKEOFF_START:
+                # Override trajectory msg for straight-up takeoff in first phase
+                trajectory_msg = utils.gen_traj_msg_straight_up(TAKEOFF_HEIGHT_LOAD_PRE_TENSION+TAKEOFF_HEIGHT_DRONE_REL_LOAD, self.vehicle_local_state.att_q)
+                
                 # Update counter for arm phase
                 if self.cnt_phase_ticks <=TAKEOFF_START_CNT_THRESHOLD: 
                     # Send takeoff setpoint
@@ -369,7 +372,7 @@ class Drone(Node):
 
 
             case Phase.PHASE_TAKEOFF_PRE_TENSION:
-                # Wait before attempt to pick up load
+                # Wait before attempt to pick up load as get into formation
                 if self.cnt_phase_ticks < TAKEOFF_PRE_TENSION_CNT_THRESHOLD:
                     self.cnt_phase_ticks += 1
                 else:

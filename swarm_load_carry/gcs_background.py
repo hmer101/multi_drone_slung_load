@@ -115,12 +115,16 @@ class GCSBackground(Node):
         # If drones phases don't match, simply hold position
 
         # TAKEOFF
-        if np.all(self.drone_phases == Phase.PHASE_TAKEOFF_START):
-            # Rise to point before tension is engaged
-            self.load_desired_local_state.pos = np.array([0.0, 0.0, TAKEOFF_HEIGHT_LOAD_PRE_TENSION])
-            self.load_desired_local_state.att_q = qt.array([1.0, 0.0, 0.0, 0.0])
+        # if np.all(self.drone_phases == Phase.PHASE_TAKEOFF_START):
+        #     # Rise to point before tension is engaged
+        #     self.load_desired_local_state.pos = np.array([0.0, 0.0, TAKEOFF_HEIGHT_LOAD_PRE_TENSION])
+        #     self.load_desired_local_state.att_q = qt.array([1.0, 0.0, 0.0, 0.0])
+        # if np.all(self.drone_phases == Phase.PHASE_TAKEOFF_PRE_TENSION):
+        #     # Rise to point before tension is engaged
+        #     self.load_desired_local_state.pos = np.array([0.0, 0.0, TAKEOFF_HEIGHT_LOAD_PRE_TENSION])
+        #     self.load_desired_local_state.att_q = qt.array([1.0, 0.0, 0.0, 0.0])
 
-        elif np.all(self.drone_phases == Phase.PHASE_TAKEOFF_POST_TENSION):
+        if np.all(self.drone_phases == Phase.PHASE_TAKEOFF_POST_TENSION):
             # Rise slowly - tension will engage
             self.load_desired_local_state.pos = np.array([0.0, 0.0, self.load_desired_local_state.pos[2] + 0.1*MAIN_TIMER_PERIOD])
 
@@ -141,7 +145,7 @@ class GCSBackground(Node):
             self.mission_theta = self.mission_theta + omega*dt
 
         else:
-            # Waiting for pre tension time, takeoff complete or drones not in same phase. Keep same setpoint as previous
+            # Initial take-off to set point, waiting for pre tension time, takeoff complete or drones not in same phase. Keep same setpoint as previous
             pass
         
         self.send_desired_pose()

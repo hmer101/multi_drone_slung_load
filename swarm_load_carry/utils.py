@@ -147,54 +147,60 @@ def transform_frames(state, frame2_name, tf_buffer, logger):
 # Make drone follow desired load position, at the desired location relative to the load
 # TODO: Add interpolation (especially for rotation/yaw of swarm)
 def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_state, drone_name, tf_buffer, timestamp, logger):
+    # Generate trajectory message
+    trajectory_msg = TrajectorySetpoint()
+    trajectory_msg.timestamp = timestamp
+    
     # Convert load desired state into world frame
     load_desired_state_rel_world = transform_frames(load_desired_local_state, 'world', tf_buffer, logger)
 
     # Approximate load desired position as relative to world rather than load_init if load_init -> world tf not available
     if load_desired_state_rel_world == None:
-        load_desired_state_rel_world = load_desired_local_state
-        logger.warn(f'Load initial position not found. Taking load desired state as relative to world.')
+        logger.warn(f'Load initial position not found. Returning default trajectory msg.')
+        return trajectory_msg
+
+        # load_desired_state_rel_world = load_desired_local_state
+        # logger.warn(f'Load initial position not found. Taking load desired state as relative to world.')
 
     # Add effect of desired load orientation (note different physical connections to load will require different algorithms)
-    # TODO: Add switch statement for gimbal controlling yaw
     vehicle_desired_pos_rel_load_rot = load_desired_state_rel_world.att_q.rotate(vehicle_desired_state_rel_load.pos)
 
     # Desired vehicle pos relative to world (in ENU)= desired vehicle pos relative to load + desired load pos rel to world 
-    vehicle_desired_state_rel_world = [vehicle_desired_pos_rel_load_rot[0] + load_desired_state_rel_world.pos[0], 
+    vehicle_desired_pos_rel_world = [vehicle_desired_pos_rel_load_rot[0] + load_desired_state_rel_world.pos[0], 
                                             vehicle_desired_pos_rel_load_rot[1] + load_desired_state_rel_world.pos[1],
                                             vehicle_desired_pos_rel_load_rot[2] + load_desired_state_rel_world.pos[2]]
 
-    # Need drone rel to drone_init (Pixhawk's frame). Add transforms from world to drone_init frames and convert from ENU to NED
-    tf_world_to_drone_init = lookup_tf(f'{drone_name}_init', 'world', tf_buffer, rclpy.time.Time(), logger)
+    # Tranform relative to drone_init
+    vehicle_desired_state_rel_world = State('world', CS_type.ENU)
+    vehicle_desired_state_rel_world.pos = vehicle_desired_pos_rel_world
+    vehicle_desired_state_rel_world.att_q = vehicle_desired_state_rel_load.att_q*load_desired_state_rel_world.att_q
 
+    vehicle_desired_state_rel_drone_init = transform_frames(vehicle_desired_state_rel_world, f'{drone_name}_init', tf_buffer, logger)
 
-    ## GENERATE TRAJECTORY MESSAGE
-    trajectory_msg = TrajectorySetpoint()
+    
 
-
-    #TODO: HHHHHHHHHHHHHHHHHHHHHHHHEEEEEEEEEEEEEEEEEEEEEERRRRRRRRRRRRREEEEEEEEEE - simplify below with new helper functions for transforming states
-
-    if tf_world_to_drone_init != None:
-        # Transforms from world frame to drone_init frame and converts ENU-> NED 
-        # #TODO: Use frame_transforms helpers
-        # Position
-        trajectory_msg.position[0] = vehicle_desired_state_rel_world[1] + tf_world_to_drone_init.transform.translation.y
-        trajectory_msg.position[1] = vehicle_desired_state_rel_world[0] + tf_world_to_drone_init.transform.translation.x
-        trajectory_msg.position[2] = -(vehicle_desired_state_rel_world[2] + tf_world_to_drone_init.transform.translation.z)
-
-        # Orientation
-        q_drone_desired_ros_rel_world = vehicle_desired_state_rel_load.att_q*load_desired_state_rel_world.att_q
+    # Approximate vehicle desired position as relative to world rather than drone_init if drone_init -> world not available
+    if vehicle_desired_state_rel_drone_init == None:
+        logger.warn(f'Drone initial position not found. Returning default trajectory msg.')
+        return trajectory_msg
+    
+        #vehicle_desired_state_rel_drone_init = vehicle_desired_state_rel_world
+        #logger.warn(f'?????????????????????????????????????????????????????????')
+        #logger.warn(f'Drone initial position not found. Taking load desired state as relative to world.')
         
-        q_init_rel_world = qt.array([tf_world_to_drone_init.transform.rotation.w, tf_world_to_drone_init.transform.rotation.x, tf_world_to_drone_init.transform.rotation.y, tf_world_to_drone_init.transform.rotation.z])
-        q_drone_desired_ros_rel_init =  q_drone_desired_ros_rel_world*(1/q_init_rel_world)     #(1/q_init_rel_world)*q_drone_desired_ros_rel_world #TODO: TEST
+    # Transform to NED into drone_init
+    pos_drone_desired_px4 = np.array([vehicle_desired_state_rel_drone_init.pos[1], vehicle_desired_state_rel_drone_init.pos[0], -vehicle_desired_state_rel_drone_init.pos[2]])
+    q_drone_desired_px4 = ft.ros_to_px4_orientation(q_to_normalized_np(vehicle_desired_state_rel_drone_init.att_q))
 
-        q_drone_desired_px4 = ft.ros_to_px4_orientation(q_to_normalized_np(q_drone_desired_ros_rel_init))
+    # Generate trajectory message
+    trajectory_msg.position[0] = pos_drone_desired_px4[0] 
+    trajectory_msg.position[1] = pos_drone_desired_px4[1] 
+    trajectory_msg.position[2] = pos_drone_desired_px4[2] 
 
-        trajectory_msg.yaw = ft.quaternion_get_yaw(q_drone_desired_px4)
-
-        trajectory_msg.timestamp = timestamp
+    trajectory_msg.yaw = ft.quaternion_get_yaw(q_drone_desired_px4)
 
     return trajectory_msg
+
 
 # Generate trajectory message that gives setpoint at a specific height and orientation
 def gen_traj_msg_straight_up(takeoff_height, takeoff_q):
