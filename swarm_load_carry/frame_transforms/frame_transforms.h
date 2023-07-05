@@ -53,8 +53,8 @@
 #include <geometry_msgs/msg/vector3.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 
-namespace px4_ros_com
-{
+// namespace px4_ros_com
+// {
 namespace frame_transforms
 {
 
@@ -443,6 +443,6 @@ template <class T> inline T enu_to_baselink_frame(const T &in, const Eigen::Quat
 }
 
 } // namespace frame_transforms
-} // namespace px4_ros_com
+//} // namespace px4_ros_com
 
 #endif // FRAME_TRANSFORMS_H

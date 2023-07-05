@@ -72,7 +72,7 @@ class Drone(Node):
         self.vehicle_desired_state_rel_load = State(f'{self.load_name}', CS_type.ENU)
 
         # Load
-        self.load_desired_state = State(f'world', CS_type.ENU)
+        self.load_desired_local_state = State(f'{self.load_name}_init', CS_type.ENU)
 
         # Transforms
         self.tf_buffer = Buffer()
@@ -252,10 +252,10 @@ class Drone(Node):
             self.flag_gps_home_set = True   
 
     def clbk_load_desired_attitude(self, msg):
-        self.load_desired_state.att_q = qt.array([msg.q_d[0], msg.q_d[1], msg.q_d[2], msg.q_d[3]])
+        self.load_desired_local_state.att_q = qt.array([msg.q_d[0], msg.q_d[1], msg.q_d[2], msg.q_d[3]])
 
     def clbk_load_desired_local_position(self, msg):
-        self.load_desired_state.pos = np.array([msg.x, msg.y, msg.z])
+        self.load_desired_local_state.pos = np.array([msg.x, msg.y, msg.z])
     
     def clbk_set_desired_pose_rel_load(self, request, response):
         self.vehicle_desired_state_rel_load.pos = np.array([request.transform_stamped.transform.translation.x, request.transform_stamped.transform.translation.y, request.transform_stamped.transform.translation.z])
@@ -317,7 +317,7 @@ class Drone(Node):
         offboard_ros.publish_offboard_control_heartbeat_signal(self.pub_offboard_mode, 'pos', timestamp)
 
         # Run rest of setup when ready and not already setup
-        if self.flag_gps_home_set and not self.flag_local_init_pos_set: #and  self.offboard_setpoint_counter > 1
+        if self.flag_gps_home_set and not self.flag_local_init_pos_set:
             # Rest of setup differs for first drone and others
             if self.drone_id == self.first_drone_num:
                 self.set_local_init_pose_first_drone()
@@ -332,37 +332,14 @@ class Drone(Node):
             # Start with drone position (TODO: incorporate load position feedback later)
             tf_drone_rel_world = utils.lookup_tf('world', self.get_name(), self.tf_buffer, rclpy.time.Time(), self.get_logger())
 
-        # Generate desired drone positions - takeoff
-        # load_takeoff_state = State('world', CS_type.ENU)
-        # load_takeoff_state.pos[0] = -1.5
-        # load_takeoff_state.pos[1] = 0.0
-        # load_takeoff_state.pos[2] = TAKEOFF_HEIGHT_LOAD
-
-        # takeoff_q = qt.array([self.vehicle_initial_state_rel_world.att_q.w, self.vehicle_initial_state_rel_world.att_q.x, self.vehicle_initial_state_rel_world.att_q.y, self.vehicle_initial_state_rel_world.att_q.z])
-        # takeoff_q = qt.array([1.0, 0.0, 0.0, 0.0])*takeoff_q # [0.0, 0.0, 0.0, -1.0] Rotate load by 180deg cw           [0.71, 0.0, 0.0, 0.71]  90 deg acw
-
-        # load_takeoff_state.att_q.w = takeoff_q.w
-        # load_takeoff_state.att_q.x = takeoff_q.x
-        # load_takeoff_state.att_q.y = takeoff_q.y
-        # load_takeoff_state.att_q.z = takeoff_q.z
-
-        #self.get_logger().info(f'DES state rel load z: {self.vehicle_desired_state_rel_load.pos[2]}')
-        #self.get_logger().info(f'Load des state: {self.load_desired_state.pos[2]}')
-
-        trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger()) #load_takeoff_state
-
-        # self.get_logger().info(f'Traj msg: {trajectory_msg_takeoff.position[2]}')
-
-        #self.get_logger().info(f'load_takeoff_state ATT: {load_takeoff_state.att_q.w}, {load_takeoff_state.att_q.x}, {load_takeoff_state.att_q.y}, {load_takeoff_state.att_q.z}')
-
-        #trajectory_msg = utils.gen_traj_msg_straight_up(TAKEOFF_HEIGHT_LOAD + TAKEOFF_HEIGHT_DRONE_REL_LOAD, self.vehicle_initial_state_rel_world.att_q) #takeoff_rpy[2])
-
-
+        # Generate trajectory message
+        trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger()) #load_takeoff_state
+        
         # Perform actions depending on what mode is requested
         match self.phase:
             # Run takeoff
-            # Note that arming and taking off like this may not perform all pre-flight checks that MAVLINK does. 
             # TODO: test if performs preflight checks. Perform manually if doesn't
+            # TODO: Add some formation feedback to all phases (especially mission)
             case Phase.PHASE_TAKEOFF_START:
                 # Update counter for arm phase
                 if self.cnt_phase_ticks <=TAKEOFF_START_CNT_THRESHOLD: 
@@ -379,17 +356,13 @@ class Drone(Node):
                     # Set in offboard mode
                     offboard_ros.engage_offboard_mode(self.pub_vehicle_command, timestamp)
 
-                # Continue to send setpoint whilst taking off #TODO: Make this load feedback here?
+                # Continue to send setpoint whilst taking off
                 elif self.nav_state ==VehicleStatus.NAVIGATION_STATE_OFFBOARD and self.arm_state==VehicleStatus.ARMING_STATE_ARMED: 
                     # Takeoff to pre-tension level
-
                     if tf_drone_rel_world.transform.translation.z>=(TAKEOFF_HEIGHT_LOAD_PRE_TENSION+TAKEOFF_HEIGHT_DRONE_REL_LOAD-TAKEOFF_POS_THRESHOLD):     
                         self.phase = Phase.PHASE_TAKEOFF_PRE_TENSION
                         self.cnt_phase_ticks = 0  
-                        self.get_logger().info(f'PRE_TENSION LEVEL REACHED')   
-                        
-                    #else:
-                        #TODO: Add some formation feedback
+                        self.get_logger().info(f'PRE_TENSION LEVEL REACHED')        
                         
                     # Send takeoff setpoint
                     self.pub_trajectory.publish(trajectory_msg)
@@ -426,17 +399,7 @@ class Drone(Node):
 
             # Run main offboard mission
             case Phase.PHASE_MISSION_START:
-
-
-                # Publish setpoints if vehicle is actually in offboard mode
-                if self.nav_state == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-                    pass
-                    ## Trajectory setpoint - input to PID position controller (can set position, velocity and acceleration)
-                    # Move to position
-                    # trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_state, self.get_name(), self.tf_buffer, self.get_logger())
-                    # self.pub_trajectory.publish(trajectory_msg)
-
-                # TODO: Add some formation feedback
+                self.pub_trajectory.publish(trajectory_msg)
 
 
             # Run land 

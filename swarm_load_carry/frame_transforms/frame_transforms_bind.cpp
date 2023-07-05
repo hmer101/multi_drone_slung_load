@@ -9,7 +9,7 @@
 #include "frame_transforms.h"
 
 namespace py = pybind11;
-using namespace px4_ros_com::frame_transforms;
+using namespace frame_transforms; //px4_ros_com::
 
 /*
 * CONVERSION FUNCTIONS
@@ -39,6 +39,10 @@ PYBIND11_MODULE(frame_transforms, m) {
     m.def("quaternion_get_yaw", [](py::array_t<float> arr) {
         return utils::quaternion::quaternion_get_yaw(numpy_to_eigen_quaternion(arr));
     }, "A function that computes the yaw from a quaternion");
+
+    m.def("quaternion_from_euler", [](const double roll, const double pitch, const double yaw)
+        { return eigen_quaternion_to_vector(utils::quaternion::quaternion_from_euler(roll, pitch, yaw)); },
+        py::arg("roll"), py::arg("pitch"), py::arg("yaw"), "Returns a quaternion from euler angles as a list [w, x, y, z]");
 
     /*
     * CONVERSIONS 

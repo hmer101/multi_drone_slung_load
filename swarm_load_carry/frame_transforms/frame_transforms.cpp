@@ -43,8 +43,8 @@
 
 #include <assert.h>
 
-namespace px4_ros_com
-{
+// namespace px4_ros_com
+// {
 namespace frame_transforms
 {
 
@@ -400,4 +400,4 @@ Covariance9d transform_frame(const Covariance9d &cov, const Eigen::Quaterniond &
 }
 
 } // namespace frame_transforms
-} // namespace px4_ros_com
+//} // namespace px4_ros_com

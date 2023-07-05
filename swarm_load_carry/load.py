@@ -11,7 +11,7 @@ import rclpy.qos as qos
 from rclpy.qos import QoSProfile
 from rclpy.node import Node
 
-from tf2_ros import TransformBroadcaster
+from tf2_ros import TransformBroadcaster, StaticTransformBroadcaster
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
@@ -49,14 +49,11 @@ class Load(Node):
         )
 
         ## VARIABLES
-        self.load_desired_state = State('world', CS_type.ENU)
+        self.load_desired_state = State(f'{self.get_name()}_init', CS_type.ENU)
 
-        self.load_local_state = State('world', CS_type.ENU)
-
-        self.flag_tfs_set = False
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
-        
+        self.load_initial_state_rel_world = State('world', CS_type.ENU)
+        self.load_state_rel_world = State('world', CS_type.ENU)
+      
 
         ## TIMERS
         self.timer = self.create_timer(0.02, self.clbk_publoop)
@@ -81,6 +78,11 @@ class Load(Node):
 
         ## TFS
         self.tf_broadcaster = TransformBroadcaster(self)
+        self.tf_static_broadcaster_init_pose = StaticTransformBroadcaster(self)
+
+        self.flag_tf_init_set = False
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
 
         self.get_logger().info('Setup complete')
 
@@ -127,21 +129,36 @@ class Load(Node):
         # Only broadcast load position if all drone positions can be found to estimate it
         if count_tf == self.num_drones:
             # Estimate load position as average of drone positions 
-            self.load_local_state.pos  = np.average(drone_positions, axis=0)
+            self.load_state_rel_world.pos  = np.average(drone_positions, axis=0)
 
             # Estimate load orientation #TODO: Better orientation estimation method
-            self.load_local_state.att_q = qt.array(drone_orientations[0, :])
+            self.load_state_rel_world.att_q = qt.array(drone_orientations[0, :])
 
-            # Publish estimate load 
-            self.broadcast_load_local_state()
+            # Set and publish initial load position TF
+            if self.flag_tf_init_set == False:
+                self.set_tf_init_pose()
+
+            # Publish estimate load relative to load initial position
+            load_rel_load_init = State(f'{self.get_name()}_init', CS_type.ENU)
+            load_rel_load_init.pos = self.load_state_rel_world.pos - self.load_initial_state_rel_world.pos
+            load_rel_load_init.att_q = self.load_state_rel_world.att_q*(1/self.load_initial_state_rel_world.att_q)
+
+            utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', self.get_name(), load_rel_load_init.pos, load_rel_load_init.att_q, self.tf_broadcaster)          
 
 
 
     ## HELPER FUNCTIONS
-    def broadcast_load_local_state(self):
-        # Update tf
-        utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', self.get_name(), self.load_local_state.pos, self.load_local_state.att_q, self.tf_broadcaster)
+    def set_tf_init_pose(self):
+        # Set initial pose
+        self.load_initial_state_rel_world.pos = np.copy(self.load_state_rel_world.pos)
+        self.load_initial_state_rel_world.att_q = self.load_state_rel_world.att_q.copy()
         
+        # Publish static transform for init pose (relative to world)
+        utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'{self.get_name()}_init', self.load_initial_state_rel_world.pos, self.load_initial_state_rel_world.att_q, self.tf_static_broadcaster_init_pose)
+
+        self.flag_tf_init_set = True 
+        self.get_logger().info('Initial pose TF set')
+
 
 def main():
     # Create node
