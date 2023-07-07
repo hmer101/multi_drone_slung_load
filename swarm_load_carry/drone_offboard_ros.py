@@ -39,18 +39,10 @@ def engage_offboard_mode(pub_vehicle_command, timestamp):
     publish_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_MODE, 
                             pub_vehicle_command, timestamp, param1=1.0, param2=6.0)
 
-# TODO: Probably have to set home and origin?? Rename accordingly
+
 # Note that can only reset home after vehicle is armed
 def set_origin(pub_vehicle_command, lat, lon, alt, timestamp):
-    """Set home location"""
-    #uint16 VEHICLE_CMD_DO_SET_HOME = 179			# Changes the home location either to the current location or a specified location. |Use current (1=use current location, 0=use specified location)| Empty| Empty| Empty| Latitude| Longitude| Altitude|
-    #VEHICLE_CMD_SET_GPS_GLOBAL_ORIGIN
-    
-    # publish_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_HOME, 
-    #                         pub_vehicle_command, timestamp, param1=1.0)
-    # publish_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_HOME, 
-    #                         pub_vehicle_command, timestamp, param1=0.0, param5=0.0, param6=0.0, param7=0.0)
-    
+    """Set GPS origin location"""   
     publish_vehicle_command(VehicleCommand.VEHICLE_CMD_SET_GPS_GLOBAL_ORIGIN, 
                             pub_vehicle_command, timestamp, param5=lat, param6=lon, param7=alt)
     

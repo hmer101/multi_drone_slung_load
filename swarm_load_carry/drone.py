@@ -29,10 +29,10 @@ DEFAULT_DRONE_NUM=1
 DEFAULT_FIRST_DRONE_NUM=1
 DEFAULT_LOAD_ID=1
 
-MAIN_TIMER_PERIOD=0.02
+MAIN_TIMER_PERIOD=0.2 # sec
 
 TAKEOFF_HEIGHT_LOAD_PRE_TENSION=-0.2
-TAKEOFF_HEIGHT_LOAD=3.0 #0.0 #3.0
+TAKEOFF_HEIGHT_LOAD=3.0 
 TAKEOFF_HEIGHT_DRONE_REL_LOAD=1.082
 
 TAKEOFF_START_CNT_THRESHOLD=2/MAIN_TIMER_PERIOD
@@ -80,7 +80,7 @@ class Drone(Node):
 
         
         ## TIMERS
-        timer_period = MAIN_TIMER_PERIOD #0.02 #0.02  # seconds
+        timer_period = MAIN_TIMER_PERIOD
         self.timer = self.create_timer(timer_period, self.clbk_cmdloop)
         self.cnt_phase_ticks = 0
 
@@ -338,11 +338,10 @@ class Drone(Node):
         # Perform actions depending on what mode is requested
         match self.phase:
             # Run takeoff
-            # TODO: test if performs preflight checks. Perform manually if doesn't
             # TODO: Add some formation feedback to all phases (especially mission)
             case Phase.PHASE_TAKEOFF_START:
                 # Override trajectory msg for straight-up takeoff in first phase
-                trajectory_msg = utils.gen_traj_msg_straight_up(TAKEOFF_HEIGHT_LOAD_PRE_TENSION+TAKEOFF_HEIGHT_DRONE_REL_LOAD, self.vehicle_local_state.att_q)
+                trajectory_msg = utils.gen_traj_msg_straight_up(TAKEOFF_HEIGHT_LOAD_PRE_TENSION+TAKEOFF_HEIGHT_DRONE_REL_LOAD, self.vehicle_local_state.att_q, timestamp)
                 
                 # Update counter for arm phase
                 if self.cnt_phase_ticks <=TAKEOFF_START_CNT_THRESHOLD: 

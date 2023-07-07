@@ -29,9 +29,9 @@ DEFAULT_DRONE_NUM=1
 DEFAULT_FIRST_DRONE_NUM=1
 DEFAULT_LOAD_ID=1
 
-TAKEOFF_HEIGHT_LOAD_PRE_TENSION=-0.2 # m
+#TAKEOFF_HEIGHT_LOAD_PRE_TENSION=-0.2 # m
 
-MAIN_TIMER_PERIOD=0.02 # s
+MAIN_TIMER_PERIOD=0.2 # s
 
 class GCSBackground(Node):
 
@@ -104,7 +104,7 @@ class GCSBackground(Node):
                 self.get_logger().info(f'Waiting for set pose rel load service: drone {i}')
 
         # Set drone arrangement around load
-        self.set_drone_arrangement(1, [1.082, 1.082, 1.082])
+        self.set_drone_arrangement(1, [1.082, 1.082, 1.082], [0, -np.pi*(1-2/self.num_drones), np.pi*(1-2/self.num_drones)])
 
         self.get_logger().info('Setup complete')
 
@@ -135,9 +135,9 @@ class GCSBackground(Node):
             # Update theta
             self.mission_theta = self.mission_theta + omega*dt
 
-        else:
-            # Initial take-off to set point, waiting for pre tension time, takeoff complete or drones not in same phase. Keep same setpoint as previous
-            pass
+        # else:
+        #     # Initial take-off to set point, waiting for pre tension time, takeoff complete or drones not in same phase. Keep same setpoint as previous
+        #     pass
         
         self.send_desired_pose()
 
@@ -148,8 +148,8 @@ class GCSBackground(Node):
 
 
     ## HELPERS
-    # TODO: Set drones to positions that minimizes sum of squared distance from drone start points to desired points
-    def set_drone_arrangement(self, r, z):
+    # TODO: Set drones to positions that minimizes sum of squared distance from drone start points to desired points (set yaws accordingly)
+    def set_drone_arrangement(self, r, z, yaw):
         ref_points = utils.generate_points_cylinder(self.num_drones, r, z)
 
         pos_req_future = [None] * self.num_drones
@@ -162,14 +162,18 @@ class GCSBackground(Node):
             pos_req.transform_stamped.header.frame_id = f'load{self.load_id}'
             pos_req.transform_stamped.child_frame_id = f'drone{i}'
 
+            # Set position
             pos_req.transform_stamped.transform.translation.x = float(ref_points[i][0])
             pos_req.transform_stamped.transform.translation.y = float(ref_points[i][1])
             pos_req.transform_stamped.transform.translation.z = float(ref_points[i][2])
 
-            pos_req.transform_stamped.transform.rotation.x = float(0)
-            pos_req.transform_stamped.transform.rotation.y = float(0)
-            pos_req.transform_stamped.transform.rotation.z = float(0)
-            pos_req.transform_stamped.transform.rotation.w = float(1)
+            # Set yaw
+            q_des = qt.array(ft.quaternion_from_euler(0.0, 0.0, yaw[i]))
+
+            pos_req.transform_stamped.transform.rotation.x = float(q_des.x)
+            pos_req.transform_stamped.transform.rotation.y = float(q_des.y)
+            pos_req.transform_stamped.transform.rotation.z = float(q_des.z)
+            pos_req.transform_stamped.transform.rotation.w = float(q_des.w)
 
             pos_req_future[i] = next_cli_set_drone_pose.call_async(pos_req)
 

@@ -195,8 +195,9 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
 
 
 # Generate trajectory message that gives setpoint at a specific height and orientation
-def gen_traj_msg_straight_up(takeoff_height, takeoff_q):
+def gen_traj_msg_straight_up(takeoff_height, takeoff_q, timestamp):
     trajectory_msg = TrajectorySetpoint()
+    trajectory_msg.timestamp = timestamp
 
     # Set position straight up
     trajectory_msg.position[0] = 0.0
@@ -210,8 +211,10 @@ def gen_traj_msg_straight_up(takeoff_height, takeoff_q):
     return trajectory_msg
 
 # Make drone orbit in a circle of radius r and height h
-def gen_traj_msg_orbit(r, theta, h):
+def gen_traj_msg_orbit(r, theta, h, timestamp):
     trajectory_msg = TrajectorySetpoint()
+    trajectory_msg.timestamp = timestamp
+
     trajectory_msg.position[0] = r * np.cos(theta)
     trajectory_msg.position[1] = r * np.sin(theta)
     trajectory_msg.position[2] = -h
@@ -219,8 +222,9 @@ def gen_traj_msg_orbit(r, theta, h):
     return trajectory_msg
 
 # Make drone travel at set velocity
-def gen_traj_msg_vel(desired_velocity):
+def gen_traj_msg_vel(desired_velocity, timestamp):
     trajectory_msg = TrajectorySetpoint()
+    trajectory_msg.timestamp = timestamp
 
     trajectory_msg.position[0] = None
     trajectory_msg.position[1] = None

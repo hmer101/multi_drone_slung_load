@@ -22,6 +22,8 @@ from swarm_load_carry.state import State, CS_type
 DEFAULT_DRONE_NUM=1
 DEFAULT_FIRST_DRONE_NUM=1
 
+PUB_LOOP_TIMER_PERIOD=0.02
+
 # Could make subclasses for different load types (e.g. camera etc.)
 class Load(Node):
     def __init__(self):
@@ -56,7 +58,7 @@ class Load(Node):
       
 
         ## TIMERS
-        self.timer = self.create_timer(0.02, self.clbk_publoop)
+        self.timer = self.create_timer(PUB_LOOP_TIMER_PERIOD, self.clbk_publoop)
 
         ## PUBLISHERS
         
