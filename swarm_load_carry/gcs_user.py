@@ -75,7 +75,7 @@ class GCSUser(Node):
         cmd = None
 
         while cmd != 'q':
-            cmd = input('Enter command [t = takeoff, m = mission start, l = land, r = return to home, h = hold, k = kill, q= quit]:')
+            cmd = input('Enter command [t = takeoff, m = mission start, l = land, h = hold, k = kill, q= quit]:') #r = return to home,
 
             match(cmd):
                 case 't':

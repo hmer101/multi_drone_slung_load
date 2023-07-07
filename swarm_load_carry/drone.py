@@ -31,13 +31,18 @@ DEFAULT_LOAD_ID=1
 
 MAIN_TIMER_PERIOD=0.2 # sec
 
-TAKEOFF_HEIGHT_LOAD_PRE_TENSION=-0.2
+HEIGHT_DRONE_REL_LOAD=1.082
+HEIGHT_LOAD_PRE_TENSION=-0.2
+POS_THRESHOLD=0.1
+
 TAKEOFF_HEIGHT_LOAD=3.0 
-TAKEOFF_HEIGHT_DRONE_REL_LOAD=1.082
 
 TAKEOFF_START_CNT_THRESHOLD=2/MAIN_TIMER_PERIOD
 TAKEOFF_PRE_TENSION_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
-TAKEOFF_POS_THRESHOLD=0.1
+
+LAND_PRE_DESCENT_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
+LAND_POST_LOAD_DOWN_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
+
 
 # Node to encapsulate drone information and actions
 class Drone(Node):
@@ -341,7 +346,7 @@ class Drone(Node):
             # TODO: Add some formation feedback to all phases (especially mission)
             case Phase.PHASE_TAKEOFF_START:
                 # Override trajectory msg for straight-up takeoff in first phase
-                trajectory_msg = utils.gen_traj_msg_straight_up(TAKEOFF_HEIGHT_LOAD_PRE_TENSION+TAKEOFF_HEIGHT_DRONE_REL_LOAD, self.vehicle_local_state.att_q, timestamp)
+                trajectory_msg = utils.gen_traj_msg_straight_up(HEIGHT_LOAD_PRE_TENSION+HEIGHT_DRONE_REL_LOAD, self.vehicle_local_state.att_q, timestamp)
                 
                 # Update counter for arm phase
                 if self.cnt_phase_ticks <=TAKEOFF_START_CNT_THRESHOLD: 
@@ -361,7 +366,7 @@ class Drone(Node):
                 # Continue to send setpoint whilst taking off
                 elif self.nav_state ==VehicleStatus.NAVIGATION_STATE_OFFBOARD and self.arm_state==VehicleStatus.ARMING_STATE_ARMED: 
                     # Takeoff to pre-tension level
-                    if tf_drone_rel_world.transform.translation.z>=(TAKEOFF_HEIGHT_LOAD_PRE_TENSION+TAKEOFF_HEIGHT_DRONE_REL_LOAD-TAKEOFF_POS_THRESHOLD):     
+                    if tf_drone_rel_world.transform.translation.z>=(HEIGHT_LOAD_PRE_TENSION+HEIGHT_DRONE_REL_LOAD-POS_THRESHOLD):     
                         self.phase = Phase.PHASE_TAKEOFF_PRE_TENSION
                         self.cnt_phase_ticks = 0  
                         self.get_logger().info(f'PRE_TENSION LEVEL REACHED')        
@@ -385,7 +390,7 @@ class Drone(Node):
 
             case Phase.PHASE_TAKEOFF_POST_TENSION:
                 #Takeoff complete
-                if tf_drone_rel_world.transform.translation.z>=(TAKEOFF_HEIGHT_LOAD+TAKEOFF_HEIGHT_DRONE_REL_LOAD-TAKEOFF_POS_THRESHOLD):     
+                if tf_drone_rel_world.transform.translation.z>=(TAKEOFF_HEIGHT_LOAD+HEIGHT_DRONE_REL_LOAD-POS_THRESHOLD):     
                     self.phase = Phase.PHASE_TAKEOFF_END 
                     
                     self.get_logger().info(f'Takeoff complete')
@@ -406,21 +411,42 @@ class Drone(Node):
 
             # Run land 
             case Phase.PHASE_LAND_START:
-                
-                self.phase = Phase.PHASE_LAND_END 
+                if self.cnt_phase_ticks < LAND_PRE_DESCENT_CNT_THRESHOLD:
+                    self.cnt_phase_ticks += 1
+                else:
+                    self.phase = Phase.PHASE_LAND_DESCENT
+                    self.cnt_phase_ticks = 0
+                    self.get_logger().info(f'LAND DESCENT BEGINNING') 
 
-                # TODO: Add some formation feedback
+                # Send hold setpoint
+                self.pub_trajectory.publish(trajectory_msg)
+            
+            case Phase.PHASE_LAND_DESCENT:
+                if tf_drone_rel_world.transform.translation.z<=(HEIGHT_LOAD_PRE_TENSION+HEIGHT_DRONE_REL_LOAD-POS_THRESHOLD):
+                    self.phase = Phase.PHASE_LAND_POST_LOAD_DOWN
+                    self.get_logger().info(f'LOAD PLACED ON GROUND') 
 
-            # Run RTL 
-            # case Phase.PHASE_RTL_START:
+                # Send descending setpoint
+                self.pub_trajectory.publish(trajectory_msg)
 
-            #     self.phase = Phase.PHASE_RTL_END
 
-            #     # TODO: Add some formation feedback
+            case Phase.PHASE_LAND_POST_LOAD_DOWN:
+                if self.cnt_phase_ticks <LAND_POST_LOAD_DOWN_CNT_THRESHOLD:
+                    self.cnt_phase_ticks += 1
+                else: 
+                    self.phase = Phase.PHASE_LAND_END
+                    self.get_logger().info(f'READY TO SET DOWN') 
 
-            # Hold 
-            # case Phase.PHASE_HOLD:
-            #     pass
+                # Send spread out setpoint
+                self.pub_trajectory.publish(trajectory_msg)
+
+
+            case Phase.PHASE_LAND_END:
+                offboard_ros.land(self.pub_vehicle_command, timestamp) 
+
+                # Send land setpoint???????????
+                #self.pub_trajectory.publish(trajectory_msg)
+
 
             # Kill
             case Phase.PHASE_KILL:

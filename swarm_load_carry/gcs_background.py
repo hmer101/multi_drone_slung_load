@@ -117,7 +117,7 @@ class GCSBackground(Node):
         # SAFETY MEASURES
         if np.any(self.drone_phases == Phase.PHASE_KILL):
             pass
-        
+
         elif np.any(self.drone_phases == Phase.PHASE_HOLD):
             self.load_desired_local_state.pos = self.load_desired_local_state.pos
             self.load_desired_local_state.att_q = self.load_desired_local_state.att_q
@@ -143,9 +143,19 @@ class GCSBackground(Node):
             # Update theta
             self.mission_theta = self.mission_theta + omega*dt
 
-        # else:
-        #     # Initial take-off to set point, waiting for pre tension time, takeoff complete or drones not in same phase. Keep same setpoint as previous
-        #     pass
+        # LAND
+        #elif np.all(self.drone_phases == Phase.PHASE_LAND_START):
+            #hold
+        
+        elif np.all(self.drone_phases == Phase.PHASE_LAND_DESCENT):
+            # Lower slowly - tension will disengage
+            self.load_desired_local_state.pos = np.array([0.0, 0.0, self.load_desired_local_state.pos[2] - 0.1*MAIN_TIMER_PERIOD])
+        elif np.all(self.drone_phases == Phase.PHASE_LAND_POST_LOAD_DOWN):
+            self.set_drone_arrangement(1.3, [1.082, 1.082, 1.082], [0, -np.pi*(1-2/self.num_drones), np.pi*(1-2/self.num_drones)])
+
+        #elif np.all(self.drone_phases == Phase.PHASE_LAND_END):
+            # disarm?
+
         
         self.send_desired_pose()
 
