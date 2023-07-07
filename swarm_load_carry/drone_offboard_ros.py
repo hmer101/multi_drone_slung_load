@@ -20,6 +20,11 @@ def disarm(pub_vehicle_command, timestamp):
     publish_vehicle_command(VehicleCommand.VEHICLE_CMD_COMPONENT_ARM_DISARM, 
                             pub_vehicle_command, timestamp, param1=0.0)
 
+def kill(pub_vehicle_command, timestamp):
+    """Send a kill command to the vehicle."""
+    publish_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_FLIGHTTERMINATION, 
+                            pub_vehicle_command, timestamp, param1=1.0)
+
 # TODO: Debug
 # def takeoff(pub_vehicle_command, timestamp, takeoff_state_lla):
 #     """Switch to takeoff mode."""

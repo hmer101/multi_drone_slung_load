@@ -412,19 +412,19 @@ class Drone(Node):
                 # TODO: Add some formation feedback
 
             # Run RTL 
-            case Phase.PHASE_RTL_START:
+            # case Phase.PHASE_RTL_START:
 
-                self.phase = Phase.PHASE_RTL_END
+            #     self.phase = Phase.PHASE_RTL_END
 
-                # TODO: Add some formation feedback
+            #     # TODO: Add some formation feedback
 
             # Hold 
-            case Phase.PHASE_HOLD:
-                pass
+            # case Phase.PHASE_HOLD:
+            #     pass
 
             # Kill
             case Phase.PHASE_KILL:
-                pass
+                offboard_ros.kill(self.pub_vehicle_command, timestamp)
 
         # Publish the phase the drone is currently in 
         msg_current_phase = Phase()

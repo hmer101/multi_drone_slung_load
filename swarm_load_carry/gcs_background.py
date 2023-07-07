@@ -114,8 +114,16 @@ class GCSBackground(Node):
         # Publish different setpoints depending on what phase the drones are in. 
         # If drones phases don't match, simply hold position
 
+        # SAFETY MEASURES
+        if np.any(self.drone_phases == Phase.PHASE_KILL):
+            pass
+        
+        elif np.any(self.drone_phases == Phase.PHASE_HOLD):
+            self.load_desired_local_state.pos = self.load_desired_local_state.pos
+            self.load_desired_local_state.att_q = self.load_desired_local_state.att_q
+
         # TAKEOFF
-        if np.all(self.drone_phases == Phase.PHASE_TAKEOFF_POST_TENSION):
+        elif np.all(self.drone_phases == Phase.PHASE_TAKEOFF_POST_TENSION):
             # Rise slowly - tension will engage
             self.load_desired_local_state.pos = np.array([0.0, 0.0, self.load_desired_local_state.pos[2] + 0.1*MAIN_TIMER_PERIOD])
 
@@ -127,7 +135,7 @@ class GCSBackground(Node):
             omega = v_lin/r # rad/s
             dt = MAIN_TIMER_PERIOD # s
 
-            # Move in 
+            # Move load in circle
             self.load_desired_local_state.pos = np.array([r*(np.cos(self.mission_theta)-1), r*np.sin(self.mission_theta), self.load_desired_local_state.pos[2]])
             q_list = ft.quaternion_from_euler(0.0, 0.0, self.mission_theta)
             self.load_desired_local_state.att_q = qt.array(q_list)
