@@ -159,9 +159,6 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
         logger.warn(f'Load initial position not found. Returning default trajectory msg.')
         return trajectory_msg
 
-        # load_desired_state_rel_world = load_desired_local_state
-        # logger.warn(f'Load initial position not found. Taking load desired state as relative to world.')
-
     # Add effect of desired load orientation (note different physical connections to load will require different algorithms)
     vehicle_desired_pos_rel_load_rot = load_desired_state_rel_world.att_q.rotate(vehicle_desired_state_rel_load.pos)
 
@@ -178,15 +175,10 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
     vehicle_desired_state_rel_drone_init = transform_frames(vehicle_desired_state_rel_world, f'{drone_name}_init', tf_buffer, logger)
 
     
-
     # Approximate vehicle desired position as relative to world rather than drone_init if drone_init -> world not available
     if vehicle_desired_state_rel_drone_init == None:
         logger.warn(f'Drone initial position not found. Returning default trajectory msg.')
         return trajectory_msg
-    
-        #vehicle_desired_state_rel_drone_init = vehicle_desired_state_rel_world
-        #logger.warn(f'?????????????????????????????????????????????????????????')
-        #logger.warn(f'Drone initial position not found. Taking load desired state as relative to world.')
         
     # Transform to NED into drone_init
     pos_drone_desired_px4 = np.array([vehicle_desired_state_rel_drone_init.pos[1], vehicle_desired_state_rel_drone_init.pos[0], -vehicle_desired_state_rel_drone_init.pos[2]])

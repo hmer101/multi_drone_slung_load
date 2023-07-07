@@ -84,8 +84,8 @@ class GCSUser(Node):
                     self.phase_change(Phase.PHASE_MISSION_START)
                 case 'l':
                     self.phase_change(Phase.PHASE_LAND_START)
-                case 'r':
-                    self.phase_change(Phase.PHASE_RTL_START)
+                # case 'r':
+                #     self.phase_change(Phase.PHASE_RTL_START)
                 case 'h':
                     self.phase_change(Phase.PHASE_HOLD)
                 case 'k':
