@@ -436,13 +436,15 @@ class Drone(Node):
                 else: 
                     self.phase = Phase.PHASE_LAND_END
                     self.get_logger().info(f'READY TO SET DOWN') 
+                    offboard_ros.land(self.pub_vehicle_command, timestamp) 
 
                 # Send spread out setpoint
                 self.pub_trajectory.publish(trajectory_msg)
 
 
             case Phase.PHASE_LAND_END:
-                offboard_ros.land(self.pub_vehicle_command, timestamp) 
+                pass
+                #offboard_ros.land(self.pub_vehicle_command, timestamp) 
 
                 # Send land setpoint???????????
                 #self.pub_trajectory.publish(trajectory_msg)
