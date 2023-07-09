@@ -37,7 +37,7 @@ POS_THRESHOLD=0.1
 
 TAKEOFF_HEIGHT_LOAD=3.0 
 
-TAKEOFF_START_CNT_THRESHOLD=2/MAIN_TIMER_PERIOD
+TAKEOFF_START_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD #2
 TAKEOFF_PRE_TENSION_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
 
 LAND_PRE_DESCENT_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
@@ -174,7 +174,7 @@ class Drone(Node):
 
         ## FLAGS 
         # Ensure set services are called at least once before taking off)
-        self.flag_gps_home_set = False # GPS home set when vehicle first armed
+        self.flag_gps_home_set = False # GPS home set when vehicle armed
         self.flag_local_init_pos_set = False 
         self.flag_desired_pos_rel_load_set = False
 
@@ -185,7 +185,7 @@ class Drone(Node):
             while not self.cli_get_first_drone_init_global_pose.wait_for_service(timeout_sec=1.0):
                 self.get_logger().info(f'Waiting for global initial pose service drone {self.first_drone_num}')
 
-            self.update_first_drone_init_pose() # TODO: Call this periodically incase any FMU restarts and changes init pose
+            # self.update_first_drone_init_pose()
 
 
         ## Print information
@@ -321,7 +321,7 @@ class Drone(Node):
         timestamp = int(self.get_clock().now().nanoseconds/1000)
         offboard_ros.publish_offboard_control_heartbeat_signal(self.pub_offboard_mode, 'pos', timestamp)
 
-        # Run rest of setup when ready and not already setup
+        # # Run rest of setup when ready and not already setup (triggered at start and on every arming)
         if self.flag_gps_home_set and not self.flag_local_init_pos_set:
             # Rest of setup differs for first drone and others
             if self.drone_id == self.first_drone_num:
@@ -347,9 +347,15 @@ class Drone(Node):
             case Phase.PHASE_TAKEOFF_START:
                 # Override trajectory msg for straight-up takeoff in first phase
                 trajectory_msg = utils.gen_traj_msg_straight_up(HEIGHT_LOAD_PRE_TENSION+HEIGHT_DRONE_REL_LOAD, self.vehicle_local_state.att_q, timestamp)
-                
+
                 # Update counter for arm phase
                 if self.cnt_phase_ticks <=TAKEOFF_START_CNT_THRESHOLD: 
+                    # Reset FMU and TF home positions
+                    if (self.drone_id == self.first_drone_num) and self.cnt_phase_ticks == 0: # Reset first drone first (to give time for new position to be set before it is broadcast to others)
+                        self.reset_pre_arm()
+                    elif (self.drone_id > self.first_drone_num) and self.cnt_phase_ticks == round(TAKEOFF_START_CNT_THRESHOLD/2):
+                        self.reset_pre_arm()
+
                     # Send takeoff setpoint
                     self.pub_trajectory.publish(trajectory_msg)
 
@@ -435,7 +441,9 @@ class Drone(Node):
                     self.cnt_phase_ticks += 1
                 else: 
                     self.phase = Phase.PHASE_LAND_END
+                    self.cnt_phase_ticks = 0
                     self.get_logger().info(f'READY TO SET DOWN') 
+
                     offboard_ros.land(self.pub_vehicle_command, timestamp) 
 
                 # Send spread out setpoint
@@ -443,16 +451,16 @@ class Drone(Node):
 
 
             case Phase.PHASE_LAND_END:
+                # Reset flags for following takeoff
+                #self.reset_land()
                 pass
-                #offboard_ros.land(self.pub_vehicle_command, timestamp) 
-
-                # Send land setpoint???????????
-                #self.pub_trajectory.publish(trajectory_msg)
 
 
             # Kill
             case Phase.PHASE_KILL:
                 offboard_ros.kill(self.pub_vehicle_command, timestamp)
+                #self.reset_land()
+                pass
 
         # Publish the phase the drone is currently in 
         msg_current_phase = Phase()
@@ -463,6 +471,28 @@ class Drone(Node):
     
 
     ## HELPER FUNCTIONS
+
+    # Resets required flags upon land to ensure successful following takeoff
+    # def reset_land(self):
+    #     self.flag_gps_home_set = False
+
+    #     # Reset local_init_pos of first drone upon landing, reset others upon next arming
+    #     # TODO: Find way to reset local_init_pos of first drone (and gps_home_set) upon arming so drones can be moved between landing and next arming
+    #     if self.drone_id == self.first_drone_num:
+    #         self.flag_local_init_pos_set = False
+    #     # self.flag_desired_pos_rel_load_set = False
+
+    def reset_pre_arm(self):
+        self.flag_gps_home_set = False
+
+        # Reset local_init_pos of first drone or get local_init_pos of first drone to reset later drones' init_poses
+        if self.drone_id == self.first_drone_num:
+            self.flag_local_init_pos_set = False
+        else: 
+            self.flag_local_init_pos_set = False
+            self.update_first_drone_init_pose()
+        # self.flag_desired_pos_rel_load_set = False
+
     def update_first_drone_init_pose(self):
         # Request updated init pose of first drone
         self.first_drone_init_global_pose_future = self.cli_get_first_drone_init_global_pose.call_async(GetGlobalInitPose.Request())
