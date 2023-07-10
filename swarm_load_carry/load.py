@@ -18,11 +18,14 @@ from tf2_ros.transform_listener import TransformListener
 from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
 
 from swarm_load_carry.state import State, CS_type
+from swarm_load_carry_interfaces.msg import Phase
 
 DEFAULT_DRONE_NUM=1
 DEFAULT_FIRST_DRONE_NUM=1
 
 PUB_LOOP_TIMER_PERIOD=0.02
+
+HEIGHT_DRONE_REL_LOAD=2 #m
 
 # Could make subclasses for different load types (e.g. camera etc.)
 class Load(Node):
@@ -55,7 +58,8 @@ class Load(Node):
 
         self.load_initial_state_rel_world = State('world', CS_type.ENU)
         self.load_state_rel_world = State('world', CS_type.ENU)
-      
+
+        self.drone_phases = np.array([-1] * self.num_drones)
 
         ## TIMERS
         self.timer = self.create_timer(PUB_LOOP_TIMER_PERIOD, self.clbk_publoop)
@@ -75,6 +79,18 @@ class Load(Node):
             self.clbk_desired_load_local_position,
             qos_profile)
 
+        # Drone current phases
+        self.sub_drone_phases = [None] * self.num_drones
+
+        for i in range(self.first_drone_num, self.num_drones+self.first_drone_num):
+            callback = lambda msg, drone_ind=(i-self.first_drone_num): self.clbk_update_drone_phase(msg, drone_ind)
+        
+            self.sub_drone_phases[i-self.first_drone_num] = self.create_subscription(
+                Phase,
+                f'/px4_{i}/out/current_phase',
+                callback,
+                qos_profile)
+
         ## SERVICES
         ## CLIENTS
 
@@ -82,7 +98,7 @@ class Load(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
         self.tf_static_broadcaster_init_pose = StaticTransformBroadcaster(self)
 
-        self.flag_tf_init_set = False
+        # self.flag_tf_init_set = False
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
@@ -103,6 +119,8 @@ class Load(Node):
         
         # TEMP: Assume load position moves directly to desired position (TODO: add dynamics or sensing/estimation. Publish actual pos in timer clbk instead)
 
+    def clbk_update_drone_phase(self, msg, drone_ind):
+        self.drone_phases[drone_ind] = msg.phase
 
     # Loop on timer to publish actual load pose
     def clbk_publoop(self):
@@ -114,38 +132,39 @@ class Load(Node):
         count_tf = 0
 
         for i in range(self.num_drones):
-            from_frame_rel = 'world'
-            to_frame_rel = f'drone{i+self.first_drone_num}'
+            target_frame = 'world'
+            source_frame = f'drone{i+self.first_drone_num}'
             
-            if self.tf_buffer.can_transform(from_frame_rel, to_frame_rel, rclpy.time.Time(), rclpy.duration.Duration(seconds=1)):
-                t = utils.lookup_tf(from_frame_rel, to_frame_rel, self.tf_buffer, rclpy.time.Time(), self.get_logger())
+            t = utils.lookup_tf(target_frame, source_frame, self.tf_buffer, rclpy.time.Time(), self.get_logger())
 
-                if t != None:
-                    drone_positions[i, :] = [t.transform.translation.x, t.transform.translation.y, t.transform.translation.z]
-                    drone_orientations[i, :] = [t.transform.rotation.w, t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z]
+            if t != None:
+                drone_positions[i, :] = [t.transform.translation.x, t.transform.translation.y, t.transform.translation.z]
+                drone_orientations[i, :] = [t.transform.rotation.w, t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z]
 
-                    count_tf += 1
-            else:
-                self.get_logger().warn(f'Cannot transform from: {from_frame_rel} to {to_frame_rel}')
+                count_tf += 1
+
 
         # Only broadcast load position if all drone positions can be found to estimate it
         if count_tf == self.num_drones:
             # Estimate load position as average of drone positions 
             self.load_state_rel_world.pos  = np.average(drone_positions, axis=0)
 
+            if np.all(self.drone_phases >= Phase.PHASE_TAKEOFF_POST_TENSION):
+                self.load_state_rel_world.pos[2] -= HEIGHT_DRONE_REL_LOAD # TODO: Better height estimate
+
             # Estimate load orientation #TODO: Better orientation estimation method
             self.load_state_rel_world.att_q = qt.array(drone_orientations[0, :])
 
-            # Set and publish initial load position TF
-            if self.flag_tf_init_set == False:
+            # If all drones are in setup phase, reset load's init pose
+            if np.all(self.drone_phases == Phase.PHASE_SETUP):
                 self.set_tf_init_pose()
 
             # Publish estimate load relative to load initial position
-            load_rel_load_init = State(f'{self.get_name()}_init', CS_type.ENU)
-            load_rel_load_init.pos = self.load_state_rel_world.pos - self.load_initial_state_rel_world.pos
-            load_rel_load_init.att_q = self.load_state_rel_world.att_q*(1/self.load_initial_state_rel_world.att_q)
+            load_rel_load_init = utils.transform_frames(self.load_state_rel_world, f'{self.get_name()}_init', self.tf_buffer, self.get_logger())
+            
 
-            utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', self.get_name(), load_rel_load_init.pos, load_rel_load_init.att_q, self.tf_broadcaster)          
+            if load_rel_load_init != None:
+                utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', self.get_name(), load_rel_load_init.pos, load_rel_load_init.att_q, self.tf_broadcaster)          
 
 
 
@@ -158,7 +177,7 @@ class Load(Node):
         # Publish static transform for init pose (relative to world)
         utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'{self.get_name()}_init', self.load_initial_state_rel_world.pos, self.load_initial_state_rel_world.att_q, self.tf_static_broadcaster_init_pose)
 
-        self.flag_tf_init_set = True 
+        #self.flag_tf_init_set = True 
         self.get_logger().info('Initial pose TF set')
 
 

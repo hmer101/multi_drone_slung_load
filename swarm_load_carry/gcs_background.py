@@ -29,7 +29,7 @@ DEFAULT_DRONE_NUM=1
 DEFAULT_FIRST_DRONE_NUM=1
 DEFAULT_LOAD_ID=1
 
-#TAKEOFF_HEIGHT_LOAD_PRE_TENSION=-0.2 # m
+HEIGHT_DRONE_REL_LOAD=1.5 #2 #m
 
 MAIN_TIMER_PERIOD=0.2 # s
 
@@ -64,6 +64,8 @@ class GCSBackground(Node):
 
         self.drone_phases = np.array([-1] * self.num_drones)
         self.mission_theta = 0.0 # rad
+
+        self.futures_set_drone_poses_rel_load = [None] * self.num_drones
 
         # Timers
         self.timer = self.create_timer(MAIN_TIMER_PERIOD, self.clbk_cmdloop)
@@ -103,9 +105,6 @@ class GCSBackground(Node):
             while not self.cli_set_drone_poses_rel_load[i-self.first_drone_num].wait_for_service(timeout_sec=1.0):
                 self.get_logger().info(f'Waiting for set pose rel load service: drone {i}')
 
-        # Set drone arrangement around load
-        self.set_drone_arrangement(1, [1.082, 1.082, 1.082], [0, -np.pi*(1-2/self.num_drones), np.pi*(1-2/self.num_drones)])
-
         self.get_logger().info('Setup complete')
 
 
@@ -122,7 +121,19 @@ class GCSBackground(Node):
             self.load_desired_local_state.pos = self.load_desired_local_state.pos
             self.load_desired_local_state.att_q = self.load_desired_local_state.att_q
 
+        # Only allow transitioning if not waiting to set drone arrangement
+        if np.any(self.futures_set_drone_poses_rel_load != None):
+            # Skip this command loop if any drone's position relative to the load has not been successfully set (i.e. service has not yet returned)
+            for i in range(self.num_drones):
+                if self.futures_set_drone_poses_rel_load[i] != None:
+                    if not self.futures_set_drone_poses_rel_load[i].done():
+                        self.get_logger().info(f'Waiting for drone {i}\'s pose rel load to be set')
+                        return
+        
         # TAKEOFF
+        if np.all(self.drone_phases == Phase.PHASE_SETUP):
+            self.reset_pre_arm()
+
         elif np.all(self.drone_phases == Phase.PHASE_TAKEOFF_POST_TENSION):
             # Rise slowly - tension will engage
             self.load_desired_local_state.pos = np.array([0.0, 0.0, self.load_desired_local_state.pos[2] + 0.1*MAIN_TIMER_PERIOD])
@@ -142,36 +153,36 @@ class GCSBackground(Node):
 
             # Update theta
             self.mission_theta = self.mission_theta + omega*dt
-
-        # LAND
-        #elif np.all(self.drone_phases == Phase.PHASE_LAND_START):
-            #hold
         
         elif np.all(self.drone_phases == Phase.PHASE_LAND_DESCENT):
             # Lower slowly - tension will disengage
             self.load_desired_local_state.pos = np.array([0.0, 0.0, self.load_desired_local_state.pos[2] - 0.1*MAIN_TIMER_PERIOD])
+
         elif np.all(self.drone_phases == Phase.PHASE_LAND_POST_LOAD_DOWN):
-            self.set_drone_arrangement(1.3, [1.082, 1.082, 1.082], [0, -np.pi*(1-2/self.num_drones), np.pi*(1-2/self.num_drones)])
-
-        #elif np.all(self.drone_phases == Phase.PHASE_LAND_END):
-            # disarm?
-
+            self.set_drone_arrangement(1.3, [1, 1, 1], [0, -np.pi*(1-2/self.num_drones), np.pi*(1-2/self.num_drones)])
         
         self.send_desired_pose()
 
         
-
     def clbk_update_phase(self, msg, drone_ind):
         self.drone_phases[drone_ind] = msg.phase
 
 
     ## HELPERS
+    def reset_pre_arm(self):
+        # Set load desired state
+        self.load_desired_local_state.pos = np.array([0.0, 0.0, 0.0])
+        self.load_desired_local_state.att_q = qt.array([1.0, 0.0, 0.0, 0.0])
+
+        # Set drone arrangement around load
+        self.set_drone_arrangement(1, [HEIGHT_DRONE_REL_LOAD, HEIGHT_DRONE_REL_LOAD, HEIGHT_DRONE_REL_LOAD], [0, -np.pi*(1-2/self.num_drones), np.pi*(1-2/self.num_drones)])
+
+        # Set variables related to mission
+        self.mission_theta = 0.0
+
     # TODO: Set drones to positions that minimizes sum of squared distance from drone start points to desired points (set yaws accordingly)
     def set_drone_arrangement(self, r, z, yaw):
         ref_points = utils.generate_points_cylinder(self.num_drones, r, z)
-
-        pos_req_future = [None] * self.num_drones
-
         # Get current drone positions 
 
         # Set drone arrangements
@@ -193,11 +204,7 @@ class GCSBackground(Node):
             pos_req.transform_stamped.transform.rotation.z = float(q_des.z)
             pos_req.transform_stamped.transform.rotation.w = float(q_des.w)
 
-            pos_req_future[i] = next_cli_set_drone_pose.call_async(pos_req)
-
-        # Wait for response
-        for i in range(self.num_drones):
-            rclpy.spin_until_future_complete(self, pos_req_future[i])
+            self.futures_set_drone_poses_rel_load[i] = next_cli_set_drone_pose.call_async(pos_req)
 
 
     def send_desired_pose(self):

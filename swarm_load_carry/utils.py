@@ -123,21 +123,21 @@ def transform_frames(state, frame2_name, tf_buffer, logger):
     state2 = State(f'{frame2_name}', CS_type.ENU)
 
     # Find the transform
-    tf_f2_rel_f2 = lookup_tf(frame2_name, state.frame, tf_buffer, rclpy.time.Time(), logger)
+    tf_f2_rel_f1 = lookup_tf(frame2_name, state.frame, tf_buffer, rclpy.time.Time(), logger)
 
     # Make the transform if the frames exist, otherwise return None
-    if tf_f2_rel_f2 == None:
+    if tf_f2_rel_f1 == None:
         return None
 
     else:
-        state2.pos = transform_position(state.pos, np.array([tf_f2_rel_f2.transform.translation.x, 
-                                                            tf_f2_rel_f2.transform.translation.y, 
-                                                            tf_f2_rel_f2.transform.translation.z]))
+        state2.pos = transform_position(state.pos, np.array([tf_f2_rel_f1.transform.translation.x, 
+                                                            tf_f2_rel_f1.transform.translation.y, 
+                                                            tf_f2_rel_f1.transform.translation.z]))
         
-        state2.att_q = transform_orientation(state.att_q, qt.array([tf_f2_rel_f2.transform.rotation.w, 
-                                                                    tf_f2_rel_f2.transform.rotation.x,
-                                                                    tf_f2_rel_f2.transform.rotation.y,
-                                                                    tf_f2_rel_f2.transform.rotation.z]))
+        state2.att_q = transform_orientation(state.att_q, qt.array([tf_f2_rel_f1.transform.rotation.w, 
+                                                                    tf_f2_rel_f1.transform.rotation.x,
+                                                                    tf_f2_rel_f1.transform.rotation.y,
+                                                                    tf_f2_rel_f1.transform.rotation.z]))
         
     return state2
 
