@@ -79,7 +79,7 @@ class GCSUser(Node):
 
             match(cmd):
                 case 't':
-                    self.phase_change(Phase.PHASE_TAKEOFF_START)
+                    self.phase_change(Phase.PHASE_SETUP)
                 case 'm':
                     self.phase_change(Phase.PHASE_MISSION_START)
                 case 'l':

@@ -25,16 +25,21 @@ class State():
         self.frame = frame
         self.cs_type = cs_type
 
-        if cs_type == CS_type.LLA:
-            # Individual variables for LLA to prevent unit conversion errors
-            self.lat = lat
-            self.lon = lon
-            self.alt = alt
-        else:
-            self.pos = np.copy(pos)      # Position relative to frame in given co-ordinate system type
+        # if cs_type == CS_type.LLA:
+        #     # Individual variables for LLA to prevent unit conversion errors
+        #     self.lat = lat
+        #     self.lon = lon
+        #     self.alt = alt
+        # else:
+        self.pos = np.copy(pos)      # Position relative to frame in given co-ordinate system type
         
         self.att_q = att.copy() #qt.array([att.w, att.x, att.y, att.z])   # Attitude relative to frame as a quaternion [w, x, y, z] (note quaternionic and PX4 default have w first. ROS quaternion msg doesn't have a vector - must specify .x,.y,.z,.w components)
         self.vel = np.copy(vel)                               # Velocity relative to frame in given co-ordinate system type
 
-        
-       
+    def __eq__(self, other):
+        if other is None:
+            return False
+        elif ((np.array_equal(self.pos, other.pos)) and (np.array_equal(self.att_q, other.att_q)) and (np.array_equal(self.vel, other.vel))): #(self.lat == other.lat) and (self.lon == other.lon) and (self.alt == other.alt) and
+            return True
+        else: 
+            return False

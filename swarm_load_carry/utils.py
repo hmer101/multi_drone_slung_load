@@ -99,8 +99,9 @@ def lookup_tf(target_frame, source_frame, tf_buffer, time, logger):
             source_frame,
             time)
     except TransformException as ex:
-        logger.warn(
-            f'Could not transform {source_frame} to {target_frame}: {ex}')
+        #logger.warn(
+          #  f'Could not transform {source_frame} to {target_frame}: {ex}') #TODO: reactivate
+          pass
     
     return t
 
@@ -156,7 +157,7 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
 
     # Approximate load desired position as relative to world rather than load_init if load_init -> world tf not available
     if load_desired_state_rel_world == None:
-        logger.warn(f'Load initial position not found. Returning default trajectory msg.')
+        #logger.warn(f'Load initial position not found. Returning default trajectory msg.') #TODO: reactivate
         return trajectory_msg
 
     # Add effect of desired load orientation (note different physical connections to load will require different algorithms)
@@ -177,7 +178,7 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
     
     # Approximate vehicle desired position as relative to world rather than drone_init if drone_init -> world not available
     if vehicle_desired_state_rel_drone_init == None:
-        logger.warn(f'Drone initial position not found. Returning default trajectory msg.')
+        #logger.warn(f'Drone initial position not found. Returning default trajectory msg.') #TODO: reactivate
         return trajectory_msg
         
     # Transform to NED into drone_init
