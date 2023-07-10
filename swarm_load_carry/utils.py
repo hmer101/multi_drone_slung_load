@@ -154,11 +154,15 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
     
     # Convert load desired state into world frame
     load_desired_state_rel_world = transform_frames(load_desired_local_state, 'world', tf_buffer, logger)
-
+    
     # Approximate load desired position as relative to world rather than load_init if load_init -> world tf not available
     if load_desired_state_rel_world == None:
         #logger.warn(f'Load initial position not found. Returning default trajectory msg.') #TODO: reactivate
         return trajectory_msg
+
+    logger.info(f'load_desired_state_rel_world: {[load_desired_state_rel_world.pos[0], load_desired_state_rel_world.pos[1], load_desired_state_rel_world.pos[2]]}')
+    logger.info(f'load_desired_state_rel_world att: {[load_desired_state_rel_world.att_q.w, load_desired_state_rel_world.att_q.x, load_desired_state_rel_world.att_q.y, load_desired_state_rel_world.att_q.z]}')
+
 
     # Add effect of desired load orientation (note different physical connections to load will require different algorithms)
     vehicle_desired_pos_rel_load_rot = load_desired_state_rel_world.att_q.rotate(vehicle_desired_state_rel_load.pos)
@@ -168,13 +172,14 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
                                             vehicle_desired_pos_rel_load_rot[1] + load_desired_state_rel_world.pos[1],
                                             vehicle_desired_pos_rel_load_rot[2] + load_desired_state_rel_world.pos[2]]
 
-    # Tranform relative to drone_init
+    # Transform relative to drone_init
     vehicle_desired_state_rel_world = State('world', CS_type.ENU)
     vehicle_desired_state_rel_world.pos = vehicle_desired_pos_rel_world
     vehicle_desired_state_rel_world.att_q = vehicle_desired_state_rel_load.att_q*load_desired_state_rel_world.att_q
 
     vehicle_desired_state_rel_drone_init = transform_frames(vehicle_desired_state_rel_world, f'{drone_name}_init', tf_buffer, logger)
-
+    logger.info(f'vehicle_desired_state_rel_drone_init: {[vehicle_desired_state_rel_drone_init.pos[0], vehicle_desired_state_rel_drone_init.pos[1], vehicle_desired_state_rel_drone_init.pos[2]]}')
+    logger.info(f'vehicle_desired_state_rel_drone_init att: {[vehicle_desired_state_rel_drone_init.att_q.w, vehicle_desired_state_rel_drone_init.att_q.x, vehicle_desired_state_rel_drone_init.att_q.y, vehicle_desired_state_rel_drone_init.att_q.z]} \n')
     
     # Approximate vehicle desired position as relative to world rather than drone_init if drone_init -> world not available
     if vehicle_desired_state_rel_drone_init == None:

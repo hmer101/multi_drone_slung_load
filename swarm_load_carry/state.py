@@ -37,3 +37,11 @@ class State():
             return True
         else: 
             return False
+        
+    def copy(self):
+        return State(self.frame, self.cs_type, np.copy(self.pos), self.att_q.copy(), np.copy(self.vel))
+    
+    def to_string(self):
+        str = f'Frame: {self.frame}, CS type: {self.cs_type}, pos: {[self.pos[0], self.pos[1], self.pos[2]]}, att_q: {[self.att_q.w, self.att_q.x, self.att_q.y, self.att_q.z]}'
+
+        return str
