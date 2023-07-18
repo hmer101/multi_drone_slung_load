@@ -251,6 +251,8 @@ class Drone(Node):
             self.vehicle_initial_global_state.pos[2] = msg.alt
 
             offboard_ros.set_origin(self.pub_vehicle_command, msg.lat, msg.lon, msg.alt, int(self.get_clock().now().nanoseconds/1000))
+            # self.get_logger().info(f'FMU ORIGIN RESET')
+
 
             # Publish this information
             msg_global_pose = GlobalPose()
@@ -426,8 +428,10 @@ class Drone(Node):
                 # self.get_logger().info(f'Desired rel load: {[self.vehicle_desired_state_rel_load.pos[0], self.vehicle_desired_state_rel_load.pos[1], self.vehicle_desired_state_rel_load.pos[2]]}')
                 # self.get_logger().info(f'Desired rel load att: {[self.vehicle_desired_state_rel_load.att_q.w, self.vehicle_desired_state_rel_load.att_q.x, self.vehicle_desired_state_rel_load.att_q.y, self.vehicle_desired_state_rel_load.att_q.z]} \n')
 
-                self.get_logger().info(f'trajectory_msg: {[trajectory_msg.position[0], trajectory_msg.position[1], trajectory_msg.position[2]]}')
-                self.get_logger().info(f'trajectory_msg yaw: {trajectory_msg.yaw} \n')
+
+                #TODO: Find out what is causing the incorrect msg below
+                #self.get_logger().info(f'trajectory_msg: {[trajectory_msg.position[0], trajectory_msg.position[1], trajectory_msg.position[2]]}')
+                #self.get_logger().info(f'trajectory_msg yaw: {trajectory_msg.yaw} \n')
 
             
 

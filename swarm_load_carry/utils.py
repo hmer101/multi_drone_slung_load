@@ -160,27 +160,33 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
         #logger.warn(f'Load initial position not found. Returning default trajectory msg.') #TODO: reactivate
         return trajectory_msg
 
-    logger.info(f'load_desired_state_rel_world: {[load_desired_state_rel_world.pos[0], load_desired_state_rel_world.pos[1], load_desired_state_rel_world.pos[2]]}')
-    logger.info(f'load_desired_state_rel_world att: {[load_desired_state_rel_world.att_q.w, load_desired_state_rel_world.att_q.x, load_desired_state_rel_world.att_q.y, load_desired_state_rel_world.att_q.z]}')
-
-
     # Add effect of desired load orientation (note different physical connections to load will require different algorithms)
     vehicle_desired_pos_rel_load_rot = load_desired_state_rel_world.att_q.rotate(vehicle_desired_state_rel_load.pos)
 
     # Desired vehicle pos relative to world (in ENU)= desired vehicle pos relative to load + desired load pos rel to world 
-    vehicle_desired_pos_rel_world = [vehicle_desired_pos_rel_load_rot[0] + load_desired_state_rel_world.pos[0], 
-                                            vehicle_desired_pos_rel_load_rot[1] + load_desired_state_rel_world.pos[1],
-                                            vehicle_desired_pos_rel_load_rot[2] + load_desired_state_rel_world.pos[2]]
+    # vehicle_desired_pos_rel_world = [vehicle_desired_pos_rel_load_rot[0] + load_desired_state_rel_world.pos[0], 
+    #                                         vehicle_desired_pos_rel_load_rot[1] + load_desired_state_rel_world.pos[1],
+    #                                         vehicle_desired_pos_rel_load_rot[2] + load_desired_state_rel_world.pos[2]]
+    vehicle_desired_pos_rel_world = transform_position(load_desired_state_rel_world.pos, vehicle_desired_pos_rel_load_rot)
 
     # Transform relative to drone_init
+    # Note: cannot use transform_frames() directly as requires load desired, not actual current TF
     vehicle_desired_state_rel_world = State('world', CS_type.ENU)
-    vehicle_desired_state_rel_world.pos = vehicle_desired_pos_rel_world
-    vehicle_desired_state_rel_world.att_q = vehicle_desired_state_rel_load.att_q*load_desired_state_rel_world.att_q
-
-    vehicle_desired_state_rel_drone_init = transform_frames(vehicle_desired_state_rel_world, f'{drone_name}_init', tf_buffer, logger)
-    logger.info(f'vehicle_desired_state_rel_drone_init: {[vehicle_desired_state_rel_drone_init.pos[0], vehicle_desired_state_rel_drone_init.pos[1], vehicle_desired_state_rel_drone_init.pos[2]]}')
-    logger.info(f'vehicle_desired_state_rel_drone_init att: {[vehicle_desired_state_rel_drone_init.att_q.w, vehicle_desired_state_rel_drone_init.att_q.x, vehicle_desired_state_rel_drone_init.att_q.y, vehicle_desired_state_rel_drone_init.att_q.z]} \n')
     
+    vehicle_desired_state_rel_world.pos = np.copy(vehicle_desired_pos_rel_world)
+    vehicle_desired_state_rel_world.att_q = transform_orientation(load_desired_state_rel_world.att_q, vehicle_desired_state_rel_load.att_q) #vehicle_desired_state_rel_load.att_q*load_desired_state_rel_world.att_q
+
+
+    #logger.info(f'vehicle_desired_state_rel_world: {vehicle_desired_state_rel_world.to_string()}') This not problem!
+    
+    # TODO: PROBLEM IN THIS LINE
+    vehicle_desired_state_rel_drone_init = transform_frames(vehicle_desired_state_rel_world, f'{drone_name}_init', tf_buffer, logger)
+
+    logger.info(f'vehicle_desired_state_rel_drone_init: {vehicle_desired_state_rel_drone_init.to_string()} \n')
+    # logger.info(f'vehicle_desired_state_rel_drone_init: {[vehicle_desired_state_rel_drone_init.pos[0], vehicle_desired_state_rel_drone_init.pos[1], vehicle_desired_state_rel_drone_init.pos[2]]}')
+    # logger.info(f'vehicle_desired_state_rel_drone_init att: {[vehicle_desired_state_rel_drone_init.att_q.w, vehicle_desired_state_rel_drone_init.att_q.x, vehicle_desired_state_rel_drone_init.att_q.y, vehicle_desired_state_rel_drone_init.att_q.z]} \n')
+    
+
     # Approximate vehicle desired position as relative to world rather than drone_init if drone_init -> world not available
     if vehicle_desired_state_rel_drone_init == None:
         #logger.warn(f'Drone initial position not found. Returning default trajectory msg.') #TODO: reactivate
