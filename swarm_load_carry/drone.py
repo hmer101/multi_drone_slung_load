@@ -39,7 +39,7 @@ TAKEOFF_HEIGHT_LOAD=3.0
 
 SETUP_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
 
-TAKEOFF_START_CNT_THRESHOLD=2/MAIN_TIMER_PERIOD
+TAKEOFF_START_CNT_THRESHOLD=3/MAIN_TIMER_PERIOD
 TAKEOFF_PRE_TENSION_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD #10
 
 LAND_PRE_DESCENT_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
@@ -366,9 +366,9 @@ class Drone(Node):
                         if self.global_origin_state != self.global_origin_state_prev:
                             self.set_local_init_pose_later_drones()
 
-                            self.get_logger().info(f'self.global_origin_state_prev: {self.global_origin_state_prev.to_string()}')
+                            #self.get_logger().info(f'self.global_origin_state_prev: {self.global_origin_state_prev.to_string()}')
                             self.global_origin_state_prev = self.global_origin_state.copy()
-                            self.get_logger().info(f'UPDATE: self.global_origin_state_prev: {self.global_origin_state_prev.to_string()}')
+                            #self.get_logger().info(f'UPDATE: self.global_origin_state_prev: {self.global_origin_state_prev.to_string()}')
 
                             self.cnt_phase_ticks = 0
                             self.phase = Phase.PHASE_TAKEOFF_START

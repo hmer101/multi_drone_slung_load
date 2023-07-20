@@ -106,38 +106,49 @@ def lookup_tf(target_frame, source_frame, tf_buffer, time, logger):
     return t
 
 
-# Transform a position from one frame into another
-def transform_position(pos_frame_1: np.ndarray[(3,), float], pos_frame_2_rel_frame_1: np.ndarray[(3,), float]): 
-    pos_frame_2 = pos_frame_1 + pos_frame_2_rel_frame_1
+# Transform a position of an item (d) from one frame (B) into another (C) given the position of frame B (p_AB), position of C rel A (p_AC)
+# and the orientation of C rel B (q_BC)
+def transform_position(p_BA: np.ndarray[(3,), float], p_CB: np.ndarray[(3,), float], q_CB): #: qt.QuaternionicArray
+    # Perform translation between frames that are both rotated and translated 
+    p_CA = q_CB.rotate(p_BA) + p_CB #q_BC*qt.from_vector_part(p_Bd)*(1/q_BC) + qt.from_vector_part(p_BC) #q_BC*np.insert(p_Bd, 0, 0.0, axis=0)*(1/q_BC) + np.insert(p_BC, 0, 0.0, axis=0) 
 
-    return pos_frame_2
+    return p_CA #qt.to_vector_part(p_Cd)
 
-# Transform an orientation (given by a quaternion) from frame1 to frame2
-def transform_orientation(q_frame_1, q_frame_2_rel_frame_1):
-    q_frame_2 = q_frame_2_rel_frame_1*q_frame_1
+# Transform an orientation A (given by a quaternion) from frame B to frame C
+def transform_orientation(q_BA, q_CB): 
+    #q_AB, q_BC
+    #q_CA = (1/q_BC)*(1/q_AB) #q_frame_2_rel_frame_1*q_frame_1
 
-    return q_frame_2
+    q_CA = q_CB*q_BA
+
+    return q_CA
+
 
 # Create a new state object that represents an input state transformed into frame2 
 def transform_frames(state, frame2_name, tf_buffer, logger):
     state2 = State(f'{frame2_name}', CS_type.ENU)
 
     # Find the transform
-    tf_f2_rel_f1 = lookup_tf(frame2_name, state.frame, tf_buffer, rclpy.time.Time(), logger)
+    tf_f1_rel_f2 = lookup_tf(frame2_name, state.frame, tf_buffer, rclpy.time.Time(), logger)
 
     # Make the transform if the frames exist, otherwise return None
-    if tf_f2_rel_f1 == None:
+    if tf_f1_rel_f2 == None:
         return None
 
     else:
-        state2.pos = transform_position(state.pos, np.array([tf_f2_rel_f1.transform.translation.x, 
-                                                            tf_f2_rel_f1.transform.translation.y, 
-                                                            tf_f2_rel_f1.transform.translation.z]))
+        # Collect transformation vector and quaternion
+        p_f2f1 = np.array([tf_f1_rel_f2.transform.translation.x, 
+                            tf_f1_rel_f2.transform.translation.y, 
+                            tf_f1_rel_f2.transform.translation.z])
         
-        state2.att_q = transform_orientation(state.att_q, qt.array([tf_f2_rel_f1.transform.rotation.w, 
-                                                                    tf_f2_rel_f1.transform.rotation.x,
-                                                                    tf_f2_rel_f1.transform.rotation.y,
-                                                                    tf_f2_rel_f1.transform.rotation.z]))
+        q_f2f1 = qt.array([tf_f1_rel_f2.transform.rotation.w, 
+                          tf_f1_rel_f2.transform.rotation.x,
+                          tf_f1_rel_f2.transform.rotation.y,
+                          tf_f1_rel_f2.transform.rotation.z])
+
+        # Perform transform
+        state2.pos = transform_position(state.pos, p_f2f1, q_f2f1)
+        state2.att_q = transform_orientation(state.att_q, q_f2f1)
         
     return state2
 
@@ -152,44 +163,42 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
     trajectory_msg = TrajectorySetpoint()
     trajectory_msg.timestamp = timestamp
     
+    ## GET LOAD DESIRED STATE
     # Convert load desired state into world frame
     load_desired_state_rel_world = transform_frames(load_desired_local_state, 'world', tf_buffer, logger)
     
     # Approximate load desired position as relative to world rather than load_init if load_init -> world tf not available
     if load_desired_state_rel_world == None:
-        #logger.warn(f'Load initial position not found. Returning default trajectory msg.') #TODO: reactivate
+        logger.warn(f'Load initial position not found. Returning default trajectory msg.')
         return trajectory_msg
 
+
+    logger.info(f'load_desired_state_rel_world: {load_desired_state_rel_world.to_string()}')
+
+    ## GET VEHICLE DESIRED STATE
     # Add effect of desired load orientation (note different physical connections to load will require different algorithms)
-    vehicle_desired_pos_rel_load_rot = load_desired_state_rel_world.att_q.rotate(vehicle_desired_state_rel_load.pos)
+    #vehicle_desired_pos_rel_load_rot = load_desired_state_rel_world.att_q.rotate(vehicle_desired_state_rel_load.pos)
 
-    # Desired vehicle pos relative to world (in ENU)= desired vehicle pos relative to load + desired load pos rel to world 
-    # vehicle_desired_pos_rel_world = [vehicle_desired_pos_rel_load_rot[0] + load_desired_state_rel_world.pos[0], 
-    #                                         vehicle_desired_pos_rel_load_rot[1] + load_desired_state_rel_world.pos[1],
-    #                                         vehicle_desired_pos_rel_load_rot[2] + load_desired_state_rel_world.pos[2]]
-    vehicle_desired_pos_rel_world = transform_position(load_desired_state_rel_world.pos, vehicle_desired_pos_rel_load_rot)
-
-    # Transform relative to drone_init
+    
     # Note: cannot use transform_frames() directly as requires load desired, not actual current TF
     vehicle_desired_state_rel_world = State('world', CS_type.ENU)
     
-    vehicle_desired_state_rel_world.pos = np.copy(vehicle_desired_pos_rel_world)
-    vehicle_desired_state_rel_world.att_q = transform_orientation(load_desired_state_rel_world.att_q, vehicle_desired_state_rel_load.att_q) #vehicle_desired_state_rel_load.att_q*load_desired_state_rel_world.att_q
+    vehicle_desired_state_rel_world.pos = transform_position(vehicle_desired_state_rel_load.pos, load_desired_state_rel_world.pos, load_desired_state_rel_world.att_q) #transform_position(load_desired_state_rel_world.pos, vehicle_desired_pos_rel_load_rot, )
+    vehicle_desired_state_rel_world.att_q = transform_orientation(vehicle_desired_state_rel_load.att_q, load_desired_state_rel_world.att_q)                             #load_desired_state_rel_world.att_q, vehicle_desired_state_rel_load.att_q)
 
-
-    #logger.info(f'vehicle_desired_state_rel_world: {vehicle_desired_state_rel_world.to_string()}') This not problem!
+    # logger.info(f'vehicle_desired_state_rel_world: {vehicle_desired_state_rel_world.to_string()}')
     
     # TODO: PROBLEM IN THIS LINE
+    # Transform relative to drone_init
     vehicle_desired_state_rel_drone_init = transform_frames(vehicle_desired_state_rel_world, f'{drone_name}_init', tf_buffer, logger)
 
-    logger.info(f'vehicle_desired_state_rel_drone_init: {vehicle_desired_state_rel_drone_init.to_string()} \n')
-    # logger.info(f'vehicle_desired_state_rel_drone_init: {[vehicle_desired_state_rel_drone_init.pos[0], vehicle_desired_state_rel_drone_init.pos[1], vehicle_desired_state_rel_drone_init.pos[2]]}')
-    # logger.info(f'vehicle_desired_state_rel_drone_init att: {[vehicle_desired_state_rel_drone_init.att_q.w, vehicle_desired_state_rel_drone_init.att_q.x, vehicle_desired_state_rel_drone_init.att_q.y, vehicle_desired_state_rel_drone_init.att_q.z]} \n')
+    #logger.info(f'vehicle_desired_state_rel_drone_init: {vehicle_desired_state_rel_drone_init.to_string()} \n')
     
 
+    ## CONVERT TO TRAJECTORY MSG
     # Approximate vehicle desired position as relative to world rather than drone_init if drone_init -> world not available
     if vehicle_desired_state_rel_drone_init == None:
-        #logger.warn(f'Drone initial position not found. Returning default trajectory msg.') #TODO: reactivate
+        logger.warn(f'Drone initial position not found. Returning default trajectory msg.') #TODO: reactivate
         return trajectory_msg
         
     # Transform to NED into drone_init

@@ -156,7 +156,7 @@ class GCSBackground(Node):
         
         elif np.all(self.drone_phases == Phase.PHASE_LAND_DESCENT):
             # Lower slowly - tension will disengage
-            self.load_desired_local_state.pos = np.array([self.load_desired_local_state.pos[0], self.load_desired_local_state.pos[1], self.load_desired_local_state.pos[2] - 0.1*MAIN_TIMER_PERIOD])
+            self.load_desired_local_state.pos = np.array([self.load_desired_local_state.pos[0], self.load_desired_local_state.pos[1], self.load_desired_local_state.pos[2] - 0.3*MAIN_TIMER_PERIOD]) #- 0.1
 
         elif np.all(self.drone_phases == Phase.PHASE_LAND_POST_LOAD_DOWN):
             self.set_drone_arrangement(1.3, [1, 1, 1], [0, -np.pi*(1-2/self.num_drones), np.pi*(1-2/self.num_drones)])
