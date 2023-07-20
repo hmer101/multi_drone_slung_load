@@ -99,26 +99,21 @@ def lookup_tf(target_frame, source_frame, tf_buffer, time, logger):
             source_frame,
             time)
     except TransformException as ex:
-        #logger.warn(
-          #  f'Could not transform {source_frame} to {target_frame}: {ex}') #TODO: reactivate
-          pass
+        logger.warn(f'Could not find transform: {target_frame} to {source_frame}: {ex}')
     
     return t
 
 
-# Transform a position of an item (d) from one frame (B) into another (C) given the position of frame B (p_AB), position of C rel A (p_AC)
-# and the orientation of C rel B (q_BC)
-def transform_position(p_BA: np.ndarray[(3,), float], p_CB: np.ndarray[(3,), float], q_CB): #: qt.QuaternionicArray
+# Transform a position of an item (A) from one frame (B) into another (C) given the position of the item in frame B (p_BA), position of B rel C (p_CB)
+# and the orientation of B rel C (q_CB)
+def transform_position(p_BA: np.ndarray[(3,), float], p_CB: np.ndarray[(3,), float], q_CB):
     # Perform translation between frames that are both rotated and translated 
-    p_CA = q_CB.rotate(p_BA) + p_CB #q_BC*qt.from_vector_part(p_Bd)*(1/q_BC) + qt.from_vector_part(p_BC) #q_BC*np.insert(p_Bd, 0, 0.0, axis=0)*(1/q_BC) + np.insert(p_BC, 0, 0.0, axis=0) 
+    p_CA = q_CB.rotate(p_BA) + p_CB
 
-    return p_CA #qt.to_vector_part(p_Cd)
+    return p_CA
 
 # Transform an orientation A (given by a quaternion) from frame B to frame C
 def transform_orientation(q_BA, q_CB): 
-    #q_AB, q_BC
-    #q_CA = (1/q_BC)*(1/q_AB) #q_frame_2_rel_frame_1*q_frame_1
-
     q_CA = q_CB*q_BA
 
     return q_CA
@@ -157,7 +152,6 @@ def transform_frames(state, frame2_name, tf_buffer, logger):
 # Note trajectories sent to Pixhawk controller must be in NED co-ordinates relative to initial drone position. ENU -> NED and frame transformations handled here
 
 # Make drone follow desired load position, at the desired location relative to the load
-# TODO: Add interpolation (especially for rotation/yaw of swarm)
 def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_state, drone_name, tf_buffer, timestamp, logger):
     # Generate trajectory message
     trajectory_msg = TrajectorySetpoint()
@@ -175,11 +169,7 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
 
     logger.info(f'load_desired_state_rel_world: {load_desired_state_rel_world.to_string()}')
 
-    ## GET VEHICLE DESIRED STATE
-    # Add effect of desired load orientation (note different physical connections to load will require different algorithms)
-    #vehicle_desired_pos_rel_load_rot = load_desired_state_rel_world.att_q.rotate(vehicle_desired_state_rel_load.pos)
-
-    
+    ## GET VEHICLE DESIRED STATE   
     # Note: cannot use transform_frames() directly as requires load desired, not actual current TF
     vehicle_desired_state_rel_world = State('world', CS_type.ENU)
     
