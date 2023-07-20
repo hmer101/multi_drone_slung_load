@@ -29,7 +29,7 @@ DEFAULT_DRONE_NUM=1
 DEFAULT_FIRST_DRONE_NUM=1
 DEFAULT_LOAD_ID=1
 
-MAIN_TIMER_PERIOD=0.2 # sec
+MAIN_TIMER_PERIOD=0.1 #0.2 # sec
 
 HEIGHT_DRONE_REL_LOAD=2 # m
 HEIGHT_LOAD_PRE_TENSION=-0.2
@@ -338,43 +338,47 @@ class Drone(Node):
             # Start with drone position (TODO: incorporate load position feedback later)
             tf_drone_rel_world = utils.lookup_tf('world', self.get_name(), self.tf_buffer, rclpy.time.Time(), self.get_logger())
 
-        # Generate trajectory message
-        trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger())
+
+        # Generate trajectory message for formation used after take-off
+        if self.phase > Phase.PHASE_TAKEOFF_START:
+            trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger())
+
+            if trajectory_msg == None:
+                # TODO: Check if this causes cut-out issues again
+                self.get_logger().warn(f'Load or drone initial position not found. Skipping this command loop.')
+                return
         
         # Perform actions depending on what mode is requested
         # TODO: Add some formation feedback to all phases (especially mission)
         match self.phase:
             # Run origin-altering setup pre-arming
             case Phase.PHASE_SETUP:
+                # Check if load's setup is complete
+                tf_load_init_rel_world = utils.lookup_tf('world', f'{self.load_name}_init', self.tf_buffer, rclpy.time.Time(), self.get_logger())
+                
                 # Reset FMU and TF home positions
                 if self.cnt_phase_ticks == 0:
                     self.reset_pre_arm()
 
                 # Set initial poses when ready
-                if self.flag_gps_home_set and not self.flag_local_init_pos_set:
+                if self.flag_gps_home_set and not self.flag_local_init_pos_set:                    
                     # Rest of setup differs for first drone and others
                     if self.drone_id == self.first_drone_num:
                         self.set_local_init_pose_first_drone()
 
-                        self.cnt_phase_ticks = 0
-                        self.phase = Phase.PHASE_TAKEOFF_START
-                        self.get_logger().info(f'SETUP COMPLETE')
-
-                        return
                     else:
                         # Set init poses once the first drone's initial position has been received
                         if self.global_origin_state != self.global_origin_state_prev:
                             self.set_local_init_pose_later_drones()
-
-                            #self.get_logger().info(f'self.global_origin_state_prev: {self.global_origin_state_prev.to_string()}')
                             self.global_origin_state_prev = self.global_origin_state.copy()
-                            #self.get_logger().info(f'UPDATE: self.global_origin_state_prev: {self.global_origin_state_prev.to_string()}')
+                
+                # Exit setup only once drone's GPS home and initial positions have been set, and the load's initial pose has been set
+                elif self.flag_gps_home_set and self.flag_local_init_pos_set and (tf_load_init_rel_world != None):
+                    self.cnt_phase_ticks = 0
+                    self.phase = Phase.PHASE_TAKEOFF_START
+                    self.get_logger().info(f'SETUP COMPLETE')
 
-                            self.cnt_phase_ticks = 0
-                            self.phase = Phase.PHASE_TAKEOFF_START
-                            self.get_logger().info(f'SETUP COMPLETE')
-
-                            return
+                    return
                         
                 self.cnt_phase_ticks += 1
                 
