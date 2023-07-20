@@ -244,15 +244,13 @@ class Drone(Node):
 
     def clbk_vehicle_global_position(self, msg):
         # Set GPS/location home immediately prior to first arming/takeoff
-        if not self.flag_gps_home_set and (self.phase == Phase.PHASE_SETUP): #(self.cnt_phase_ticks > 1):          
+        if not self.flag_gps_home_set and (self.phase == Phase.PHASE_SETUP):          
             # Set the initial position as the current global position
             self.vehicle_initial_global_state.pos[0] = msg.lat
             self.vehicle_initial_global_state.pos[1] = msg.lon 
             self.vehicle_initial_global_state.pos[2] = msg.alt
 
             offboard_ros.set_origin(self.pub_vehicle_command, msg.lat, msg.lon, msg.alt, int(self.get_clock().now().nanoseconds/1000))
-            # self.get_logger().info(f'FMU ORIGIN RESET')
-
 
             # Publish this information
             msg_global_pose = GlobalPose()
