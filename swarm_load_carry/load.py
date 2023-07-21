@@ -23,7 +23,7 @@ from swarm_load_carry_interfaces.msg import Phase
 DEFAULT_DRONE_NUM=1
 DEFAULT_FIRST_DRONE_NUM=1
 
-PUB_LOOP_TIMER_PERIOD=0.1 #0.02
+PUB_LOOP_TIMER_PERIOD=0.1
 
 HEIGHT_DRONE_REL_LOAD=2 #m
 
@@ -98,11 +98,10 @@ class Load(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
         self.tf_static_broadcaster_init_pose = StaticTransformBroadcaster(self)
 
-        # self.flag_tf_init_set = False
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
-        self.get_logger().info('Setup complete')
+        self.get_logger().info('Initialization complete')
 
 
     ## CALLBACKS
@@ -175,9 +174,9 @@ class Load(Node):
         self.load_initial_state_rel_world.att_q = self.load_state_rel_world.att_q.copy()
         
         # Publish static transform for init pose (relative to world)
-        utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'{self.get_name()}_init', self.load_initial_state_rel_world.pos, self.load_initial_state_rel_world.att_q, self.tf_static_broadcaster_init_pose)
+        # As CS is in ENU, always aligned
+        utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'{self.get_name()}_init', self.load_initial_state_rel_world.pos, qt.array([1.0, 0.0, 0.0, 0.0]), self.tf_static_broadcaster_init_pose)
 
-        #self.flag_tf_init_set = True 
         self.get_logger().info('Initial pose TF set')
 
 

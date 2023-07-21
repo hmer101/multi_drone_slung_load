@@ -99,7 +99,7 @@ def lookup_tf(target_frame, source_frame, tf_buffer, time, logger):
             source_frame,
             time)
     except TransformException as ex:
-        logger.warn(f'Could not find transform: {target_frame} to {source_frame}: {ex}')
+        logger.warn(f'Could not find transform: {source_frame} to {target_frame}: {ex}')
     
     return t
 
@@ -164,8 +164,6 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
     if load_desired_state_rel_world == None:
         return None
 
-    #logger.info(f'load_desired_state_rel_world: {load_desired_state_rel_world.to_string()}')
-
     ## GET VEHICLE DESIRED STATE   
     # Note: cannot use transform_frames() directly as requires load desired, not actual current TF
     vehicle_desired_state_rel_world = State('world', CS_type.ENU)
@@ -173,13 +171,8 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
     vehicle_desired_state_rel_world.pos = transform_position(vehicle_desired_state_rel_load.pos, load_desired_state_rel_world.pos, load_desired_state_rel_world.att_q) #transform_position(load_desired_state_rel_world.pos, vehicle_desired_pos_rel_load_rot, )
     vehicle_desired_state_rel_world.att_q = transform_orientation(vehicle_desired_state_rel_load.att_q, load_desired_state_rel_world.att_q)                             #load_desired_state_rel_world.att_q, vehicle_desired_state_rel_load.att_q)
 
-    # logger.info(f'vehicle_desired_state_rel_world: {vehicle_desired_state_rel_world.to_string()}')
-    
-    # TODO: PROBLEM IN THIS LINE
     # Transform relative to drone_init
     vehicle_desired_state_rel_drone_init = transform_frames(vehicle_desired_state_rel_world, f'{drone_name}_init', tf_buffer, logger)
-
-    #logger.info(f'vehicle_desired_state_rel_drone_init: {vehicle_desired_state_rel_drone_init.to_string()} \n')
     
 
     ## CONVERT TO TRAJECTORY MSG

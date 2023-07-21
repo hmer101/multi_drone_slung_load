@@ -29,7 +29,7 @@ DEFAULT_DRONE_NUM=1
 DEFAULT_FIRST_DRONE_NUM=1
 DEFAULT_LOAD_ID=1
 
-MAIN_TIMER_PERIOD=0.1 #0.2 # sec
+MAIN_TIMER_PERIOD=0.1 # sec
 
 HEIGHT_DRONE_REL_LOAD=2 # m
 HEIGHT_LOAD_PRE_TENSION=-0.2
@@ -40,7 +40,7 @@ TAKEOFF_HEIGHT_LOAD=3.0
 SETUP_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
 
 TAKEOFF_START_CNT_THRESHOLD=3/MAIN_TIMER_PERIOD
-TAKEOFF_PRE_TENSION_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD #10
+TAKEOFF_PRE_TENSION_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
 
 LAND_PRE_DESCENT_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
 LAND_POST_LOAD_DOWN_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
@@ -80,7 +80,7 @@ class Drone(Node):
 
         # Other vehicles
         self.global_origin_state = State('globe', CS_type.LLA)
-        self.global_origin_state_prev = self.global_origin_state.copy() #State('globe', CS_type.LLA)
+        self.global_origin_state_prev = self.global_origin_state.copy()
 
         # Load
         self.load_desired_local_state = State(f'{self.load_name}_init', CS_type.ENU)
@@ -224,16 +224,16 @@ class Drone(Node):
             self.vehicle_initial_global_state.att_q = self.vehicle_local_state.att_q.copy()
 
         # Update tf
-        if not (np.isnan(self.vehicle_local_state.pos[0])):
-            utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', f'{self.get_name()}', self.vehicle_local_state.pos, self.vehicle_local_state.att_q, self.tf_broadcaster)
+        # if not (np.isnan(self.vehicle_local_state.pos[0])):
+        #     utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', f'{self.get_name()}', self.vehicle_local_state.pos, self.vehicle_local_state.att_q, self.tf_broadcaster)
 
     def clbk_vehicle_local_position(self, msg):
-        # TODO: handle NED->ENU transformation 
-        self.vehicle_local_state.pos[0] = msg.x
-        self.vehicle_local_state.pos[1] = -msg.y
+        # Handles NED->ENU transformation 
+        self.vehicle_local_state.pos[0] = msg.y 
+        self.vehicle_local_state.pos[1] = msg.x 
         self.vehicle_local_state.pos[2] = -msg.z
-        self.vehicle_local_state.vel[0] = msg.vx
-        self.vehicle_local_state.vel[1] = -msg.vy
+        self.vehicle_local_state.vel[0] = msg.vy 
+        self.vehicle_local_state.vel[1] = msg.vx 
         self.vehicle_local_state.vel[2] = -msg.vz
 
         # Publish TF
@@ -245,7 +245,8 @@ class Drone(Node):
     def clbk_vehicle_global_position(self, msg):
         # Set GPS/location home immediately prior to first arming/takeoff
         if not self.flag_gps_home_set and (self.phase == Phase.PHASE_SETUP):          
-            # Set the initial position as the current global position
+            # Set the initial position as the current global position 
+            # (could average over last few samples but GPS seems to have low frequency noise of about 0.1m -> can turn down in simulation if required)
             self.vehicle_initial_global_state.pos[0] = msg.lat
             self.vehicle_initial_global_state.pos[1] = msg.lon 
             self.vehicle_initial_global_state.pos[2] = msg.alt
@@ -423,19 +424,7 @@ class Drone(Node):
                 
                 # Send takeoff setpoint
                 self.pub_trajectory.publish(trajectory_msg)
-                
-                # self.get_logger().info(f'Load desired: {[self.load_desired_local_state.pos[0], self.load_desired_local_state.pos[1], self.load_desired_local_state.pos[2]]}')
-                # self.get_logger().info(f'Load desired att: {[self.load_desired_local_state.att_q.w, self.load_desired_local_state.att_q.x, self.load_desired_local_state.att_q.y, self.load_desired_local_state.att_q.z]} \n')
-                
-                # self.get_logger().info(f'Desired rel load: {[self.vehicle_desired_state_rel_load.pos[0], self.vehicle_desired_state_rel_load.pos[1], self.vehicle_desired_state_rel_load.pos[2]]}')
-                # self.get_logger().info(f'Desired rel load att: {[self.vehicle_desired_state_rel_load.att_q.w, self.vehicle_desired_state_rel_load.att_q.x, self.vehicle_desired_state_rel_load.att_q.y, self.vehicle_desired_state_rel_load.att_q.z]} \n')
-
-
-                #TODO: Find out what is causing the incorrect msg below
-                #self.get_logger().info(f'trajectory_msg: {[trajectory_msg.position[0], trajectory_msg.position[1], trajectory_msg.position[2]]}')
-                #self.get_logger().info(f'trajectory_msg yaw: {trajectory_msg.yaw} \n')
-
-            
+                            
 
             case Phase.PHASE_TAKEOFF_POST_TENSION:
                 #Takeoff complete
@@ -485,7 +474,7 @@ class Drone(Node):
                 else: 
                     self.phase = Phase.PHASE_LAND_END
                     self.cnt_phase_ticks = 0
-                    self.get_logger().info(f'READY TO SET DOWN') 
+                    self.get_logger().info(f'READY TO SET DRONES DOWN') 
 
                     offboard_ros.land(self.pub_vehicle_command, timestamp) 
 
@@ -494,23 +483,24 @@ class Drone(Node):
 
 
             case Phase.PHASE_LAND_END:
-                # Reset flags for following takeoff
-                #self.reset_land()
+                # TODO: Disarm vehicle when on ground
                 pass
-
+            
+            case Phase.PHASE_HOLD:
+                # Send setpoint as current position
+                self.pub_trajectory.publish(trajectory_msg)
+                pass
 
             # Kill
             case Phase.PHASE_KILL:
                 offboard_ros.kill(self.pub_vehicle_command, timestamp)
-                #self.reset_land()
+                self.cnt_phase_ticks = 0
                 pass
 
         # Publish the phase the drone is currently in 
         msg_current_phase = Phase()
         msg_current_phase.phase = self.phase
         self.pub_current_phase.publish(msg_current_phase)
-
-        #self.get_logger().info(f'Phase: {self.phase}')
     
 
     ## HELPER FUNCTIONS
@@ -521,10 +511,11 @@ class Drone(Node):
 
     def broadcast_tf_init_pose(self):
         # Publish static transform for init pose (relative to world)
-        utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'drone{self.drone_id}_init', self.vehicle_initial_state_rel_world.pos, self.vehicle_initial_state_rel_world.att_q, self.tf_static_broadcaster_init_pose)
+        # As all init CS are in ENU, they are all aligned in orientation
+        utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'drone{self.drone_id}_init', self.vehicle_initial_state_rel_world.pos, qt.array([1.0, 0.0, 0.0, 0.0]), self.tf_static_broadcaster_init_pose)
 
         self.flag_local_init_pos_set = True 
-        self.get_logger().info('Local init pos set')
+        self.get_logger().info('Local init pose set')
 
     def set_local_init_pose_later_drones(self):
         ## Set initial pose relative to first drone's initial pose
