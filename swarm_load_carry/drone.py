@@ -352,6 +352,14 @@ class Drone(Node):
         match self.phase:
             # Run origin-altering setup pre-arming
             case Phase.PHASE_SETUP:
+                # If drone is armed, setup has already been performed. Skip straight to takeoff phase
+                if self.arm_state==VehicleStatus.ARMING_STATE_ARMED:
+                    self.cnt_phase_ticks = 0
+                    self.phase = Phase.PHASE_TAKEOFF_PRE_TENSION
+                    self.get_logger().info(f'Vehicle already setup. Skipping to takeoff phase.')
+
+                    return
+                
                 # Check if load's setup is complete
                 tf_load_init_rel_world = utils.lookup_tf('world', f'{self.load_name}_init', self.tf_buffer, rclpy.time.Time(), self.get_logger())
                 
@@ -382,7 +390,7 @@ class Drone(Node):
                 self.cnt_phase_ticks += 1
                 
             # Run takeoff
-            case Phase.PHASE_TAKEOFF_START:
+            case Phase.PHASE_TAKEOFF_START:               
                 # Override trajectory msg for straight-up takeoff in first phase
                 trajectory_msg = utils.gen_traj_msg_straight_up(HEIGHT_LOAD_PRE_TENSION+HEIGHT_DRONE_REL_LOAD, self.vehicle_local_state.att_q, timestamp)
 
