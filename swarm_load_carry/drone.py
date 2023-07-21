@@ -491,8 +491,11 @@ class Drone(Node):
 
 
             case Phase.PHASE_LAND_END:
-                # TODO: Disarm vehicle when on ground
-                pass
+                # Disarm when landed
+                if tf_drone_rel_world.transform.translation.z<=0.05:
+                    offboard_ros.disarm(self.pub_vehicle_command, timestamp)
+                    self.phase = Phase.PHASE_UNASSIGNED
+                    self.get_logger().info(f'LANDED AND DISARMED') 
             
             case Phase.PHASE_HOLD:
                 # Send setpoint as current position
