@@ -51,10 +51,12 @@ class GCSBackground(Node):
         self.declare_parameter('num_drones', DEFAULT_DRONE_NUM)
         self.declare_parameter('first_drone_num', DEFAULT_FIRST_DRONE_NUM)
         self.declare_parameter('load_id', DEFAULT_LOAD_ID)
-
+        self.declare_parameter('drone_order', [1, 2, 3])
+        
         self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
         self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
         self.load_id = self.get_parameter('load_id').get_parameter_value().integer_value
+        self.drone_order = self.get_parameter('drone_order').get_parameter_value().integer_array_value
 
         ## Print information
         self.get_logger().info('GCS BACKGROUND NODE')
@@ -161,7 +163,7 @@ class GCSBackground(Node):
             self.load_desired_local_state.pos = np.array([self.load_desired_local_state.pos[0], self.load_desired_local_state.pos[1], self.load_desired_local_state.pos[2] - 0.3*MAIN_TIMER_PERIOD]) #- 0.1
 
         elif np.all(self.drone_phases == Phase.PHASE_LAND_POST_LOAD_DOWN):
-            self.set_drone_arrangement(1.3, [1, 1, 1], [0, -np.pi*(1-2/self.num_drones), np.pi*(1-2/self.num_drones)])
+            self.set_drone_arrangement(1.3, np.array([1, 1, 1], [0, -np.pi*(1-2/self.num_drones), np.pi*(1-2/self.num_drones)]))
         
         self.send_desired_pose()
 
@@ -177,92 +179,34 @@ class GCSBackground(Node):
         self.load_desired_local_state.att_q = qt.array([1.0, 0.0, 0.0, 0.0])
 
         # Set drone arrangement around load
-        self.set_drone_arrangement(1, [HEIGHT_DRONE_REL_LOAD, HEIGHT_DRONE_REL_LOAD, HEIGHT_DRONE_REL_LOAD], [0, -np.pi*(1-2/self.num_drones), np.pi*(1-2/self.num_drones)])
+        self.set_drone_arrangement(1, [HEIGHT_DRONE_REL_LOAD, HEIGHT_DRONE_REL_LOAD, HEIGHT_DRONE_REL_LOAD], np.array([0, -np.pi*(1-2/self.num_drones), np.pi*(1-2/self.num_drones)]))
 
         # Set variables related to mission
         self.mission_theta = 0.0
 
-    # # TODO: Set drones to positions that minimizes sum of squared distance from drone start points to desired points (set yaws accordingly)
-    # def set_drone_arrangement(self, r, z, yaw):
-    #     ref_points = utils.generate_points_cylinder(self.num_drones, r, z)
-    #     # Get current drone positions 
 
-    #     # Set drone arrangements
-    #     for i, next_cli_set_drone_pose in enumerate(self.cli_set_drone_poses_rel_load):
-    #         pos_req = SetLocalPose.Request()
-    #         pos_req.transform_stamped.header.frame_id = f'load{self.load_id}'
-    #         pos_req.transform_stamped.child_frame_id = f'drone{i+self.first_drone_num}'
-
-    #         # Set position
-    #         pos_req.transform_stamped.transform.translation.x = float(ref_points[i][0])
-    #         pos_req.transform_stamped.transform.translation.y = float(ref_points[i][1])
-    #         pos_req.transform_stamped.transform.translation.z = float(ref_points[i][2])
-
-    #         # Set yaw
-    #         q_des = qt.array(ft.quaternion_from_euler(0.0, 0.0, yaw[i]))
-
-    #         pos_req.transform_stamped.transform.rotation.x = float(q_des.x)
-    #         pos_req.transform_stamped.transform.rotation.y = float(q_des.y)
-    #         pos_req.transform_stamped.transform.rotation.z = float(q_des.z)
-    #         pos_req.transform_stamped.transform.rotation.w = float(q_des.w)
-
-    #         self.futures_set_drone_poses_rel_load[i] = next_cli_set_drone_pose.call_async(pos_req)
-
-
-    # TODO: Set drones to positions that minimizes sum of squared distance from drone start points to desired points (set yaws accordingly)
     def set_drone_arrangement(self, r, z, yaw):
-        # Generate reference positions relative to load
         ref_points = utils.generate_points_cylinder(self.num_drones, r, z)
-        
-        # Get initial drone positions relative to load
-        drones_init_rel_load_init = np.zeros((self.num_drones, 3))
 
-
-        # TODO: Can't use TF's bc in ENU. Use service get_initial_pose instead
-        for i in range(self.first_drone_num, self.num_drones):
-            tf_drone_init_rel_load_init = utils.lookup_tf(f'load{self.load_id}_init', f'drone{i}_init', self.tf_buffer, rclpy.time.Time(), self.get_logger())
-            drones_init_rel_load_init[i] = np.array([tf_drone_init_rel_load_init.transform.translation.x, tf_drone_init_rel_load_init.transform.translation.y, tf_drone_init_rel_load_init.transform.translation.z])
+        # Re-arrange reference points and yaws based on drones' connection order to load 
+        drone_order_indices = np.array(self.drone_order) - self.first_drone_num
+        ref_points_ordered = ref_points[drone_order_indices]
+        yaw_ordered = yaw[drone_order_indices]
         
 
-        # Minimize euclidean distance from drone start points to desired points
-        prog = MathematicalProgram()
-        x = prog.NewBinaryVariables(self.num_drones, self.num_drones, 'x') #If drone i is assigned to position j, x[i,j] = 1, else 0
-        
-        prog.AddConstraint(prog.Sum(x[:,j]) == 1 for j in range(self.num_drones)) # Each drone is assigned to exactly one position
-        prog.AddConstraint(prog.Sum(x[i,:]) == 1 for i in range(self.num_drones)) # Each position is assigned to exactly one drone
-        
-        prog.AddCost(prog.Sum(x[i,j]*np.linalg.norm(drones_init_rel_load_init[i] - ref_points[j]) for i in range(self.num_drones) for j in range(self.num_drones)))
-
-        result = prog.Solve()
-        x_opt = result.GetSolution(x)
-        
-
-        # Find the column index where value is '1' for each row
-        indices = np.argmax(x_opt, axis=1)
-
-        # Get corresponding values from ref_points
-        ref_points_ordered = ref_points[indices]
-        
-        
-        #ref_points[np.arange(len(ref_points)), indices]
-
-
-        x_opt[i]
-
-
-        # Set drone arrangements.
+        # Set drone arrangements
         for i, next_cli_set_drone_pose in enumerate(self.cli_set_drone_poses_rel_load):
             pos_req = SetLocalPose.Request()
             pos_req.transform_stamped.header.frame_id = f'load{self.load_id}'
             pos_req.transform_stamped.child_frame_id = f'drone{i+self.first_drone_num}'
 
             # Set position
-            pos_req.transform_stamped.transform.translation.x = float(ref_points[i][0])
-            pos_req.transform_stamped.transform.translation.y = float(ref_points[i][1])
-            pos_req.transform_stamped.transform.translation.z = float(ref_points[i][2])
+            pos_req.transform_stamped.transform.translation.x = float(ref_points_ordered[i][0])
+            pos_req.transform_stamped.transform.translation.y = float(ref_points_ordered[i][1])
+            pos_req.transform_stamped.transform.translation.z = float(ref_points_ordered[i][2])
 
             # Set yaw
-            q_des = qt.array(ft.quaternion_from_euler(0.0, 0.0, yaw[i]))
+            q_des = qt.array(ft.quaternion_from_euler(0.0, 0.0, yaw_ordered[i]))
 
             pos_req.transform_stamped.transform.rotation.x = float(q_des.x)
             pos_req.transform_stamped.transform.rotation.y = float(q_des.y)
@@ -270,6 +214,7 @@ class GCSBackground(Node):
             pos_req.transform_stamped.transform.rotation.w = float(q_des.w)
 
             self.futures_set_drone_poses_rel_load[i] = next_cli_set_drone_pose.call_async(pos_req)
+
 
 
     def send_desired_pose(self):
