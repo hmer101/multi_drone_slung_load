@@ -161,7 +161,6 @@ class Load(Node):
             # Publish estimate load relative to load initial position
             load_rel_load_init = utils.transform_frames(self.load_state_rel_world, f'{self.get_name()}_init', self.tf_buffer, self.get_logger())
             
-
             if load_rel_load_init != None:
                 utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', self.get_name(), load_rel_load_init.pos, load_rel_load_init.att_q, self.tf_broadcaster)          
 

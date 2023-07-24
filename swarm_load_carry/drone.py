@@ -343,7 +343,6 @@ class Drone(Node):
             trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger())
 
             if trajectory_msg == None:
-                # TODO: Check if this causes cut-out issues again
                 self.get_logger().warn(f'Load or drone initial position not found. Skipping this command loop.')
                 return
         
@@ -379,8 +378,9 @@ class Drone(Node):
                             self.set_local_init_pose_later_drones()
                             self.global_origin_state_prev = self.global_origin_state.copy()
                 
-                # Exit setup only once drone's GPS home and initial positions have been set, and the load's initial pose has been set
-                elif self.flag_gps_home_set and self.flag_local_init_pose_set and (tf_load_init_rel_world != None):
+                # Exit setup only once drone's GPS home and initial positions have been set, 
+                # the drone's desired pose relative to the load has been set and the load's initial pose has been set
+                elif self.flag_gps_home_set and self.flag_local_init_pose_set and self.flag_desired_pose_rel_load_set and (tf_load_init_rel_world != None):
                     self.cnt_phase_ticks = 0
                     self.phase = Phase.PHASE_TAKEOFF_START
                     self.get_logger().info(f'SETUP COMPLETE')
@@ -412,7 +412,7 @@ class Drone(Node):
                 # Continue to send setpoint whilst taking off
                 elif self.nav_state ==VehicleStatus.NAVIGATION_STATE_OFFBOARD and self.arm_state==VehicleStatus.ARMING_STATE_ARMED: 
                     # Takeoff to pre-tension level. Only transition once pre-tension level reached and pose rel load set
-                    if tf_drone_rel_world.transform.translation.z>=(HEIGHT_LOAD_PRE_TENSION+HEIGHT_DRONE_REL_LOAD-POS_THRESHOLD) and self.flag_desired_pose_rel_load_set:     
+                    if tf_drone_rel_world.transform.translation.z>=(HEIGHT_LOAD_PRE_TENSION+HEIGHT_DRONE_REL_LOAD-POS_THRESHOLD): # and self.flag_desired_pose_rel_load_set:     
                         self.phase = Phase.PHASE_TAKEOFF_PRE_TENSION
                         self.cnt_phase_ticks = 0  
                         self.get_logger().info(f'PRE_TENSION LEVEL REACHED')        

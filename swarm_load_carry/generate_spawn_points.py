@@ -13,7 +13,7 @@ import frame_transforms as ft
 
 
 def main(): 
-    # 
+    # Set up
     num_drones = 3
 
     drones_pos = [np.array([0,0,0]) for i in range(num_drones)]
@@ -45,12 +45,12 @@ def main():
 
     # Desired load pose
     # Translated and rotated over 90 deg CW
-    load_pos = np.array([10, -5, 0])
-    load_att = qt.array(ft.quaternion_from_euler(0, 0, -math.pi/2 - 0.1))
+    # load_pos = np.array([10, -5, 0])
+    # load_att = qt.array(ft.quaternion_from_euler(0, 0, -math.pi/2 - 0.5))
 
     # Translated and rotated over 180 deg CCW
-    # load_pos = np.array([-2.5, -15, 0])
-    # load_att = qt.array(ft.quaternion_from_euler(0, 0, math.pi + 0.3))
+    load_pos = np.array([-2.5, -15, 0])
+    load_att = qt.array(ft.quaternion_from_euler(0, 0, math.pi + 0.3))
 
 
     # Translate drone poses by desired load pose
@@ -72,9 +72,7 @@ def main():
         tethers_pos_transformed[i] = utils.transform_position(tethers_pos[i], load_pos, load_att)
         tethers_att_transformed[i] = utils.transform_orientation(tethers_att[i], load_att)
         tethers_yaw_transformed[i] = ft.quaternion_get_yaw(tethers_att_transformed[i])
-        
-        # print(f'Drone {i+1} position: {drones_pos_transformed[i]}')
-        # print(f'Drone {i+1} attitude: {drones_att_transformed[i]}')
+
         print(f'Drone {i+1} pose: {drones_pos_transformed[i][0]} {drones_pos_transformed[i][1]} {drones_pos_transformed[i][2]} 0 0 {drones_yaw_transformed[i]}')
         print(f'Tether {i+1} pose: {tethers_pos_transformed[i][0]} {tethers_pos_transformed[i][1]} {tethers_pos_transformed[i][2]} 0 0 {tethers_yaw_transformed[i]} \n')
 

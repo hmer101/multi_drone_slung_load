@@ -65,6 +65,7 @@ class GCSBackground(Node):
 
         ## VARIABLES
         self.load_desired_local_state = State(f'load{self.load_id}_init', CS_type.ENU)
+        self.load_initial_local_state = State(f'load{self.load_id}_init', CS_type.ENU)
 
         self.drone_phases = np.array([-1] * self.num_drones)
         self.mission_theta = 0.0 # rad
@@ -79,6 +80,9 @@ class GCSBackground(Node):
         self.pub_load_position_desired = self.create_publisher(VehicleLocalPositionSetpoint, f'load_{self.load_id}/in/desired_local_position', qos_profile)
 
         ## SUBSCRIBERS
+        # # Load current pose
+        # self.sub_load_pose = self.create_subscription(
+
         # Drone current phases
         self.sub_drone_phases = [None] * self.num_drones
 
@@ -152,7 +156,7 @@ class GCSBackground(Node):
 
             # Move load in circle
             self.load_desired_local_state.pos = np.array([r*(np.cos(self.mission_theta)-1), r*np.sin(self.mission_theta), self.load_desired_local_state.pos[2]])
-            q_list = ft.quaternion_from_euler(0.0, 0.0, self.mission_theta)
+            q_list = ft.quaternion_from_euler(0.0, 0.0, ft.quaternion_get_yaw(self.load_initial_local_state.att_q) + self.mission_theta)
             self.load_desired_local_state.att_q = qt.array(q_list)
 
             # Update theta
@@ -163,7 +167,7 @@ class GCSBackground(Node):
             self.load_desired_local_state.pos = np.array([self.load_desired_local_state.pos[0], self.load_desired_local_state.pos[1], self.load_desired_local_state.pos[2] - 0.3*MAIN_TIMER_PERIOD]) #- 0.1
 
         elif np.all(self.drone_phases == Phase.PHASE_LAND_POST_LOAD_DOWN):
-            self.set_drone_arrangement(1.3, np.array([1, 1, 1], [0, -np.pi*(1-2/self.num_drones), np.pi*(1-2/self.num_drones)]))
+            self.set_drone_arrangement(1.3, np.array([1, 1, 1]), np.array([0, -np.pi*(1-2/self.num_drones), np.pi*(1-2/self.num_drones)]))
         
         self.send_desired_pose()
 
@@ -174,12 +178,31 @@ class GCSBackground(Node):
 
     ## HELPERS
     def reset_pre_arm(self):
+        # Get current load orientation
+        tf_load_rel_load_init = utils.lookup_tf(f'load{self.load_id}_init', f'load{self.load_id}', self.tf_buffer, rclpy.time.Time(), self.get_logger())
+
+        # Skip setting if load pose not yet available
+        if tf_load_rel_load_init == None:
+            self.get_logger().info('Waiting for load pose to be set. Skipping reset until available')
+            return
+
+        # Set load initial local state
+        self.load_initial_local_state.pos = np.array([tf_load_rel_load_init.transform.translation.x,
+                                                        tf_load_rel_load_init.transform.translation.y,
+                                                        tf_load_rel_load_init.transform.translation.z])
+        
+        self.load_initial_local_state.att_q = qt.array([tf_load_rel_load_init.transform.rotation.w,
+                                                        tf_load_rel_load_init.transform.rotation.x,
+                                                        tf_load_rel_load_init.transform.rotation.y,
+                                                        tf_load_rel_load_init.transform.rotation.z])
+
         # Set load desired state
+        # As attitude is in ENU, initial desired local attitude must be the same as starting attitude
         self.load_desired_local_state.pos = np.array([0.0, 0.0, 0.0])
-        self.load_desired_local_state.att_q = qt.array([1.0, 0.0, 0.0, 0.0])
+        self.load_desired_local_state.att_q = self.load_initial_local_state.att_q.copy() 
 
         # Set drone arrangement around load
-        self.set_drone_arrangement(1, [HEIGHT_DRONE_REL_LOAD, HEIGHT_DRONE_REL_LOAD, HEIGHT_DRONE_REL_LOAD], np.array([0, -np.pi*(1-2/self.num_drones), np.pi*(1-2/self.num_drones)]))
+        self.set_drone_arrangement(1, np.array([HEIGHT_DRONE_REL_LOAD, HEIGHT_DRONE_REL_LOAD, HEIGHT_DRONE_REL_LOAD]), np.array([0, -np.pi*(1-2/self.num_drones), np.pi*(1-2/self.num_drones)]))
 
         # Set variables related to mission
         self.mission_theta = 0.0
