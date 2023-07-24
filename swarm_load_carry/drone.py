@@ -182,8 +182,8 @@ class Drone(Node):
         ## FLAGS 
         # Ensure set services are called at least once before taking off)
         self.flag_gps_home_set = False # GPS home set when vehicle armed
-        self.flag_local_init_pos_set = False 
-        self.flag_desired_pos_rel_load_set = False
+        self.flag_local_init_pose_set = False 
+        self.flag_desired_pose_rel_load_set = False
 
 
         ## Print information
@@ -286,14 +286,14 @@ class Drone(Node):
         self.global_origin_state.att_q.z = msg.global_att.q[3]
 
         # Global origin updated - must update local initial poses
-        self.flag_local_init_pos_set = False
+        self.flag_local_init_pose_set = False
         
 
     def clbk_set_desired_pose_rel_load(self, request, response):
         self.vehicle_desired_state_rel_load.pos = np.array([request.transform_stamped.transform.translation.x, request.transform_stamped.transform.translation.y, request.transform_stamped.transform.translation.z])
         self.vehicle_desired_state_rel_load.att_q = qt.array([request.transform_stamped.transform.rotation.w, request.transform_stamped.transform.rotation.x, request.transform_stamped.transform.rotation.y, request.transform_stamped.transform.rotation.z])
 
-        self.flag_desired_pos_rel_load_set = True
+        self.flag_desired_pose_rel_load_set = True
         response.success = True
 
         return response
@@ -332,7 +332,7 @@ class Drone(Node):
         offboard_ros.publish_offboard_control_heartbeat_signal(self.pub_offboard_mode, 'pos', timestamp)
         
         # Get TF relative to world if the world position is set
-        if self.flag_local_init_pos_set:
+        if self.flag_local_init_pose_set:
             # Get actual position feedback 
             # Start with drone position (TODO: incorporate load position feedback later)
             tf_drone_rel_world = utils.lookup_tf('world', self.get_name(), self.tf_buffer, rclpy.time.Time(), self.get_logger())
@@ -368,7 +368,7 @@ class Drone(Node):
                     self.reset_pre_arm()
 
                 # Set initial poses when ready
-                if self.flag_gps_home_set and not self.flag_local_init_pos_set:                    
+                if self.flag_gps_home_set and not self.flag_local_init_pose_set:                    
                     # Rest of setup differs for first drone and others
                     if self.drone_id == self.first_drone_num:
                         self.set_local_init_pose_first_drone()
@@ -380,7 +380,7 @@ class Drone(Node):
                             self.global_origin_state_prev = self.global_origin_state.copy()
                 
                 # Exit setup only once drone's GPS home and initial positions have been set, and the load's initial pose has been set
-                elif self.flag_gps_home_set and self.flag_local_init_pos_set and (tf_load_init_rel_world != None):
+                elif self.flag_gps_home_set and self.flag_local_init_pose_set and (tf_load_init_rel_world != None):
                     self.cnt_phase_ticks = 0
                     self.phase = Phase.PHASE_TAKEOFF_START
                     self.get_logger().info(f'SETUP COMPLETE')
@@ -411,8 +411,8 @@ class Drone(Node):
 
                 # Continue to send setpoint whilst taking off
                 elif self.nav_state ==VehicleStatus.NAVIGATION_STATE_OFFBOARD and self.arm_state==VehicleStatus.ARMING_STATE_ARMED: 
-                    # Takeoff to pre-tension level
-                    if tf_drone_rel_world.transform.translation.z>=(HEIGHT_LOAD_PRE_TENSION+HEIGHT_DRONE_REL_LOAD-POS_THRESHOLD):     
+                    # Takeoff to pre-tension level. Only transition once pre-tension level reached and pose rel load set
+                    if tf_drone_rel_world.transform.translation.z>=(HEIGHT_LOAD_PRE_TENSION+HEIGHT_DRONE_REL_LOAD-POS_THRESHOLD) and self.flag_desired_pose_rel_load_set:     
                         self.phase = Phase.PHASE_TAKEOFF_PRE_TENSION
                         self.cnt_phase_ticks = 0  
                         self.get_logger().info(f'PRE_TENSION LEVEL REACHED')        
@@ -517,7 +517,8 @@ class Drone(Node):
     ## HELPER FUNCTIONS
     def reset_pre_arm(self):
         self.flag_gps_home_set = False
-        self.flag_local_init_pos_set = False
+        self.flag_local_init_pose_set = False
+        self.flag_desired_pose_rel_load_set = False
 
 
     def broadcast_tf_init_pose(self):
@@ -525,7 +526,7 @@ class Drone(Node):
         # As all init CS are in ENU, they are all aligned in orientation
         utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'drone{self.drone_id}_init', self.vehicle_initial_state_rel_world.pos, qt.array([1.0, 0.0, 0.0, 0.0]), self.tf_static_broadcaster_init_pose)
 
-        self.flag_local_init_pos_set = True 
+        self.flag_local_init_pose_set = True 
         self.get_logger().info('Local init pose set')
 
     def set_local_init_pose_later_drones(self):
