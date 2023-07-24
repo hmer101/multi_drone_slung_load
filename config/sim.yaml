@@ -5,4 +5,4 @@
       first_drone_num: 1
       num_drones: 3
       
-      drone_order: [3, 2, 1] #[1, 2, 3] #ACW from load's x axis
+      drone_order: [1, 2, 3] #ACW from load's x axis
