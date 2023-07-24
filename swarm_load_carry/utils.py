@@ -52,18 +52,6 @@ def within_radius_3D(p1, p2, rad):
         return False
     
 
-# Generates a list of <X,Y,Z> co-ordinates to set drones equally spaced around a load on a circumscribing circle.
-# Input r is radius of circle circumscribing drone positions.
-# Input Z is a list (with num_drone elements) of Z heights above the load for the drones to fly 
-# def generate_points_cylinder(num_points, r, z):
-#     positions = []
-
-# 	# Use polar co-ordinate system to generate (x,y) points in circumscribing circle 
-#     for i in range(num_points):
-#         positions.append(tuple([r*math.cos(2*math.pi*i/num_points), r*math.sin(2*math.pi*i/num_points), z[i]]))
-    
-#     return positions
-
 def generate_points_cylinder(num_points, r, z):
     positions = np.zeros((num_points, 3))
 

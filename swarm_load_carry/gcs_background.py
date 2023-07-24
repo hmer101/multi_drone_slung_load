@@ -80,9 +80,6 @@ class GCSBackground(Node):
         self.pub_load_position_desired = self.create_publisher(VehicleLocalPositionSetpoint, f'load_{self.load_id}/in/desired_local_position', qos_profile)
 
         ## SUBSCRIBERS
-        # # Load current pose
-        # self.sub_load_pose = self.create_subscription(
-
         # Drone current phases
         self.sub_drone_phases = [None] * self.num_drones
 
