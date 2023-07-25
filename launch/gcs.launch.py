@@ -6,7 +6,7 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument, ExecuteProcess
 
-DEFAULT_ENV='sim'
+DEFAULT_ENV='phys'
 
 def generate_launch_description():
     ## LAUNCH ARGUMENTS

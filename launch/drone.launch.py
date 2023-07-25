@@ -7,7 +7,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 
 DEFAULT_DRONE_ID=1
-DEFAULT_ENV='sim'
+DEFAULT_ENV='phys'
 
 def generate_launch_description():
     ## LAUNCH ARGUMENTS
@@ -27,7 +27,7 @@ def generate_launch_description():
     env = DEFAULT_ENV
     for arg in sys.argv:
         if arg.startswith("env:="):
-            env = int(arg.split(":=")[1])
+            env = arg.split(":=")[1]
 
 
     ## GET PARAMETERS

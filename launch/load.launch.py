@@ -7,7 +7,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess
 
 DEFAULT_LOAD_ID=1
-DEFAULT_ENV='sim'
+DEFAULT_ENV='phys'
 
 def generate_launch_description():
     ## LAUNCH ARGUMENTS
