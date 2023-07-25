@@ -12,7 +12,6 @@ from rclpy.node import Node
 import numpy as np
 import quaternionic as qt
 import pymap3d as pm
-from pydrake.solvers import MathematicalProgram
 
 import utils
 
