@@ -21,19 +21,34 @@ def generate_launch_description():
             env = int(arg.split(":=")[1])
 
     ## GET PARAMETERS
+    config = None
+
+    if env=="sim":
+      config = os.path.join(
+        get_package_share_directory('swarm_load_carry'),
+        'config',
+        'sim.yaml'
+        )
+    elif env=="phys":
+       config = os.path.join(
+        get_package_share_directory('swarm_load_carry'),
+        'config',
+        'phys.yaml'
+        ) 
+
 
     ## LAUNCH
     return LaunchDescription([
         launch_arg_sim_phys,
         ExecuteProcess(
             cmd=[[
-                f'gnome-terminal --tab -- bash -c "ros2 run swarm_load_carry gcs_background --ros-args -r __node:=gcs_background1 --params-file ~/px4_ros_com_ros2/src/swarm_load_carry/config/{env}.yaml"', 
+                f'gnome-terminal --tab -- bash -c "ros2 run swarm_load_carry gcs_background --ros-args -r __node:=gcs_background1 --params-file {config}"', 
             ]],
             shell=True
         ),
         ExecuteProcess(
             cmd=[[
-                f'gnome-terminal --tab -- bash -c "ros2 run swarm_load_carry gcs_user --ros-args -r __node:=gcs_user1 --params-file ~/px4_ros_com_ros2/src/swarm_load_carry/config/{env}.yaml"', 
+                f'gnome-terminal --tab -- bash -c "ros2 run swarm_load_carry gcs_user --ros-args -r __node:=gcs_user1 --params-file {config}"', 
             ]],
             shell=True
         )
