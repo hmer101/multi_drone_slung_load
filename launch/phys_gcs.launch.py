@@ -7,7 +7,6 @@ from launch.actions import ExecuteProcess, IncludeLaunchDescription
 from launch_ros.actions import Node
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
-ENV='phys'
 
 def generate_launch_description():
     ## INCLUDE LAUNCH FILES
@@ -15,13 +14,13 @@ def generate_launch_description():
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('swarm_load_carry'), 'launch'),
          '/load.launch.py']),
-      launch_arguments={'env': ENV}.items()
+      launch_arguments={'env': 'phys'}.items()
       )
     gcs = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('swarm_load_carry'), 'launch'),
          '/gcs.launch.py']),
-      launch_arguments={'env': ENV}.items()
+      launch_arguments={'env': 'phys'}.items()
       )
 
     ## RUN LAUNCH FILES
@@ -29,5 +28,3 @@ def generate_launch_description():
         load,
         gcs    
     ])
-
-# TODO: USE ENVIRONMENT VARS TO DEFINE DRONE NUM ON EACH RPI: https://docs.ros.org/en/humble/Tutorials/Intermediate/Launch/Using-ROS2-Launch-For-Large-Projects.html#environment-variables
