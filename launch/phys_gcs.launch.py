@@ -26,5 +26,5 @@ def generate_launch_description():
     ## RUN LAUNCH FILES
     return LaunchDescription([
         load,
-        gcs    
+        gcs
     ])
