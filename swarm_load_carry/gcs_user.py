@@ -55,24 +55,6 @@ class GCSUser(Node):
     ## CALLBACKS
 
     ## MISSION CONTROL
-    # Change the phase of all drones
-    # def change_phase_all_drones(self, phase_desired):
-    #     # Prepare request
-    #     phase_req = PhaseChange.Request()
-    #     phase_req.phase_request.phase = phase_desired
-        
-    #     # Send request
-    #     phase_future = [None] * self.num_drones
-
-    #     for i in range(self.num_drones):
-    #         #phase_future[i] = self.cli_phase_change[i].call_async(phase_req)
-    #         phase_change(self, cli_phase_change, phase_desired)
-
-    #     # Wait for response
-    #     for i in range(self.num_drones):
-    #         rclpy.spin_until_future_complete(self, phase_future[i])
-
-
     # Take in user commands for the drones
     def user_commands(self):
         cmd = None

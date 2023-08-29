@@ -48,7 +48,6 @@ LAND_POST_LOAD_DOWN_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
 LAND_PRE_DISARM_CNT_THRESHOLD=3/MAIN_TIMER_PERIOD
 
 FULLY_AUTO_PRE_TAKEOFF_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
-# FULLY_AUTO_MISSION_CNT_THRESHOLD=10/MAIN_TIMER_PERIOD
 
 
 # Node to encapsulate drone information and actions
@@ -74,8 +73,6 @@ class Drone(Node):
         self.load_name = f'load{self.load_id}'
 
         # Vehicle
-        # self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX     # Actual mode of the FMU
-        # self.arm_state = VehicleStatus.ARMING_STATE_MAX         # Actual arming state of FMU
         self.vehicle_status = None  # Current state of the FMU
 
         self.phase = Phase.PHASE_UNASSIGNED        # Desired phase (action to perform when in offboard mode. Use 'phase' to differentiate from 'mode' of the FMU)
@@ -213,8 +210,6 @@ class Drone(Node):
 
     ## CALLBACKS
     def clbk_vehicle_status(self, msg):
-        # self.nav_state = msg.nav_state
-        # self.arm_state = msg.arming_state
         self.vehicle_status = msg
 
     def clbk_vehicle_attitude(self, msg):
@@ -470,23 +465,11 @@ class Drone(Node):
                 self.pub_trajectory.publish(trajectory_msg)
                 self.cnt_phase_ticks = 0
 
-                # Automatically start mission if fully auto
-                # if self.fully_auto:
-                #     self.phase = Phase.PHASE_MISSION_START
-                #     self.get_logger().info(f'In fully auto mode. Starting mission.')
-
 
             # Run main offboard mission
             case Phase.PHASE_MISSION_START:
                 self.pub_trajectory.publish(trajectory_msg)
                 self.cnt_phase_ticks += 1
-
-                # Automatically end mission if fully auto
-                # if self.fully_auto and self.cnt_phase_ticks >= FULLY_AUTO_MISSION_CNT_THRESHOLD:
-                #     self.phase = Phase.PHASE_LAND_START
-                #     self.cnt_phase_ticks = 0
-
-                #     self.get_logger().info(f'In fully auto mode. Ending mission.')
                     
 
             # Run land 
