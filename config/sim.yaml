@@ -5,4 +5,6 @@
       first_drone_num: 1
       num_drones: 3
       
+      fully_auto: true
+
       drone_order: [1, 2, 3] #ACW from load's x axis

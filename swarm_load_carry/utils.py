@@ -12,6 +12,7 @@ from px4_msgs.msg import TrajectorySetpoint
 from tf2_ros import TransformException
 
 from swarm_load_carry.state import State, CS_type
+from swarm_load_carry_interfaces.srv import PhaseChange
 
 ## STRING HANDLING 
 
@@ -233,3 +234,39 @@ def gen_traj_msg_vel(desired_velocity, timestamp):
     trajectory_msg.velocity[2] = -desired_velocity[2]
 
     return trajectory_msg
+
+
+## DRONE CONTROL
+# Change the phase of a drone
+def phase_change(cli_phase_change, phase_desired):
+    # Prepare request
+    phase_req = PhaseChange.Request()
+    phase_req.phase_request.phase = phase_desired
+    
+    # Send request
+    #phase_future = [None] * self.num_drones
+
+    # for i in range(self.num_drones):
+    #     phase_future[i] = self.cli_phase_change[i].call_async(phase_req)
+    phase_future = cli_phase_change.call_async(phase_req)
+
+    # Wait for response
+    # for i in range(self.num_drones):
+    #     rclpy.spin_until_future_complete(self, phase_future[i])
+
+    return phase_future
+
+def change_phase_all_drones(node, num_drones, cli_array_phase_change, phase_desired):
+    # Prepare request
+    # phase_req = PhaseChange.Request()
+    # phase_req.phase_request.phase = phase_desired
+    
+    # # Send request
+    phase_future = [None] * num_drones
+
+    for i in range(num_drones):
+        phase_future[i] = phase_change(cli_array_phase_change[i], phase_desired)
+
+    # Wait for response
+    for i in range(num_drones):
+        rclpy.spin_until_future_complete(node, phase_future[i])

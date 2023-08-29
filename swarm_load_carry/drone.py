@@ -28,6 +28,7 @@ from swarm_load_carry_interfaces.msg import Phase, GlobalPose
 DEFAULT_DRONE_NUM=1
 DEFAULT_FIRST_DRONE_NUM=1
 DEFAULT_LOAD_ID=1
+DEFAULT_FULLY_AUTO=False
 
 MAIN_TIMER_PERIOD=0.1 # sec
 
@@ -44,6 +45,10 @@ TAKEOFF_PRE_TENSION_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
 
 LAND_PRE_DESCENT_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
 LAND_POST_LOAD_DOWN_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
+LAND_PRE_DISARM_CNT_THRESHOLD=3/MAIN_TIMER_PERIOD
+
+FULLY_AUTO_PRE_TAKEOFF_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
+# FULLY_AUTO_MISSION_CNT_THRESHOLD=10/MAIN_TIMER_PERIOD
 
 
 # Node to encapsulate drone information and actions
@@ -60,15 +65,19 @@ class Drone(Node):
         self.declare_parameter('num_drones', DEFAULT_DRONE_NUM)
         self.declare_parameter('first_drone_num', DEFAULT_FIRST_DRONE_NUM)
         self.declare_parameter('load_id', DEFAULT_LOAD_ID)
+        self.declare_parameter('fully_auto', DEFAULT_FULLY_AUTO)
 
         self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
         self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
+        self.fully_auto = self.get_parameter('fully_auto').get_parameter_value().bool_value
         self.load_id = self.get_parameter('load_id').get_parameter_value().integer_value
         self.load_name = f'load{self.load_id}'
 
         # Vehicle
-        self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX     # Actual mode of the FMU
-        self.arm_state = VehicleStatus.ARMING_STATE_MAX         # Actual arming state of FMU
+        # self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX     # Actual mode of the FMU
+        # self.arm_state = VehicleStatus.ARMING_STATE_MAX         # Actual arming state of FMU
+        self.vehicle_status = None  # Current state of the FMU
+
         self.phase = Phase.PHASE_UNASSIGNED        # Desired phase (action to perform when in offboard mode. Use 'phase' to differentiate from 'mode' of the FMU)
 
         self.vehicle_local_state = State(f'{self.get_name()}_init', CS_type.ENU)
@@ -204,8 +213,9 @@ class Drone(Node):
 
     ## CALLBACKS
     def clbk_vehicle_status(self, msg):
-        self.nav_state = msg.nav_state
-        self.arm_state = msg.arming_state
+        # self.nav_state = msg.nav_state
+        # self.arm_state = msg.arming_state
+        self.vehicle_status = msg
 
     def clbk_vehicle_attitude(self, msg):
         # Original q from FRD->NED
@@ -338,21 +348,33 @@ class Drone(Node):
             tf_drone_rel_world = utils.lookup_tf('world', self.get_name(), self.tf_buffer, rclpy.time.Time(), self.get_logger())
 
 
-        # Generate trajectory message for formation used after take-off
-        if self.phase > Phase.PHASE_TAKEOFF_START:
+        # Start setup and take-off automatically if in fully-auto mode. 
+        if self.fully_auto and self.phase == Phase.PHASE_UNASSIGNED and self.vehicle_status is not None:
+            # Counter starts when attempt to put into offboard mode by RC
+            if self.vehicle_status.nav_state_user_intention == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+                if self.cnt_phase_ticks >= FULLY_AUTO_PRE_TAKEOFF_CNT_THRESHOLD:
+                    self.phase = Phase.PHASE_SETUP
+                    self.cnt_phase_ticks = 0
+
+                else:
+                    self.cnt_phase_ticks += 1
+
+        # Generate trajectory message for formation used after take-off. #TODO: utils.gen_traj_msg_circle_load runs slowly and causes cut-out
+        elif self.phase > Phase.PHASE_TAKEOFF_START:
             trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger())
 
             if trajectory_msg == None:
                 self.get_logger().warn(f'Load or drone initial position not found. Skipping this command loop.')
                 return
-        
+
+
         # Perform actions depending on what mode is requested
         # TODO: Add some formation feedback to all phases (especially mission)
         match self.phase:
             # Run origin-altering setup pre-arming
             case Phase.PHASE_SETUP:
                 # If drone is armed, setup has already been performed. Skip straight to takeoff phase
-                if self.arm_state==VehicleStatus.ARMING_STATE_ARMED:
+                if self.vehicle_status.arming_state == VehicleStatus.ARMING_STATE_ARMED:
                     self.cnt_phase_ticks = 0
                     self.phase = Phase.PHASE_TAKEOFF_PRE_TENSION
                     self.get_logger().info(f'Vehicle already setup. Skipping to takeoff phase.')
@@ -394,34 +416,36 @@ class Drone(Node):
                 # Override trajectory msg for straight-up takeoff in first phase
                 trajectory_msg = utils.gen_traj_msg_straight_up(HEIGHT_LOAD_PRE_TENSION+HEIGHT_DRONE_REL_LOAD, self.vehicle_local_state.att_q, timestamp)
 
+                # Send takeoff setpoint
+                self.pub_trajectory.publish(trajectory_msg)
+
                 # Update counter for arm phase
                 if self.cnt_phase_ticks <=TAKEOFF_START_CNT_THRESHOLD:                   
-                    # Send takeoff setpoint
-                    self.pub_trajectory.publish(trajectory_msg)
-
                     self.cnt_phase_ticks += 1
 
-                # Arm vehicle when offboard message has been published for long enough
-                if self.cnt_phase_ticks == TAKEOFF_START_CNT_THRESHOLD:                   
-                    # Arm
-                    offboard_ros.arm(self.pub_vehicle_command, timestamp)
-
-                    # Set in offboard mode
-                    offboard_ros.engage_offboard_mode(self.pub_vehicle_command, timestamp)
-
                 # Continue to send setpoint whilst taking off
-                elif self.nav_state ==VehicleStatus.NAVIGATION_STATE_OFFBOARD and self.arm_state==VehicleStatus.ARMING_STATE_ARMED: 
+                if self.vehicle_status.arming_state==VehicleStatus.ARMING_STATE_ARMED and self.vehicle_status.nav_state==VehicleStatus.NAVIGATION_STATE_OFFBOARD:
                     # Takeoff to pre-tension level. Only transition once pre-tension level reached and pose rel load set
                     if tf_drone_rel_world.transform.translation.z>=(HEIGHT_LOAD_PRE_TENSION+HEIGHT_DRONE_REL_LOAD-POS_THRESHOLD): # and self.flag_desired_pose_rel_load_set:     
                         self.phase = Phase.PHASE_TAKEOFF_PRE_TENSION
                         self.cnt_phase_ticks = 0  
                         self.get_logger().info(f'PRE_TENSION LEVEL REACHED')        
-                        
-                    # Send takeoff setpoint
-                    self.pub_trajectory.publish(trajectory_msg)
+
+                # Arm vehicle (and switch to offboard mode) when offboard message has been published for long enough, and if not already armed or in offboard mode
+                elif self.cnt_phase_ticks >= TAKEOFF_START_CNT_THRESHOLD:                   
+                    # Set in offboard mode
+                    if self.vehicle_status.nav_state!=VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+                        offboard_ros.engage_offboard_mode(self.pub_vehicle_command, timestamp)
+
+                    # Arm (once in offboard mode)
+                    elif self.vehicle_status.arming_state!=VehicleStatus.ARMING_STATE_ARMED:
+                        offboard_ros.arm(self.pub_vehicle_command, timestamp)
 
 
             case Phase.PHASE_TAKEOFF_PRE_TENSION:
+                # Send takeoff setpoint
+                self.pub_trajectory.publish(trajectory_msg)
+
                 # Wait before attempt to pick up load as get into formation
                 if self.cnt_phase_ticks < TAKEOFF_PRE_TENSION_CNT_THRESHOLD:
                     self.cnt_phase_ticks += 1
@@ -429,10 +453,7 @@ class Drone(Node):
                     self.phase = Phase.PHASE_TAKEOFF_POST_TENSION
                     self.cnt_phase_ticks = 0
                     self.get_logger().info(f'PRE_TENSION LEVEL COMPLETE') 
-                
-                # Send takeoff setpoint
-                self.pub_trajectory.publish(trajectory_msg)
-                            
+                     
 
             case Phase.PHASE_TAKEOFF_POST_TENSION:
                 #Takeoff complete
@@ -449,11 +470,24 @@ class Drone(Node):
                 self.pub_trajectory.publish(trajectory_msg)
                 self.cnt_phase_ticks = 0
 
+                # Automatically start mission if fully auto
+                # if self.fully_auto:
+                #     self.phase = Phase.PHASE_MISSION_START
+                #     self.get_logger().info(f'In fully auto mode. Starting mission.')
+
 
             # Run main offboard mission
             case Phase.PHASE_MISSION_START:
                 self.pub_trajectory.publish(trajectory_msg)
+                self.cnt_phase_ticks += 1
 
+                # Automatically end mission if fully auto
+                # if self.fully_auto and self.cnt_phase_ticks >= FULLY_AUTO_MISSION_CNT_THRESHOLD:
+                #     self.phase = Phase.PHASE_LAND_START
+                #     self.cnt_phase_ticks = 0
+
+                #     self.get_logger().info(f'In fully auto mode. Ending mission.')
+                    
 
             # Run land 
             case Phase.PHASE_LAND_START:
@@ -493,9 +527,15 @@ class Drone(Node):
             case Phase.PHASE_LAND_END:
                 # Disarm when landed
                 if tf_drone_rel_world.transform.translation.z<=0.05:
-                    offboard_ros.disarm(self.pub_vehicle_command, timestamp)
-                    self.phase = Phase.PHASE_UNASSIGNED
-                    self.get_logger().info(f'LANDED AND DISARMED') 
+                    if self.cnt_phase_ticks <LAND_PRE_DISARM_CNT_THRESHOLD:
+                        self.cnt_phase_ticks += 1
+                    else:
+                        offboard_ros.disarm(self.pub_vehicle_command, timestamp)
+                        offboard_ros.disengage_offboard_mode(self.pub_vehicle_command, timestamp)
+                        self.phase = Phase.PHASE_UNASSIGNED
+                        self.cnt_phase_ticks = 0
+
+                        self.get_logger().info(f'LANDED AND DISARMED') 
             
             case Phase.PHASE_HOLD:
                 # Send setpoint as current position

@@ -21,7 +21,7 @@ from tf2_ros.transform_listener import TransformListener
 
 from swarm_load_carry.state import State, CS_type
 
-from swarm_load_carry_interfaces.srv import SetLocalPose, GetGlobalInitPose
+from swarm_load_carry_interfaces.srv import SetLocalPose, GetGlobalInitPose, PhaseChange
 from swarm_load_carry_interfaces.msg import Phase
 
 from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
@@ -29,10 +29,13 @@ from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
 DEFAULT_DRONE_NUM=1
 DEFAULT_FIRST_DRONE_NUM=1
 DEFAULT_LOAD_ID=1
+DEFAULT_FULLY_AUTO=False
 
 HEIGHT_DRONE_REL_LOAD=1.5 #2 #m
 
 MAIN_TIMER_PERIOD=0.2 # s
+
+FULLY_AUTO_MISSION_CNT_THRESHOLD=10/MAIN_TIMER_PERIOD
 
 class GCSBackground(Node):
 
@@ -51,9 +54,11 @@ class GCSBackground(Node):
         self.declare_parameter('first_drone_num', DEFAULT_FIRST_DRONE_NUM)
         self.declare_parameter('load_id', DEFAULT_LOAD_ID)
         self.declare_parameter('drone_order', [1, 2, 3])
+        self.declare_parameter('fully_auto', DEFAULT_FULLY_AUTO)
         
         self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
         self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
+        self.fully_auto = self.get_parameter('fully_auto').get_parameter_value().bool_value
         self.load_id = self.get_parameter('load_id').get_parameter_value().integer_value
         self.drone_order = self.get_parameter('drone_order').get_parameter_value().integer_array_value
 
@@ -73,6 +78,7 @@ class GCSBackground(Node):
 
         # Timers
         self.timer = self.create_timer(MAIN_TIMER_PERIOD, self.clbk_cmdloop)
+        self.cnt_phase_ticks = 0
 
         ## PUBLISHERS
         self.pub_load_attitude_desired = self.create_publisher(VehicleAttitudeSetpoint, f'load_{self.load_id}/in/desired_attitude', qos_profile)
@@ -100,6 +106,7 @@ class GCSBackground(Node):
 
         ## SERVICES
         ## CLIENTS
+        # Set drone poses relative to load
         self.cli_set_drone_poses_rel_load = [None] * self.num_drones
 
         for i in range(self.first_drone_num, self.num_drones+self.first_drone_num):
@@ -108,6 +115,15 @@ class GCSBackground(Node):
 
             while not self.cli_set_drone_poses_rel_load[i-self.first_drone_num].wait_for_service(timeout_sec=1.0):
                 self.get_logger().info(f'Waiting for set pose rel load service: drone {i}')
+
+        # Phase change
+        self.cli_phase_change = [None] * self.num_drones
+        #self.phase_future = [None] * self.num_drones
+
+        for i in range(self.first_drone_num, self.num_drones+self.first_drone_num):
+            self.cli_phase_change[i-self.first_drone_num] = self.create_client(PhaseChange,f'/px4_{i}/phase_change')
+            while not self.cli_phase_change[i-self.first_drone_num].wait_for_service(timeout_sec=1.0):
+                self.get_logger().info(f'Waiting for offboard ROS start service {i}')
 
         self.get_logger().info('Setup complete')
 
@@ -142,6 +158,13 @@ class GCSBackground(Node):
             # Rise slowly - tension will engage
             self.load_desired_local_state.pos = np.array([0.0, 0.0, self.load_desired_local_state.pos[2] + 0.1*MAIN_TIMER_PERIOD])
 
+        elif np.all(self.drone_phases == Phase.PHASE_TAKEOFF_END) and self.fully_auto:
+            # In fully auto, set drones to mission start
+            for i in range(self.num_drones):
+                utils.phase_change(self.cli_phase_change[i], Phase.PHASE_MISSION_START) #self.phase_future[i] = 
+            
+            self.get_logger().info(f'In fully auto mode. Takeoff complete. Starting mission.')
+
         elif np.all(self.drone_phases == Phase.PHASE_MISSION_START):
             # Perform mission - currently move load in circle
             v_lin = 1 # m/s
@@ -157,6 +180,17 @@ class GCSBackground(Node):
 
             # Update theta
             self.mission_theta = self.mission_theta + omega*dt
+
+            self.cnt_phase_ticks += 1
+
+            # If fully auto, transition to land phase when mission complete
+            if self.fully_auto and self.cnt_phase_ticks > FULLY_AUTO_MISSION_CNT_THRESHOLD:
+                for i in range(self.num_drones):
+                    utils.phase_change(self.cli_phase_change[i], Phase.PHASE_LAND_START)
+                        
+                self.get_logger().info(f'In fully auto mode. Mission complete. Transitioning to land phase.')
+                self.cnt_phase_ticks = 0
+            
         
         elif np.all(self.drone_phases == Phase.PHASE_LAND_DESCENT):
             # Lower slowly - tension will disengage
