@@ -20,11 +20,6 @@ def generate_launch_description():
       'env', default_value=str(DEFAULT_ENV)
     )
 
-    # load_id_value = LaunchConfiguration('load_id')
-    # sim_phys_value = LaunchConfiguration('env')
-
-    #print(f'sim_phys_value: {sim_phys_value.perform(None)}')
-
     # Get arguments
     load_id = DEFAULT_LOAD_ID
     for arg in sys.argv:
@@ -60,31 +55,4 @@ def generate_launch_description():
             ]],
             shell=True
         )
-        #ExecuteProcess(cmd=cmd, shell=True)
     ])
-
-
-
-# config = os.path.join(
-#       get_package_share_directory('swarm_load_carry'),
-#       'config',
-#       'sim.yaml'
-#       )
-
-#     with open(config, 'r') as file:
-#         params = yaml.safe_load(file)
-    
-#     num_drones = params["/**"]["ros__parameters"]["num_drones"]
-#     first_drone_num = params["/**"]["ros__parameters"]["first_drone_num"]
-
-#     ## LAUNCH BODY
-#     # Launch each drone in a new terminal by calling the single drone launch file multiple times in new terminals
-#     launch_description = []
-
-#     for i in range(first_drone_num, num_drones+first_drone_num):
-#         launch_description.append(ExecuteProcess(
-#             cmd=[[
-#                 f'gnome-terminal --tab -- bash -c "ros2 launch swarm_load_carry load.launch.py load_id:={1} env:=sim"',
-#             ]],
-#             shell=True
-#         ))

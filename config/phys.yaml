@@ -3,9 +3,9 @@
       load_id: 1
 
       first_drone_num: 1
-      num_drones: 3
+      num_drones: 1 #3
       this_drone_num: 1
 
       fully_auto: true
       
-      drone_order: [1, 2, 3] #ACW from load's x axis
+      drone_order: [1] #[1, 2, 3] #ACW from load's x axis
