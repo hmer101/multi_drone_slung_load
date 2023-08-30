@@ -3,7 +3,7 @@
       load_id: 1
 
       first_drone_num: 1
-      num_drones: 3
+      num_drones: 1 #3
       
       fully_auto: true
 

@@ -16,18 +16,33 @@ def generate_launch_description():
          get_package_share_directory('swarm_load_carry'), 'launch'),
          '/drones.launch.py'])
       )
-    load = IncludeLaunchDescription(
-      PythonLaunchDescriptionSource([os.path.join(
-         get_package_share_directory('swarm_load_carry'), 'launch'),
-         '/load.launch.py']),
-      launch_arguments={'env': ENV}.items()
-      )
-    gcs = IncludeLaunchDescription(
-      PythonLaunchDescriptionSource([os.path.join(
-         get_package_share_directory('swarm_load_carry'), 'launch'),
-         '/gcs.launch.py']),
-         launch_arguments={'env': ENV}.items()
-      )
+    # load = IncludeLaunchDescription(
+    #   PythonLaunchDescriptionSource([os.path.join(
+    #      get_package_share_directory('swarm_load_carry'), 'launch'),
+    #      '/load.launch.py']),
+    #   launch_arguments={'env': ENV}.items()
+    #   #launch_arguments=[('env', ENV)]
+    #   )
+    load = ExecuteProcess(
+            cmd=[[
+                f'gnome-terminal --tab -- bash -c "ros2 launch swarm_load_carry load.launch.py load_id:={1} env:=sim"',
+            ]],
+            shell=True
+        )
+    
+    # gcs = IncludeLaunchDescription(
+    #   PythonLaunchDescriptionSource([os.path.join(
+    #      get_package_share_directory('swarm_load_carry'), 'launch'),
+    #      '/gcs.launch.py']),
+    #      launch_arguments={'env': ENV}.items()
+    #      #launch_arguments=[('env', ENV)]
+    #   )
+    gcs = ExecuteProcess(
+            cmd=[[
+                f'gnome-terminal --tab -- bash -c "ros2 launch swarm_load_carry gcs.launch.py env:=sim"',
+            ]],
+            shell=True
+        )
 
     ## RUN LAUNCH FILES
     return LaunchDescription([
