@@ -68,8 +68,6 @@ class GCSBackground(Node):
         self.get_logger().info(f'Namespace: {self.get_namespace()}')
         self.get_logger().info(f'Name: {self.get_name()}')
 
-        self.get_logger().info(f'NUM DRONES: {self.num_drones}')
-
         ## VARIABLES
         self.load_desired_local_state = State(f'load{self.load_id}_init', CS_type.ENU)
         self.load_initial_local_state = State(f'load{self.load_id}_init', CS_type.ENU)
