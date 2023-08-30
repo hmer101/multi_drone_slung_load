@@ -357,8 +357,6 @@ class Drone(Node):
         elif self.phase > Phase.PHASE_SETUP:
             trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger())
 
-            self.get_logger().info(f'trajectory_msg.position: [{trajectory_msg.position[0]}, {trajectory_msg.position[1]}, {trajectory_msg.position[2]}]')
-
             if trajectory_msg == None:
                 self.get_logger().warn(f'Load or drone initial position not found. Skipping this command loop.')
                 return

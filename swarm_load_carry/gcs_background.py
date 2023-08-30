@@ -172,7 +172,7 @@ class GCSBackground(Node):
             # Perform mission - currently move load in circle
             v_lin = 1 # m/s
 
-            r = 10 # m
+            r = 2 #10 # m
             omega = v_lin/r # rad/s
             dt = MAIN_TIMER_PERIOD # s
 
