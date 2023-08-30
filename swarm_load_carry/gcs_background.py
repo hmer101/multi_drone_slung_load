@@ -32,6 +32,7 @@ DEFAULT_LOAD_ID=1
 DEFAULT_FULLY_AUTO=False
 
 HEIGHT_DRONE_REL_LOAD=1.5 #2 #m
+MAX_LOAD_TAKEOFF_HEIGHT=4 #m
 
 MAIN_TIMER_PERIOD=0.2 # s
 
@@ -156,12 +157,12 @@ class GCSBackground(Node):
 
         elif np.all(self.drone_phases == Phase.PHASE_TAKEOFF_POST_TENSION):
             # Rise slowly - tension will engage
-            self.load_desired_local_state.pos = np.array([0.0, 0.0, self.load_desired_local_state.pos[2] + 0.1*MAIN_TIMER_PERIOD])
+            self.load_desired_local_state.pos = np.array([0.0, 0.0, min(self.load_desired_local_state.pos[2] + 0.1*MAIN_TIMER_PERIOD, MAX_LOAD_TAKEOFF_HEIGHT)])
 
         elif np.all(self.drone_phases == Phase.PHASE_TAKEOFF_END) and self.fully_auto:
             # In fully auto, set drones to mission start
             for i in range(self.num_drones):
-                utils.phase_change(self.cli_phase_change[i], Phase.PHASE_MISSION_START) #self.phase_future[i] = 
+                utils.phase_change(self.cli_phase_change[i], Phase.PHASE_MISSION_START) 
             
             self.get_logger().info(f'In fully auto mode. Takeoff complete. Starting mission.')
 

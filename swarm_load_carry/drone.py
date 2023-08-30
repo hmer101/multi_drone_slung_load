@@ -222,7 +222,6 @@ class Drone(Node):
         self.vehicle_local_state.att_q.x = q_ros[1] 
         self.vehicle_local_state.att_q.y = q_ros[2]   
         self.vehicle_local_state.att_q.z = q_ros[3] 
-        
 
         if not self.flag_gps_home_set:
             # Set the initial attitude as the current attitude
@@ -354,9 +353,11 @@ class Drone(Node):
                 else:
                     self.cnt_phase_ticks += 1
 
-        # Generate trajectory message for formation used after take-off. #TODO: utils.gen_traj_msg_circle_load runs slowly and causes cut-out
-        elif self.phase > Phase.PHASE_TAKEOFF_START:
+        # Generate trajectory message for formation used after take-off.
+        elif self.phase > Phase.PHASE_SETUP:
             trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger())
+
+            self.get_logger().info(f'trajectory_msg.position: [{trajectory_msg.position[0]}, {trajectory_msg.position[1]}, {trajectory_msg.position[2]}]')
 
             if trajectory_msg == None:
                 self.get_logger().warn(f'Load or drone initial position not found. Skipping this command loop.')
@@ -369,12 +370,12 @@ class Drone(Node):
             # Run origin-altering setup pre-arming
             case Phase.PHASE_SETUP:
                 # If drone is armed, setup has already been performed. Skip straight to takeoff phase
-                if self.vehicle_status.arming_state == VehicleStatus.ARMING_STATE_ARMED:
-                    self.cnt_phase_ticks = 0
-                    self.phase = Phase.PHASE_TAKEOFF_PRE_TENSION
-                    self.get_logger().info(f'Vehicle already setup. Skipping to takeoff phase.')
+                # if self.vehicle_status.arming_state == VehicleStatus.ARMING_STATE_ARMED:
+                #     self.cnt_phase_ticks = 0
+                #     self.phase = Phase.PHASE_TAKEOFF_PRE_TENSION
+                #     self.get_logger().info(f'Vehicle already setup. Skipping to takeoff phase.')
 
-                    return
+                #     return
                 
                 # Check if load's setup is complete
                 tf_load_init_rel_world = utils.lookup_tf('world', f'{self.load_name}_init', self.tf_buffer, rclpy.time.Time(), self.get_logger())
