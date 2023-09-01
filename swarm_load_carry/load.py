@@ -4,7 +4,8 @@
 # Date: 01/26/2023
 
 import numpy as np
-import quaternionic as qt
+#import quaternionic as quaternion
+import quaternion
 import utils
 import rclpy
 import rclpy.qos as qos
@@ -107,7 +108,7 @@ class Load(Node):
     ## CALLBACKS
     def clbk_desired_load_attitude(self, msg):
         # Update stored setpoint
-        self.load_desired_state.att_q = qt.array([msg.q_d[0], msg.q_d[1], msg.q_d[2], msg.q_d[3]])
+        self.load_desired_state.att_q = np.quaternion(*[msg.q_d[0], msg.q_d[1], msg.q_d[2], msg.q_d[3]])
 
         # TEMP: Assume load attitude moves directly to desired attitude (TODO: add dynamics or sensing/estimation. Publish actual attitude in timer clbk instead)
 
@@ -125,7 +126,8 @@ class Load(Node):
     def clbk_publoop(self):
         # Retrieve drone information 
         drone_positions = np.zeros((self.num_drones, 3))
-        drone_orientations = qt.array(np.zeros((self.num_drones, 4))) 
+        drone_orientations = np.array([np.quaternion(*q) for q in np.zeros((self.num_drones, 4))])
+        #drone_orientations = np.quaternion(*np.zeros((self.num_drones, 4))) 
 
         # Store position and orientation of each drone relative to world
         count_tf = 0
@@ -138,7 +140,9 @@ class Load(Node):
 
             if t != None:
                 drone_positions[i, :] = [t.transform.translation.x, t.transform.translation.y, t.transform.translation.z]
-                drone_orientations[i, :] = [t.transform.rotation.w, t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z]
+                # drone_orientations[i, :] = [t.transform.rotation.w, t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z]
+                #drone_positions[i] = np.quaternion(t.transform.translation.x, t.transform.translation.y, t.transform.translation.z)
+                drone_orientations[i] = np.quaternion(t.transform.rotation.w, t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z)
 
                 count_tf += 1
 
@@ -152,7 +156,7 @@ class Load(Node):
                 self.load_state_rel_world.pos[2] -= HEIGHT_DRONE_REL_LOAD # TODO: Better height estimate
 
             # Estimate load orientation #TODO: Better orientation estimation method
-            self.load_state_rel_world.att_q = qt.array(drone_orientations[0, :])
+            self.load_state_rel_world.att_q = drone_orientations[0] #np.quaternion(*drone_orientations[0, :])
 
             # If all drones are in setup phase, reset load's init pose
             if np.all(self.drone_phases == Phase.PHASE_SETUP):
@@ -161,7 +165,8 @@ class Load(Node):
                 self.get_logger().info('Debug 2')
 
             # Publish estimate load relative to load initial position
-            self.get_logger().info('Debug 3')
+            #self.get_logger().info(f'self.load_state_rel_world: {self.load_state_rel_world.to_string()}') - OK!
+
             load_rel_load_init = utils.transform_frames(self.load_state_rel_world, f'{self.get_name()}_init', self.tf_buffer, self.get_logger())
             self.get_logger().info('Debug 4')
 
@@ -179,7 +184,7 @@ class Load(Node):
         
         # Publish static transform for init pose (relative to world)
         # As CS is in ENU, always aligned
-        utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'{self.get_name()}_init', self.load_initial_state_rel_world.pos, qt.array([1.0, 0.0, 0.0, 0.0]), self.tf_static_broadcaster_init_pose)
+        utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'{self.get_name()}_init', self.load_initial_state_rel_world.pos, np.quaternion(*[1.0, 0.0, 0.0, 0.0]), self.tf_static_broadcaster_init_pose)
 
         self.get_logger().info('Initial pose TF set')
 

@@ -1,5 +1,6 @@
 import math
-import quaternionic as qt
+#import quaternionic as quaternion
+import quaternion 
 import rclpy
 
 import numpy as np
@@ -27,8 +28,8 @@ def extract_instance_from_connection(connection):
 
 ## CONVERSIONS
 # Normalize a quaternion and return the equivalent numpy representation
-def q_to_normalized_np(q: qt.array):
-    q_norm = q.normalized
+def q_to_normalized_np(q: np.quaternion): #quaternion.array):
+    q_norm = q.normalized()
 
     return np.array([q_norm.w, q_norm.x, q_norm.y, q_norm.z])
 
@@ -105,9 +106,19 @@ def lookup_tf(target_frame, source_frame, tf_buffer, time, logger):
 
 # Transform a position of an item (A) from one frame (B) into another (C) given the position of the item in frame B (p_BA), position of B rel C (p_CB)
 # and the orientation of B rel C (q_CB)
-def transform_position(p_BA: np.ndarray[(3,), float], p_CB: np.ndarray[(3,), float], q_CB):
+def transform_position(p_BA: np.ndarray[(3,), float], p_CB: np.ndarray[(3,), float], q_CB, logger):
     # Perform translation between frames that are both rotated and translated 
-    p_CA = q_CB.rotate(p_BA) + p_CB
+    #p_CA = q_CB.rotate(p_BA) + p_CB
+    #p_BA_quat = np.quaternion(0, *p_BA)
+    p_BA_rotated = q_CB*(np.quaternion(0, *p_BA))*q_CB.inverse()
+    p_CA = np.array([p_BA_rotated.x, p_BA_rotated.y, p_BA_rotated.z]) + p_CB
+
+    # logger.info(f'p_BA: {p_BA}')
+    # logger.info(f'q_CB: {q_CB}')
+    # logger.info(f'p_BA_quat: {p_BA_quat}')
+    # logger.info(f'p_BA_rotated: {p_BA_rotated}')
+    # logger.info(f'p_CB: {p_CB}')
+    # logger.info(f'p_CA: {p_CA}')
 
     return p_CA
 
@@ -135,14 +146,17 @@ def transform_frames(state, frame2_name, tf_buffer, logger):
                             tf_f1_rel_f2.transform.translation.y, 
                             tf_f1_rel_f2.transform.translation.z])
         
-        q_f2f1 = qt.array([tf_f1_rel_f2.transform.rotation.w, 
+        q_f2f1 = np.quaternion(tf_f1_rel_f2.transform.rotation.w, 
                           tf_f1_rel_f2.transform.rotation.x,
                           tf_f1_rel_f2.transform.rotation.y,
-                          tf_f1_rel_f2.transform.rotation.z])
+                          tf_f1_rel_f2.transform.rotation.z)
 
         # Perform transform
-        state2.pos = transform_position(state.pos, p_f2f1, q_f2f1)
+        state2.pos = transform_position(state.pos, p_f2f1, q_f2f1, logger)
         state2.att_q = transform_orientation(state.att_q, q_f2f1)
+
+        logger.info(f'state2.pos: {state2.pos}')
+        logger.info(f'state2.att_q: {state2.att_q}')
         
     return state2
 
@@ -167,7 +181,7 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
     # Note: cannot use transform_frames() directly as requires load desired, not actual current TF
     vehicle_desired_state_rel_world = State('world', CS_type.ENU)
     
-    vehicle_desired_state_rel_world.pos = transform_position(vehicle_desired_state_rel_load.pos, load_desired_state_rel_world.pos, load_desired_state_rel_world.att_q) #transform_position(load_desired_state_rel_world.pos, vehicle_desired_pos_rel_load_rot, )
+    vehicle_desired_state_rel_world.pos = transform_position(vehicle_desired_state_rel_load.pos, load_desired_state_rel_world.pos, load_desired_state_rel_world.att_q, logger) #transform_position(load_desired_state_rel_world.pos, vehicle_desired_pos_rel_load_rot, )
     vehicle_desired_state_rel_world.att_q = transform_orientation(vehicle_desired_state_rel_load.att_q, load_desired_state_rel_world.att_q)                             #load_desired_state_rel_world.att_q, vehicle_desired_state_rel_load.att_q)
 
     # Transform relative to drone_init

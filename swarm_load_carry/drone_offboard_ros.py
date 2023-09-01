@@ -45,13 +45,18 @@ def engage_offboard_mode(pub_vehicle_command, timestamp):
                             pub_vehicle_command, timestamp, param1=1.0, param2=6.0)
 
 
+def disengage_offboard_mode(pub_vehicle_command, timestamp):
+    """Switch to position hold mode."""
+    publish_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_MODE, 
+                            pub_vehicle_command, timestamp, param1=1.0, param2=3.0)
+
+
 # Note that can only reset home after vehicle is armed
 def set_origin(pub_vehicle_command, lat, lon, alt, timestamp):
     """Set GPS origin location"""   
     publish_vehicle_command(VehicleCommand.VEHICLE_CMD_SET_GPS_GLOBAL_ORIGIN, 
                             pub_vehicle_command, timestamp, param5=lat, param6=lon, param7=alt)
     
-
 
 def publish_offboard_control_heartbeat_signal(pub_offboard_mode, what_control, timestamp):
     """Publish the offboard control mode."""

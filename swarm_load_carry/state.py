@@ -4,7 +4,8 @@
 # Date: 02/28/2023
 
 import numpy as np
-import quaternionic as qt
+#import quaternionic as quaternion
+import quaternion
 
 from enum import Enum
 
@@ -21,7 +22,7 @@ class CS_type(Enum):
 # Like geometry_msgs/PoseStamped message but with different background datastructures allowing different co-ordinate system types and other calculations
 # TODO: Using default values for pos and att can cause initialization problems
 class State():
-    def __init__(self, frame, cs_type, pos=np.array([0.0, 0.0, 0.0]), att=qt.array([1.0, 0.0, 0.0, 0.0]), vel=np.array([0.0, 0.0, 0.0])):
+    def __init__(self, frame, cs_type, pos=np.array([0.0, 0.0, 0.0]), att=np.quaternion(1.0, 0.0, 0.0, 0.0), vel=np.array([0.0, 0.0, 0.0])):
         self.frame = frame
         self.cs_type = cs_type
 

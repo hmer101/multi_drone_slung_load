@@ -5,7 +5,8 @@
 # Date: 07/07/2021
 
 import numpy as np
-import quaternionic as qt 
+#import quaternionic as quaternion 
+import quaternion
 import math
 
 import utils
@@ -17,40 +18,40 @@ def main():
     num_drones = 3
 
     drones_pos = [np.array([0,0,0]) for i in range(num_drones)]
-    drones_att = [qt.array([1,0,0,0]) for i in range(num_drones)]
+    drones_att = [np.quaternion(*[1,0,0,0]) for i in range(num_drones)]
 
     tethers_pos = [np.array([0,0,0]) for i in range(num_drones)]
-    tethers_att = [qt.array([1,0,0,0]) for i in range(num_drones)]
+    tethers_att = [np.quaternion(*[1,0,0,0]) for i in range(num_drones)]
     
     # Default starting positions in ENU
     drones_pos[0] = np.array([1.5, 0, .24])
-    drones_att[0] = qt.array(ft.quaternion_from_euler(0, 0, 0))
+    drones_att[0] = np.quaternion(*ft.quaternion_from_euler(0, 0, 0))
 
     drones_pos[1] = np.array([-0.75, 1.3, .24])
-    drones_att[1] = qt.array(ft.quaternion_from_euler(0, 0, 0))
+    drones_att[1] = np.quaternion(*ft.quaternion_from_euler(0, 0, 0))
 
     drones_pos[2] = np.array([-0.75, -1.3, .24])
-    drones_att[2] = qt.array(ft.quaternion_from_euler(0, 0, 0))
+    drones_att[2] = np.quaternion(*ft.quaternion_from_euler(0, 0, 0))
 
 
     tethers_pos[0] = np.array([0.08, 0, .2])
-    tethers_att[0] = qt.array(ft.quaternion_from_euler(0, 0, 0))
+    tethers_att[0] = np.quaternion(*ft.quaternion_from_euler(0, 0, 0))
 
     tethers_pos[1] = np.array([-0.04, 0.069, .2])
-    tethers_att[1] = qt.array(ft.quaternion_from_euler(0, 0, 2.09439510239))
+    tethers_att[1] = np.quaternion(*ft.quaternion_from_euler(0, 0, 2.09439510239))
 
     tethers_pos[2] = np.array([-0.04, -0.069, .2])
-    tethers_att[2] = qt.array(ft.quaternion_from_euler(0, 0, 4.18879020479))
+    tethers_att[2] = np.quaternion(*ft.quaternion_from_euler(0, 0, 4.18879020479))
 
 
     # Desired load pose
     # Translated and rotated over 90 deg CW
     # load_pos = np.array([10, -5, 0])
-    # load_att = qt.array(ft.quaternion_from_euler(0, 0, -math.pi/2 - 0.5))
+    # load_att = np.quaternion(*ft.quaternion_from_euler(0, 0, -math.pi/2 - 0.5))
 
     # Translated and rotated over 180 deg CCW
     load_pos = np.array([-2.5, -15, 0])
-    load_att = qt.array(ft.quaternion_from_euler(0, 0, math.pi + 0.3))
+    load_att = np.quaternion(*ft.quaternion_from_euler(0, 0, math.pi + 0.3))
 
 
     # Translate drone poses by desired load pose

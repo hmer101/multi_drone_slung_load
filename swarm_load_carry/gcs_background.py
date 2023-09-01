@@ -10,8 +10,10 @@ from rclpy.qos import QoSProfile
 from rclpy.node import Node
 
 import numpy as np
-import quaternionic as qt
-import pymap3d as pm
+#import quaternionic as quaternion
+import quaternion as quaternion
+
+#import pymap3d as pm
 
 import utils
 
@@ -168,7 +170,7 @@ class GCSBackground(Node):
 
         elif np.all(self.drone_phases == Phase.PHASE_MISSION_START):
             # Perform mission - currently move load in circle
-            v_lin = 1 # m/s
+            v_lin = 0.5 # m/s
 
             r = 2 #10 # m
             omega = v_lin/r # rad/s
@@ -176,8 +178,10 @@ class GCSBackground(Node):
 
             # Move load in circle
             self.load_desired_local_state.pos = np.array([r*(np.cos(self.mission_theta)-1), r*np.sin(self.mission_theta), self.load_desired_local_state.pos[2]])
-            q_list = ft.quaternion_from_euler(0.0, 0.0, ft.quaternion_get_yaw(self.load_initial_local_state.att_q) + self.mission_theta)
-            self.load_desired_local_state.att_q = qt.array(q_list)
+            
+            load_init_yaw = ft.quaternion_get_yaw([self.load_initial_local_state.att_q.w, self.load_initial_local_state.att_q.x, self.load_initial_local_state.att_q.y, self.load_initial_local_state.att_q.z])
+            q_list = ft.quaternion_from_euler(0.0, 0.0, load_init_yaw + self.mission_theta)
+            self.load_desired_local_state.att_q = np.quaternion(*q_list)
 
             # Update theta
             self.mission_theta = self.mission_theta + omega*dt
@@ -222,10 +226,10 @@ class GCSBackground(Node):
                                                         tf_load_rel_load_init.transform.translation.y,
                                                         tf_load_rel_load_init.transform.translation.z])
         
-        self.load_initial_local_state.att_q = qt.array([tf_load_rel_load_init.transform.rotation.w,
+        self.load_initial_local_state.att_q = np.quaternion(tf_load_rel_load_init.transform.rotation.w,
                                                         tf_load_rel_load_init.transform.rotation.x,
                                                         tf_load_rel_load_init.transform.rotation.y,
-                                                        tf_load_rel_load_init.transform.rotation.z])
+                                                        tf_load_rel_load_init.transform.rotation.z)
 
         # Set load desired state
         # As attitude is in ENU, initial desired local attitude must be the same as starting attitude
@@ -260,7 +264,7 @@ class GCSBackground(Node):
             pos_req.transform_stamped.transform.translation.z = float(ref_points_ordered[i][2])
 
             # Set yaw
-            q_des = qt.array(ft.quaternion_from_euler(0.0, 0.0, yaw_ordered[i]))
+            q_des = np.quaternion(*ft.quaternion_from_euler(0.0, 0.0, yaw_ordered[i]))
 
             pos_req.transform_stamped.transform.rotation.x = float(q_des.x)
             pos_req.transform_stamped.transform.rotation.y = float(q_des.y)
