@@ -7,7 +7,6 @@ import asyncio, rclpy, utils # Note import utils needs additions to setup.py. Se
 import swarm_load_carry.drone_offboard_ros as offboard_ros
 import numpy as np
 import pymap3d as pm
-#import quaternionic as quaternion
 import quaternion
 
 import frame_transforms as ft
@@ -216,7 +215,7 @@ class Drone(Node):
     def clbk_vehicle_attitude(self, msg):
         # Original q from FRD->NED
         # Handles FRD->NED to FLU->ENU transformation 
-        q_px4 = utils.q_to_normalized_np(np.quaternion(msg.q[0], msg.q[1], msg.q[2], msg.q[3])) #quaternion.array([msg.q[0], msg.q[1], msg.q[2], msg.q[3]]))
+        q_px4 = utils.q_to_normalized_np(np.quaternion(msg.q[0], msg.q[1], msg.q[2], msg.q[3]))
         q_ros = ft.px4_to_ros_orientation(q_px4)
 
         self.vehicle_local_state.att_q.w = q_ros[0]
@@ -275,7 +274,7 @@ class Drone(Node):
             self.flag_gps_home_set = True   
 
     def clbk_load_desired_attitude(self, msg):
-        self.load_desired_local_state.att_q = np.quaternion(msg.q_d[0], msg.q_d[1], msg.q_d[2], msg.q_d[3]) #quaternion.array([msg.q_d[0], msg.q_d[1], msg.q_d[2], msg.q_d[3]])
+        self.load_desired_local_state.att_q = np.quaternion(msg.q_d[0], msg.q_d[1], msg.q_d[2], msg.q_d[3])
 
     def clbk_load_desired_local_position(self, msg):
         self.load_desired_local_state.pos = np.array([msg.x, msg.y, msg.z])
@@ -296,7 +295,7 @@ class Drone(Node):
 
     def clbk_set_desired_pose_rel_load(self, request, response):
         self.vehicle_desired_state_rel_load.pos = np.array([request.transform_stamped.transform.translation.x, request.transform_stamped.transform.translation.y, request.transform_stamped.transform.translation.z])
-        self.vehicle_desired_state_rel_load.att_q = np.quaternion(request.transform_stamped.transform.rotation.w, request.transform_stamped.transform.rotation.x, request.transform_stamped.transform.rotation.y, request.transform_stamped.transform.rotation.z) #quaternion.array([request.transform_stamped.transform.rotation.w, request.transform_stamped.transform.rotation.x, request.transform_stamped.transform.rotation.y, request.transform_stamped.transform.rotation.z])
+        self.vehicle_desired_state_rel_load.att_q = np.quaternion(request.transform_stamped.transform.rotation.w, request.transform_stamped.transform.rotation.x, request.transform_stamped.transform.rotation.y, request.transform_stamped.transform.rotation.z) 
 
         self.flag_desired_pose_rel_load_set = True
         response.success = True
@@ -421,7 +420,7 @@ class Drone(Node):
                 # Continue to send setpoint whilst taking off
                 if self.vehicle_status.arming_state==VehicleStatus.ARMING_STATE_ARMED and self.vehicle_status.nav_state==VehicleStatus.NAVIGATION_STATE_OFFBOARD:
                     # Takeoff to pre-tension level. Only transition once pre-tension level reached and pose rel load set
-                    if tf_drone_rel_world.transform.translation.z>=(HEIGHT_LOAD_PRE_TENSION+HEIGHT_DRONE_REL_LOAD-POS_THRESHOLD): # and self.flag_desired_pose_rel_load_set:     
+                    if tf_drone_rel_world.transform.translation.z>=(HEIGHT_LOAD_PRE_TENSION+HEIGHT_DRONE_REL_LOAD-POS_THRESHOLD): 
                         self.phase = Phase.PHASE_TAKEOFF_PRE_TENSION
                         self.cnt_phase_ticks = 0  
                         self.get_logger().info(f'PRE_TENSION LEVEL REACHED')        
@@ -547,7 +546,7 @@ class Drone(Node):
     def broadcast_tf_init_pose(self):
         # Publish static transform for init pose (relative to world)
         # As all init CS are in ENU, they are all aligned in orientation
-        utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'drone{self.drone_id}_init', self.vehicle_initial_state_rel_world.pos, np.quaternion(1.0, 0.0, 0.0, 0.0), self.tf_static_broadcaster_init_pose) #quaternion.array([1.0, 0.0, 0.0, 0.0])
+        utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'drone{self.drone_id}_init', self.vehicle_initial_state_rel_world.pos, np.quaternion(1.0, 0.0, 0.0, 0.0), self.tf_static_broadcaster_init_pose)
 
         self.flag_local_init_pose_set = True 
         self.get_logger().info('Local init pose set')

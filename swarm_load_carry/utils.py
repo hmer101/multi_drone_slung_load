@@ -108,17 +108,8 @@ def lookup_tf(target_frame, source_frame, tf_buffer, time, logger):
 # and the orientation of B rel C (q_CB)
 def transform_position(p_BA: np.ndarray[(3,), float], p_CB: np.ndarray[(3,), float], q_CB, logger):
     # Perform translation between frames that are both rotated and translated 
-    #p_CA = q_CB.rotate(p_BA) + p_CB
-    #p_BA_quat = np.quaternion(0, *p_BA)
     p_BA_rotated = q_CB*(np.quaternion(0, *p_BA))*q_CB.inverse()
     p_CA = np.array([p_BA_rotated.x, p_BA_rotated.y, p_BA_rotated.z]) + p_CB
-
-    # logger.info(f'p_BA: {p_BA}')
-    # logger.info(f'q_CB: {q_CB}')
-    # logger.info(f'p_BA_quat: {p_BA_quat}')
-    # logger.info(f'p_BA_rotated: {p_BA_rotated}')
-    # logger.info(f'p_CB: {p_CB}')
-    # logger.info(f'p_CA: {p_CA}')
 
     return p_CA
 

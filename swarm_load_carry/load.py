@@ -135,7 +135,6 @@ class Load(Node):
         # Retrieve drone information 
         drone_positions = np.zeros((self.num_drones, 3))
         drone_orientations = np.array([np.quaternion(*q) for q in np.zeros((self.num_drones, 4))])
-        #drone_orientations = np.quaternion(*np.zeros((self.num_drones, 4))) 
 
         # Store position and orientation of each drone relative to world
         count_tf = 0
@@ -148,8 +147,6 @@ class Load(Node):
 
             if t != None:
                 drone_positions[i, :] = [t.transform.translation.x, t.transform.translation.y, t.transform.translation.z]
-                # drone_orientations[i, :] = [t.transform.rotation.w, t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z]
-                #drone_positions[i] = np.quaternion(t.transform.translation.x, t.transform.translation.y, t.transform.translation.z)
                 drone_orientations[i] = np.quaternion(t.transform.rotation.w, t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z)
 
                 count_tf += 1
@@ -173,8 +170,6 @@ class Load(Node):
                 self.get_logger().info('Debug 2')
 
             # Publish estimate load relative to load initial position
-            #self.get_logger().info(f'self.load_state_rel_world: {self.load_state_rel_world.to_string()}') - OK!
-
             load_rel_load_init = utils.transform_frames(self.load_state_rel_world, f'{self.get_name()}_init', self.tf_buffer, self.get_logger())
             self.get_logger().info('Debug 4')
 
