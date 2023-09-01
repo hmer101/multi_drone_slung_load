@@ -156,14 +156,19 @@ class Load(Node):
 
             # If all drones are in setup phase, reset load's init pose
             if np.all(self.drone_phases == Phase.PHASE_SETUP):
+                self.get_logger().info('Debug 1')
                 self.set_tf_init_pose()
+                self.get_logger().info('Debug 2')
 
             # Publish estimate load relative to load initial position
+            self.get_logger().info('Debug 3')
             load_rel_load_init = utils.transform_frames(self.load_state_rel_world, f'{self.get_name()}_init', self.tf_buffer, self.get_logger())
-            
-            if load_rel_load_init != None:
-                utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', self.get_name(), load_rel_load_init.pos, load_rel_load_init.att_q, self.tf_broadcaster)          
+            self.get_logger().info('Debug 4')
 
+            if load_rel_load_init != None:
+                self.get_logger().info('Debug 5')
+                utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', self.get_name(), load_rel_load_init.pos, load_rel_load_init.att_q, self.tf_broadcaster)          
+                self.get_logger().info('Debug 6')
 
 
     ## HELPER FUNCTIONS
