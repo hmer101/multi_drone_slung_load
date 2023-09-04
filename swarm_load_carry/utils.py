@@ -146,9 +146,6 @@ def transform_frames(state, frame2_name, tf_buffer, logger):
         state2.pos = transform_position(state.pos, p_f2f1, q_f2f1, logger)
         state2.att_q = transform_orientation(state.att_q, q_f2f1)
 
-        logger.info(f'state2.pos: {state2.pos}')
-        logger.info(f'state2.att_q: {state2.att_q}')
-        
     return state2
 
 
