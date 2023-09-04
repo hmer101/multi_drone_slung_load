@@ -123,15 +123,7 @@ class Load(Node):
         self.drone_phases[drone_ind] = msg.phase
 
     # Loop on timer to publish actual load pose
-    def clbk_publoop(self):
-        self.get_logger().info('Pre-multiply')
-        q_CB = np.quaternion(*[1.0, 0.0, 0.0, 0.0])
-        q_BA = np.quaternion(*[1.0, 0.0, 0.0, 0.0])
-
-        q_CA = q_CB * q_BA
-        self.get_logger().info(f'q_CA: {q_CA}')
-        self.get_logger().info('Post-multiply')
-        
+    def clbk_publoop(self):       
         # Retrieve drone information 
         drone_positions = np.zeros((self.num_drones, 3))
         drone_orientations = np.array([np.quaternion(*q) for q in np.zeros((self.num_drones, 4))])
