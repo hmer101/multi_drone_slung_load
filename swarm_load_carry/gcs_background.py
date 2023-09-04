@@ -10,7 +10,6 @@ from rclpy.qos import QoSProfile
 from rclpy.node import Node
 
 import numpy as np
-#import quaternionic as quaternion
 import quaternion as quaternion
 
 #import pymap3d as pm
