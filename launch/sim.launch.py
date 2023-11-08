@@ -8,6 +8,8 @@ from launch_ros.actions import Node
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 ENV='sim'
+TERM_CMD= '' #'gnome-terminal --tab --'
+
 
 def generate_launch_description():
     ## INCLUDE LAUNCH FILES
