@@ -64,7 +64,7 @@ class GCSUser(Node):
 
             match(cmd):
                 case 't':
-                    utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_SETUP)
+                    utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_SETUP_DRONE)
                 case 'm':
                     utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_MISSION_START)
                 case 'l':

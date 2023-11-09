@@ -32,11 +32,11 @@ DEFAULT_FULLY_AUTO=False
 
 MAIN_TIMER_PERIOD=0.1 # sec
 
-HEIGHT_DRONE_REL_LOAD=1.5 #2 # m
+HEIGHT_DRONE_REL_LOAD=2 # m
 HEIGHT_LOAD_PRE_TENSION=-0.2
-POS_THRESHOLD=0.3 #0.1
+POS_THRESHOLD=0.3
 
-TAKEOFF_HEIGHT_LOAD=1.0 #3.0 #m 
+TAKEOFF_HEIGHT_LOAD=1.0 #m 
 
 SETUP_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
 
@@ -244,11 +244,10 @@ class Drone(Node):
         if not (np.isnan(self.vehicle_local_state.att_q.x)):
             # Update tf
             utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', f'{self.get_name()}', self.vehicle_local_state.pos, self.vehicle_local_state.att_q, self.tf_broadcaster)
-     
 
     def clbk_vehicle_global_position(self, msg):
         # Set GPS/location home immediately prior to first arming/takeoff
-        if not self.flag_gps_home_set and (self.phase == Phase.PHASE_SETUP):          
+        if not self.flag_gps_home_set and (self.phase == Phase.PHASE_SETUP_DRONE):          
             # Set the initial position as the current global position 
             # (could average over last few samples but GPS seems to have low frequency noise of about 0.1m -> can turn down in simulation if required)
             self.vehicle_initial_global_state.pos[0] = msg.lat
@@ -305,11 +304,11 @@ class Drone(Node):
 
     def clbk_change_phase(self, request, response):
 
-        # Call helper functions if required
+        # Change phase to the beginning of major phases (minor phases should change automatically within this node)
         match request.phase_request.phase:
-            case Phase.PHASE_SETUP:
+            case Phase.PHASE_SETUP_DRONE:
                 # Takeoff
-                self.phase=Phase.PHASE_SETUP
+                self.phase=Phase.PHASE_SETUP_DRONE
 
             case Phase.PHASE_MISSION_START:
                 self.phase=Phase.PHASE_MISSION_START
@@ -347,14 +346,14 @@ class Drone(Node):
             # Counter starts when attempt to put into offboard mode by RC
             if self.vehicle_status.nav_state_user_intention == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
                 if self.cnt_phase_ticks >= FULLY_AUTO_PRE_TAKEOFF_CNT_THRESHOLD:
-                    self.phase = Phase.PHASE_SETUP
+                    self.phase = Phase.PHASE_SETUP_DRONE
                     self.cnt_phase_ticks = 0
 
                 else:
                     self.cnt_phase_ticks += 1
 
         # Generate trajectory message for formation used after take-off.
-        elif self.phase > Phase.PHASE_SETUP:
+        elif self.phase > Phase.PHASE_SETUP_GCS:
             trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger())
 
             if trajectory_msg == None:
@@ -366,7 +365,7 @@ class Drone(Node):
         # TODO: Add some formation feedback to all phases (especially mission)
         match self.phase:
             # Run origin-altering setup pre-arming
-            case Phase.PHASE_SETUP:
+            case Phase.PHASE_SETUP_DRONE:
                 # If drone is armed, setup has already been performed. Skip straight to takeoff phase
                 # if self.vehicle_status.arming_state == VehicleStatus.ARMING_STATE_ARMED:
                 #     self.cnt_phase_ticks = 0
@@ -374,9 +373,6 @@ class Drone(Node):
                 #     self.get_logger().info(f'Vehicle already setup. Skipping to takeoff phase.')
 
                 #     return
-                
-                # Check if load's setup is complete
-                tf_load_init_rel_world = utils.lookup_tf('world', f'{self.load_name}_init', self.tf_buffer, rclpy.time.Time(), self.get_logger())
                 
                 # Reset FMU and TF home positions
                 if self.cnt_phase_ticks == 0:
@@ -396,15 +392,38 @@ class Drone(Node):
                 
                 # Exit setup only once drone's GPS home and initial positions have been set, 
                 # the drone's desired pose relative to the load has been set and the load's initial pose has been set
-                elif self.flag_gps_home_set and self.flag_local_init_pose_set and self.flag_desired_pose_rel_load_set and (tf_load_init_rel_world != None):
+                elif self.flag_gps_home_set and self.flag_local_init_pose_set: #and self.flag_desired_pose_rel_load_set: # and (tf_load_init_rel_world != None):
                     self.cnt_phase_ticks = 0
-                    self.phase = Phase.PHASE_TAKEOFF_START
-                    self.get_logger().info(f'SETUP COMPLETE')
+                    self.phase = Phase.PHASE_SETUP_LOAD
+                    self.get_logger().info(f'Drone setup complete')
 
                     return
                         
                 self.cnt_phase_ticks += 1
-                
+
+            # Wait for load to be set up (load set up requires drones to be properly set up). Have an extra phase to ensure drones are properly set up before
+            # load pulls the transforms to set up, otherwise can inadvertently pull old transforms
+            case Phase.PHASE_SETUP_LOAD:
+                # Check if load's setup is complete
+                tf_load_init_rel_world = utils.lookup_tf('world', f'{self.load_name}_init', self.tf_buffer, rclpy.time.Time(), self.get_logger())
+
+                # Exit setup only once load's initial pose has been set
+                if tf_load_init_rel_world != None:
+                    self.cnt_phase_ticks = 0
+                    self.phase = Phase.PHASE_SETUP_GCS
+                    self.get_logger().info(f'Load setup complete')
+
+                    return
+
+            # Wait for GCS to be set up
+            case Phase.PHASE_SETUP_GCS:               
+                # GCS sets up desired poses of drones relative to load so check if this has been set
+                if self.flag_desired_pose_rel_load_set:
+                    self.cnt_phase_ticks = 0
+                    self.phase = Phase.PHASE_TAKEOFF_START
+                    self.get_logger().info(f'GCS setup complete')
+                    self.get_logger().info(f'SETUP COMPLETE')
+
             # Run takeoff
             case Phase.PHASE_TAKEOFF_START:               
                 # Override trajectory msg for straight-up takeoff in first phase
@@ -423,7 +442,7 @@ class Drone(Node):
                     if tf_drone_rel_world.transform.translation.z>=(HEIGHT_LOAD_PRE_TENSION+HEIGHT_DRONE_REL_LOAD-POS_THRESHOLD): 
                         self.phase = Phase.PHASE_TAKEOFF_PRE_TENSION
                         self.cnt_phase_ticks = 0  
-                        self.get_logger().info(f'PRE_TENSION LEVEL REACHED')        
+                        self.get_logger().info(f'Pre-tension level reached')        
 
                 # Arm vehicle (and switch to offboard mode) when offboard message has been published for long enough, and if not already armed or in offboard mode
                 elif self.cnt_phase_ticks >= TAKEOFF_START_CNT_THRESHOLD:                   
@@ -446,7 +465,7 @@ class Drone(Node):
                 else:
                     self.phase = Phase.PHASE_TAKEOFF_POST_TENSION
                     self.cnt_phase_ticks = 0
-                    self.get_logger().info(f'PRE_TENSION LEVEL COMPLETE') 
+                    self.get_logger().info(f'Takeoff pre-tension complete') 
                      
 
             case Phase.PHASE_TAKEOFF_POST_TENSION:
@@ -454,7 +473,7 @@ class Drone(Node):
                 if tf_drone_rel_world.transform.translation.z>=(TAKEOFF_HEIGHT_LOAD+HEIGHT_DRONE_REL_LOAD-POS_THRESHOLD):     
                     self.phase = Phase.PHASE_TAKEOFF_END 
                     
-                    self.get_logger().info(f'Takeoff complete')
+                    self.get_logger().info(f'TAKEOFF COMPLETE')
 
                 # Send takeoff setpoint
                 self.pub_trajectory.publish(trajectory_msg)
@@ -478,7 +497,7 @@ class Drone(Node):
                 else:
                     self.phase = Phase.PHASE_LAND_DESCENT
                     self.cnt_phase_ticks = 0
-                    self.get_logger().info(f'LAND DESCENT BEGINNING') 
+                    self.get_logger().info(f'Land descent beginning') 
 
                 # Send hold setpoint
                 self.pub_trajectory.publish(trajectory_msg)
@@ -486,7 +505,7 @@ class Drone(Node):
             case Phase.PHASE_LAND_DESCENT:
                 if tf_drone_rel_world.transform.translation.z<=(HEIGHT_LOAD_PRE_TENSION+HEIGHT_DRONE_REL_LOAD-POS_THRESHOLD):
                     self.phase = Phase.PHASE_LAND_POST_LOAD_DOWN
-                    self.get_logger().info(f'LOAD PLACED ON GROUND') 
+                    self.get_logger().info(f'Load placed on ground') 
 
                 # Send descending setpoint
                 self.pub_trajectory.publish(trajectory_msg)
@@ -498,7 +517,7 @@ class Drone(Node):
                 else: 
                     self.phase = Phase.PHASE_LAND_END
                     self.cnt_phase_ticks = 0
-                    self.get_logger().info(f'READY TO SET DRONES DOWN') 
+                    self.get_logger().info(f'Ready to set drones down') 
 
                     offboard_ros.land(self.pub_vehicle_command, timestamp) 
 
