@@ -149,14 +149,16 @@ class Load(Node):
             # Estimate load position as average of drone positions 
             self.load_state_rel_world.pos  = np.average(drone_positions, axis=0)
 
+            self.get_logger().info(f'Load position: {self.load_state_rel_world.pos}') 
+
             if np.all(self.drone_phases >= Phase.PHASE_TAKEOFF_POST_TENSION):
                 self.load_state_rel_world.pos[2] -= HEIGHT_DRONE_REL_LOAD # TODO: Better height estimate
 
             # Estimate load orientation #TODO: Better orientation estimation method
             self.load_state_rel_world.att_q = drone_orientations[0] #np.quaternion(*drone_orientations[0, :])
 
-            # If all drones are in setup phase, reset load's init pose
-            if np.all(self.drone_phases == Phase.PHASE_SETUP):
+            # If all drones are in load setup phase, reset load's init pose
+            if np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD):
                 self.set_tf_init_pose()
 
             # Publish estimate load relative to load initial position

@@ -152,19 +152,25 @@ class GCSBackground(Node):
                         self.get_logger().info(f'Waiting for drone {i}\'s pose rel load to be set')
                         return
         
-        # TAKEOFF
-        if np.all(self.drone_phases == Phase.PHASE_SETUP):
+        # PHASES
+        # Reset GCS and set drones to takeoff once GCS setup is complete
+        if np.all(self.drone_phases == Phase.PHASE_SETUP_GCS):
             self.reset_pre_arm()
 
+            # Set drones to takeoff phase
+            #utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_TAKEOFF_START)
+
+        # TAKEOFF
         elif np.all(self.drone_phases == Phase.PHASE_TAKEOFF_POST_TENSION):
             # Rise slowly - tension will engage
             self.load_desired_local_state.pos = np.array([0.0, 0.0, min(self.load_desired_local_state.pos[2] + 0.1*MAIN_TIMER_PERIOD, MAX_LOAD_TAKEOFF_HEIGHT)])
 
         elif np.all(self.drone_phases == Phase.PHASE_TAKEOFF_END) and self.fully_auto:
             # In fully auto, set drones to mission start
-            for i in range(self.num_drones):
-                utils.phase_change(self.cli_phase_change[i], Phase.PHASE_MISSION_START) 
-            
+            # for i in range(self.num_drones):
+            #     utils.phase_change(self.cli_phase_change[i], Phase.PHASE_MISSION_START) 
+            utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_MISSION_START)
+
             self.get_logger().info(f'In fully auto mode. Takeoff complete. Starting mission.')
 
         elif np.all(self.drone_phases == Phase.PHASE_MISSION_START):
@@ -202,7 +208,7 @@ class GCSBackground(Node):
 
         elif np.all(self.drone_phases == Phase.PHASE_LAND_POST_LOAD_DOWN):
             self.set_drone_arrangement(1.3, np.array([1, 1, 1]), np.array([0, -np.pi*(1-2/self.num_drones), np.pi*(1-2/self.num_drones)]))
-        
+
         self.send_desired_pose()
 
         

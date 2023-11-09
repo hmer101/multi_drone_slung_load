@@ -100,6 +100,7 @@ def lookup_tf(target_frame, source_frame, tf_buffer, time, logger):
             time)
     except TransformException as ex:
         logger.warn(f'Could not find transform: {source_frame} to {target_frame}: {ex}')
+        pass
     
     return t
 
@@ -250,7 +251,7 @@ def phase_change(cli_phase_change, phase_desired):
 
     return phase_future
 
-def change_phase_all_drones(node, num_drones, cli_array_phase_change, phase_desired):
+def change_phase_all_drones(node, num_drones, cli_array_phase_change, phase_desired, wait_for_response=True):
     # Send request
     phase_future = [None] * num_drones
 
@@ -258,5 +259,6 @@ def change_phase_all_drones(node, num_drones, cli_array_phase_change, phase_desi
         phase_future[i] = phase_change(cli_array_phase_change[i], phase_desired)
 
     # Wait for response
-    for i in range(num_drones):
-        rclpy.spin_until_future_complete(node, phase_future[i])
+    if wait_for_response:
+        for i in range(num_drones):
+            rclpy.spin_until_future_complete(node, phase_future[i])
