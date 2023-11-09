@@ -149,10 +149,14 @@ class Load(Node):
             # Estimate load position as average of drone positions 
             self.load_state_rel_world.pos  = np.average(drone_positions, axis=0)
 
-            self.get_logger().info(f'Load position: {self.load_state_rel_world.pos}') 
-
+            # TODO: Better height estimate
             if np.all(self.drone_phases >= Phase.PHASE_TAKEOFF_POST_TENSION):
-                self.load_state_rel_world.pos[2] -= HEIGHT_DRONE_REL_LOAD # TODO: Better height estimate
+                self.load_state_rel_world.pos[2] -= HEIGHT_DRONE_REL_LOAD 
+                self.load_state_rel_world.pos[2] = max(self.load_state_rel_world.pos[2], 0.0) # Ensure load doesn't go below ground
+            else: 
+                self.load_state_rel_world.pos[2] = 0.0
+
+            self.get_logger().info(f'Load position: {self.load_state_rel_world.pos}')
 
             # Estimate load orientation #TODO: Better orientation estimation method
             self.load_state_rel_world.att_q = drone_orientations[0] #np.quaternion(*drone_orientations[0, :])
