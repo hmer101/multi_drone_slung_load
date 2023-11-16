@@ -156,8 +156,6 @@ class Load(Node):
             else: 
                 self.load_state_rel_world.pos[2] = 0.0
 
-            self.get_logger().info(f'Load position: {self.load_state_rel_world.pos}')
-
             # Estimate load orientation #TODO: Better orientation estimation method
             self.load_state_rel_world.att_q = drone_orientations[0] #np.quaternion(*drone_orientations[0, :])
 
