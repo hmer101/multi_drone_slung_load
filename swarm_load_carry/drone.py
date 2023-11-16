@@ -38,9 +38,9 @@ POS_THRESHOLD=0.3
 
 TAKEOFF_HEIGHT_LOAD=1.0 #m 
 
-SETUP_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
+SETUP_CNT_THRESHOLD=3/MAIN_TIMER_PERIOD
 
-TAKEOFF_START_CNT_THRESHOLD=3/MAIN_TIMER_PERIOD
+TAKEOFF_START_CNT_THRESHOLD=3/MAIN_TIMER_PERIOD # INCREASE IF NEEDED
 TAKEOFF_PRE_TENSION_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
 
 LAND_PRE_DESCENT_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
@@ -190,6 +190,7 @@ class Drone(Node):
         self.flag_gps_home_set = False # GPS home set when vehicle armed
         self.flag_local_init_pose_set = False 
         self.flag_desired_pose_rel_load_set = False
+        #self.flag_reset_pre_arm_complete = False # Ensure that the above flags are actually reset before drone setup is complete
 
 
         ## Print information
@@ -376,28 +377,32 @@ class Drone(Node):
                 
                 # Reset FMU and TF home positions
                 if self.cnt_phase_ticks == 0:
+                    #self.flag_reset_pre_arm_complete = False
                     self.reset_pre_arm()
-
-                # Set initial poses when ready
-                if self.flag_gps_home_set and not self.flag_local_init_pose_set:                    
-                    # Rest of setup differs for first drone and others
-                    if self.drone_id == self.first_drone_num:
-                        self.set_local_init_pose_first_drone()
-
-                    else:
-                        # Set init poses once the first drone's initial position has been received
-                        if self.global_origin_state != self.global_origin_state_prev:
-                            self.set_local_init_pose_later_drones()
-                            self.global_origin_state_prev = self.global_origin_state.copy()
                 
-                # Exit setup only once drone's GPS home and initial positions have been set, 
-                # the drone's desired pose relative to the load has been set and the load's initial pose has been set
-                elif self.flag_gps_home_set and self.flag_local_init_pose_set: #and self.flag_desired_pose_rel_load_set: # and (tf_load_init_rel_world != None):
-                    self.cnt_phase_ticks = 0
-                    self.phase = Phase.PHASE_SETUP_LOAD
-                    self.get_logger().info(f'Drone setup complete')
+                elif self.cnt_phase_ticks > SETUP_CNT_THRESHOLD: #Note: Tried flag (self.flag_reset_pre_arm_complete) but didn't work. Perhaps other processes on PX4 need time to reset (i.e. to get to reset what is published on the global pose topic)
+                    #self.get_logger().info(f'flag_gps_home_set: {self.flag_gps_home_set}, self.flag_local_init_pose_set: {self.flag_local_init_pose_set}')
+                    
+                    # Set initial poses when ready
+                    if self.flag_gps_home_set and not self.flag_local_init_pose_set:                    
+                        # Rest of setup differs for first drone and others
+                        if self.drone_id == self.first_drone_num:
+                            self.set_local_init_pose_first_drone()
 
-                    return
+                        else:
+                            # Set init poses once the first drone's initial position has been received
+                            if self.global_origin_state != self.global_origin_state_prev:
+                                self.set_local_init_pose_later_drones()
+                                self.global_origin_state_prev = self.global_origin_state.copy()
+                    
+                    # Exit setup only once drone's GPS home and initial positions have been set, 
+                    # the drone's desired pose relative to the load has been set and the load's initial pose has been set
+                    elif self.flag_gps_home_set and self.flag_local_init_pose_set: #and self.flag_desired_pose_rel_load_set: # and (tf_load_init_rel_world != None):
+                        self.cnt_phase_ticks = 0
+                        self.phase = Phase.PHASE_SETUP_LOAD
+                        self.get_logger().info(f'Drone setup complete')
+
+                        return
                         
                 self.cnt_phase_ticks += 1
 
@@ -408,12 +413,14 @@ class Drone(Node):
                 tf_load_init_rel_world = utils.lookup_tf('world', f'{self.load_name}_init', self.tf_buffer, rclpy.time.Time(), self.get_logger())
 
                 # Exit setup only once load's initial pose has been set
-                if tf_load_init_rel_world != None:
+                if tf_load_init_rel_world != None and self.cnt_phase_ticks > SETUP_CNT_THRESHOLD:
                     self.cnt_phase_ticks = 0
                     self.phase = Phase.PHASE_SETUP_GCS
                     self.get_logger().info(f'Load setup complete')
 
                     return
+                
+                self.cnt_phase_ticks += 1
 
             # Wait for GCS to be set up
             case Phase.PHASE_SETUP_GCS:               
@@ -487,7 +494,7 @@ class Drone(Node):
             # Run main offboard mission
             case Phase.PHASE_MISSION_START:
                 self.pub_trajectory.publish(trajectory_msg)
-                self.cnt_phase_ticks += 1
+                #self.cnt_phase_ticks += 1
                     
 
             # Run land 
@@ -536,6 +543,9 @@ class Drone(Node):
                         self.phase = Phase.PHASE_UNASSIGNED
                         self.cnt_phase_ticks = 0
 
+                        # Ensure that flags are properly reset on next takeoff
+                        #self.flag_reset_pre_arm_complete = False
+
                         self.get_logger().info(f'LANDED AND DISARMED') 
             
             case Phase.PHASE_HOLD:
@@ -547,6 +557,10 @@ class Drone(Node):
             case Phase.PHASE_KILL:
                 offboard_ros.kill(self.pub_vehicle_command, timestamp)
                 self.cnt_phase_ticks = 0
+
+                # Ensure that flags are properly reset on next takeoff
+                #self.flag_reset_pre_arm_complete = False
+
                 pass
 
         # Publish the phase the drone is currently in 
@@ -560,6 +574,9 @@ class Drone(Node):
         self.flag_gps_home_set = False
         self.flag_local_init_pose_set = False
         self.flag_desired_pose_rel_load_set = False
+
+        #self.flag_reset_pre_arm_complete = True # To ensure that this function finishes running before setup is complete
+        self.get_logger().info('RESET PRE-ARM COMPLETE')
 
 
     def broadcast_tf_init_pose(self):

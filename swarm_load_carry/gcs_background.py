@@ -177,7 +177,7 @@ class GCSBackground(Node):
             dt = MAIN_TIMER_PERIOD # s
 
             # Move load in circle
-            self.load_desired_local_state.pos = np.array([r*(np.cos(self.mission_theta)-1), r*np.sin(self.mission_theta), self.load_desired_local_state.pos[2]])
+            self.load_desired_local_state.pos = np.array([r*(np.cos(self.mission_theta)-1), r*np.sin(self.mission_theta), self.load_desired_local_state.pos[2]]) #np.array([self.mission_theta, 0, self.load_desired_local_state.pos[2]]) 
             
             load_init_yaw = ft.quaternion_get_yaw([self.load_initial_local_state.att_q.w, self.load_initial_local_state.att_q.x, self.load_initial_local_state.att_q.y, self.load_initial_local_state.att_q.z])
             q_list = ft.quaternion_from_euler(0.0, 0.0, load_init_yaw + self.mission_theta)
