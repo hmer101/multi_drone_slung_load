@@ -16,7 +16,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 GZ_DIR="$(dirname "$SCRIPT_DIR")/gz"
 
 # Options
-HEADLESS=1
+HEADLESS="HEADLESS=1" #HEADLESS=1
 
 # Constants
 PI=3.141592654
@@ -44,7 +44,7 @@ function cleanup() {
 function gz_launch_world() {
     #cd $GZ_DIR
     # gnome-terminal --tab -- bash -c "gz sim ./world_multi_with_load.sdf" PX4_GZ_MODEL_POSE="-100,-100"
-	gnome-terminal --tab -- bash -c "HEADLESS=$HEADLESS PX4_SYS_AUTOSTART=$PX4_SYS_AUTOSTART PX4_GZ_MODEL=$PX4_GZ_MODEL PX4_GZ_MODEL_POSE="-50,-50" $FIRMWARE_DIR/build/px4_sitl_default/bin/px4 -i $DUMMY_DRONE_NUM" #PX4_GZ_WORLD=$PX4_GZ_WORLD
+	gnome-terminal --tab -- bash -c "$HEADLESS PX4_SYS_AUTOSTART=$PX4_SYS_AUTOSTART PX4_GZ_MODEL=$PX4_GZ_MODEL PX4_GZ_MODEL_POSE="-50,-50" $FIRMWARE_DIR/build/px4_sitl_default/bin/px4 -i $DUMMY_DRONE_NUM" #PX4_GZ_WORLD=$PX4_GZ_WORLD
 }
 
 # Create PX4 SITL instances and connect to models in the world
@@ -52,7 +52,7 @@ function create_sitl_instances() {
 	# Spawn all drones numbering from first selected number
 	for (( i=$(($START_DRONE_NUM)); i<$(($NUM_DRONES + $START_DRONE_NUM)); i++ )); do
         MODEL_NAME="${PX4_GZ_MODEL_NAME}_${i}" 
-		gnome-terminal --tab -- bash -c "HEADLESS=$HEADLESS PX4_SYS_AUTOSTART=$PX4_SYS_AUTOSTART PX4_GZ_MODEL_NAME=$MODEL_NAME $FIRMWARE_DIR/build/px4_sitl_default/bin/px4 -i $i"
+		gnome-terminal --tab -- bash -c "$HEADLESS PX4_SYS_AUTOSTART=$PX4_SYS_AUTOSTART PX4_GZ_MODEL_NAME=$MODEL_NAME $FIRMWARE_DIR/build/px4_sitl_default/bin/px4 -i $i"
 		sleep 1
 	done
 }
