@@ -18,6 +18,12 @@ def generate_launch_description():
          get_package_share_directory('swarm_load_carry'), 'launch'),
          '/drones.launch.py'])
       )
+    
+    image_bridge = IncludeLaunchDescription(
+      PythonLaunchDescriptionSource([os.path.join(
+         get_package_share_directory('swarm_load_carry'), 'launch'),
+         '/image_bridge.launch.py'])
+      )
 
     load = ExecuteProcess(
             cmd=[[
@@ -35,6 +41,7 @@ def generate_launch_description():
 
     ## RUN LAUNCH FILES
     return LaunchDescription([
+        image_bridge,
         drones,
         load,
         gcs    
