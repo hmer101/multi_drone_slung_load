@@ -53,7 +53,7 @@ def generate_launch_description():
     bridge = Node(
         package='ros_gz_image',
         executable='image_bridge',
-        arguments=['/x500_1/camera', '/x500_2/camera', '/x500_3/camera'],
+        arguments=['/x500_1/camera', '/x500_2/camera', '/x500_3/camera'], #'/x500_1/camera_info', '/x500_2/camera_info', '/x500_3/camera_info'
         output='screen'
     )
 
