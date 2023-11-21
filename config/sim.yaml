@@ -4,6 +4,7 @@
 
       first_drone_num: 1
       num_drones: 3
+      num_cameras: 3
       
       fully_auto: false
 
