@@ -50,6 +50,10 @@ LAND_PRE_DISARM_CNT_THRESHOLD=3/MAIN_TIMER_PERIOD
 FULLY_AUTO_PRE_TAKEOFF_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
 
 
+t_CAM_REL_PX4 = np.array([0.1, -0.3, -0.025]) # Camera translation relative to PX4 (i.e. drone body)
+R_CAM_REL_PX4 = np.array([0.0, np.pi/2, 0.0]) # Camera rotation relative to PX4 (i.e. drone body)
+
+
 # Node to encapsulate drone information and actions
 class Drone(Node):
 
@@ -111,6 +115,7 @@ class Drone(Node):
 
         ## TFS
         self.tf_static_broadcaster_init_pose = StaticTransformBroadcaster(self)
+        self.tf_static_broadcaster_cam_rel_drone = StaticTransformBroadcaster(self)
         self.tf_broadcaster = TransformBroadcaster(self)
 
         
@@ -584,6 +589,13 @@ class Drone(Node):
         # As all init CS are in ENU, they are all aligned in orientation
         utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'drone{self.drone_id}_init', self.vehicle_initial_state_rel_world.pos, np.quaternion(1.0, 0.0, 0.0, 0.0), self.tf_static_broadcaster_init_pose)
 
+        # Publish other static transforms
+        # Camera relative to drone
+        q_list = ft.quaternion_from_euler(R_CAM_REL_PX4[0], R_CAM_REL_PX4[1], R_CAM_REL_PX4[2])
+        r_cam_rel_px4 = np.quaternion(*q_list)
+        utils.broadcast_tf(self.get_clock().now().to_msg(), f'drone{self.drone_id}', f'camera{self.drone_id}', t_CAM_REL_PX4, r_cam_rel_px4, self.tf_static_broadcaster_cam_rel_drone)
+
+        # Send complete message
         self.flag_local_init_pose_set = True 
         self.get_logger().info('Local init pose set')
 

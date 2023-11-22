@@ -12,6 +12,8 @@ import rclpy.qos as qos
 from rclpy.qos import QoSProfile
 from rclpy.node import Node
 
+import frame_transforms as ft
+
 from tf2_ros import TransformBroadcaster, StaticTransformBroadcaster
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
@@ -27,6 +29,9 @@ DEFAULT_FIRST_DRONE_NUM=1
 PUB_LOOP_TIMER_PERIOD=0.1
 
 HEIGHT_DRONE_REL_LOAD=2 #m
+
+t_MARKER_REL_LOAD = np.array([0.0, 0.0, 0.1]) # Marker translation relative to load center
+R_MARKER_REL_LOAD = np.array([0.0, 0.0, 0.0]) # Marker rotation relative to load
 
 # Could make subclasses for different load types (e.g. camera etc.)
 class Load(Node):
@@ -98,6 +103,7 @@ class Load(Node):
         ## TFS
         self.tf_broadcaster = TransformBroadcaster(self)
         self.tf_static_broadcaster_init_pose = StaticTransformBroadcaster(self)
+        self.tf_static_broadcaster_marker_rel_load = StaticTransformBroadcaster(self)
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -180,6 +186,13 @@ class Load(Node):
         # As CS is in ENU, always aligned
         utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'{self.get_name()}_init', self.load_initial_state_rel_world.pos, np.quaternion(*[1.0, 0.0, 0.0, 0.0]), self.tf_static_broadcaster_init_pose)
 
+        # Publish other static transforms
+        # Marker relative to load
+        q_list = ft.quaternion_from_euler(R_MARKER_REL_LOAD[0], R_MARKER_REL_LOAD[1], R_MARKER_REL_LOAD[2])
+        r_marker_rel_load = np.quaternion(*q_list)
+        utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}', f'load_marker{self.load_id}', t_MARKER_REL_LOAD, r_marker_rel_load, self.tf_static_broadcaster_marker_rel_load)
+
+        # Send complete message
         self.get_logger().info('Initial pose TF set')
 
 
