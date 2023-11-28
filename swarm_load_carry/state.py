@@ -15,6 +15,7 @@ class CS_type(Enum):
     LLA=0,         # Planetary co-ordinate system: Latitude, Longitude, Altitude. Frame can only be 'world'
     ENU=1,                  # (world) Local tangent plane body CS: East, North, Up (ROS2 default) 
     NED=2,                  # (world) Local tangent plane body CS: North, East, Down (PX4 default)
+    XYZ=3,                  # (world/body) General XYZ coordinates where orientation must be carfully defined (Gazebo default)
     # FLU=3,                  # (body) Body frame: Forward, Left, Up (ROS2 default) 
     # FRD=4                   # (body) Body frame: Forward, Right, Down (PX4 default)
 
