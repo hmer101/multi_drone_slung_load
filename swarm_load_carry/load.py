@@ -176,26 +176,22 @@ class Load(Node):
         elif self.load_pose_type == 'ground_truth':
             # Set self.load_state_rel_world using ground truth
             # Convert the ground truth pose to the 'world' frame
-            #self.load_state_gt
+            self.load_state_rel_world = utils.transform_frames(self.load_state_gt, 'world', self.tf_buffer, self.get_logger())
 
-            # TODO: IMPLEMENT HERE!!!
-            self.load_state_rel_world.pos = np.array([0.0, 0.0, 0.0])
-            self.load_state_rel_world.att_q = np.quaternion(1.0, 0.0, 0.0, 0.0)
-
-        
         #elif self.load_pose_type == 'visual': #TODO: Take estimation from slung_pose_estimation node
             # Set self.load_state_rel_world using visual estimation result
 
+        # Publish load pose if it has been set
+        if self.load_state_rel_world != None:
+            # If all drones are in load setup phase, reset load's init pose
+            if np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD):
+                self.set_tf_init_pose()
 
-        # If all drones are in load setup phase, reset load's init pose
-        if np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD):
-            self.set_tf_init_pose()
+            # Publish load relative to load initial position
+            load_rel_load_init = utils.transform_frames(self.load_state_rel_world, f'{self.get_name()}_init', self.tf_buffer, self.get_logger())
 
-        # Publish estimate load relative to load initial position
-        load_rel_load_init = utils.transform_frames(self.load_state_rel_world, f'{self.get_name()}_init', self.tf_buffer, self.get_logger())
-
-        if load_rel_load_init != None:
-            utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', self.get_name(), load_rel_load_init.pos, load_rel_load_init.att_q, self.tf_broadcaster)          
+            if load_rel_load_init != None:
+                utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', self.get_name(), load_rel_load_init.pos, load_rel_load_init.att_q, self.tf_broadcaster)          
 
 
     ## HELPER FUNCTIONS
