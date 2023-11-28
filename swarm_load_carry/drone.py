@@ -21,14 +21,10 @@ from tf2_ros import TransformBroadcaster, StaticTransformBroadcaster
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
+from geometry_msgs.msg import Pose, PoseArray
 from px4_msgs.msg import VehicleAttitude, VehicleLocalPosition, OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint, VehicleGlobalPosition
 from swarm_load_carry_interfaces.srv import PhaseChange, SetLocalPose # Note must build workspace and restart IDE before custom packages are found by python
 from swarm_load_carry_interfaces.msg import Phase, GlobalPose
-
-DEFAULT_DRONE_NUM=1
-DEFAULT_FIRST_DRONE_NUM=1
-DEFAULT_LOAD_ID=1
-DEFAULT_FULLY_AUTO=False
 
 MAIN_TIMER_PERIOD=0.1 # sec
 
@@ -65,16 +61,22 @@ class Drone(Node):
         self.drone_id = int(str(self.ns)[-1])
 
         # Parameters
-        self.declare_parameter('num_drones', DEFAULT_DRONE_NUM)
-        self.declare_parameter('first_drone_num', DEFAULT_FIRST_DRONE_NUM)
-        self.declare_parameter('load_id', DEFAULT_LOAD_ID)
-        self.declare_parameter('fully_auto', DEFAULT_FULLY_AUTO)
+        self.declare_parameter('env', 'phys')
+        self.declare_parameter('num_drones', 1)
+        self.declare_parameter('first_drone_num', 1)
+        self.declare_parameter('load_id', 1)
+        self.declare_parameter('load_pose_type', 'quasi-static')
+        self.declare_parameter('fully_auto', False)
+        self.declare_parameter('evaluate', False)
 
+        self.env = self.get_parameter('env').get_parameter_value().string_value
         self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
         self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
         self.fully_auto = self.get_parameter('fully_auto').get_parameter_value().bool_value
         self.load_id = self.get_parameter('load_id').get_parameter_value().integer_value
         self.load_name = f'load{self.load_id}'
+        self.load_pose_type = self.get_parameter('load_pose_type').get_parameter_value().string_value
+        self.evaluate = self.get_parameter('evaluate').get_parameter_value().bool_value
 
         # Vehicle
         self.vehicle_status = None  # Current state of the FMU
@@ -85,6 +87,8 @@ class Drone(Node):
 
         self.vehicle_initial_global_state = State('globe', CS_type.LLA)
         self.vehicle_initial_state_rel_world = State('world', CS_type.ENU)
+
+        self.vehicle_state_gt = State('ground_truth', CS_type.XYZ)
         
         self.vehicle_desired_state_rel_load = State(f'{self.load_name}', CS_type.ENU)
 
@@ -113,9 +117,17 @@ class Drone(Node):
             depth=1
         )
 
+        qos_profile_gt = QoSProfile(
+            reliability=qos.ReliabilityPolicy.RELIABLE,
+            durability=qos.DurabilityPolicy.VOLATILE,
+            history=qos.HistoryPolicy.KEEP_LAST,
+            depth=1
+        )
+
         ## TFS
         self.tf_static_broadcaster_init_pose = StaticTransformBroadcaster(self)
         self.tf_static_broadcaster_cam_rel_drone = StaticTransformBroadcaster(self)
+        self.tf_static_broadcaster_world_rel_gt = StaticTransformBroadcaster(self)
         self.tf_broadcaster = TransformBroadcaster(self)
 
         
@@ -176,6 +188,24 @@ class Drone(Node):
                 f'/px4_{self.first_drone_num}/out/global_init_pose', 
                 self.clbk_global_origin,
                 qos_profile)
+        
+        # Ground truth
+        self.sub_vehicle_pose_gt = None
+
+        if self.load_pose_type == 'ground_truth' or self.evaluate == 'true':
+            if self.env == 'sim':               
+                self.sub_vehicle_pose_gt = self.create_subscription(
+                    PoseArray,
+                    f'/x500_{self.drone_id}/out/pose_ground_truth/gz',
+                    self.clbk_vehicle_pose_gt,
+                    qos_profile_gt)
+            else:
+                pass # TODO: Add subscriber for ground truth pose in physical environment
+                # self.sub_load_pose_gt = self.create_subscription(
+                #     PoseArray,
+                #     f'load_{self.load_id}/out/pose_ground_truth/gnss',
+                #     self.clbk_load_pose_gt,
+                #     qos_profile)
 
         ## SERVICES
         self.srv_phase_change = self.create_service(
@@ -277,6 +307,17 @@ class Drone(Node):
             self.pub_global_init_pose.publish(msg_global_pose)
 
             self.flag_gps_home_set = True   
+
+    def clbk_vehicle_pose_gt(self, msg):
+        # Extract the drone pose from the message
+        drone_pose_gt = utils.extract_pose_from_pose_array_msg(msg, 2)
+
+        self.vehicle_state_gt.pos = np.array([drone_pose_gt.position.x, drone_pose_gt.position.y, drone_pose_gt.position.z])
+        self.vehicle_state_gt.att_q = np.quaternion(drone_pose_gt.orientation.w, drone_pose_gt.orientation.x, drone_pose_gt.orientation.y, drone_pose_gt.orientation.z)
+
+        # Publish drone ground truth
+        utils.broadcast_tf(self.get_clock().now().to_msg(), 'ground_truth', f'{self.get_name()}_gt', self.vehicle_state_gt.pos, self.vehicle_state_gt.att_q, self.tf_broadcaster)
+
 
     def clbk_load_desired_attitude(self, msg):
         self.load_desired_local_state.att_q = np.quaternion(msg.q_d[0], msg.q_d[1], msg.q_d[2], msg.q_d[3])
@@ -621,6 +662,10 @@ class Drone(Node):
         # Broadcast tf
         self.broadcast_tf_init_pose()
 
+        # If using ground truth
+        # Set transform from ground truth to world
+        if self.load_pose_type == 'ground_truth' or self.evaluate == 'true':
+            utils.broadcast_tf(self.get_clock().now().to_msg(), 'ground_truth', 'world', self.vehicle_state_gt.pos, self.vehicle_state_gt.att_q, self.tf_static_broadcaster_world_rel_gt)
 
      
 

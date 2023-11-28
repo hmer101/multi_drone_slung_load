@@ -50,7 +50,7 @@ def generate_launch_description():
     )
 
     # Bridge
-    bridge = Node(
+    im_bridge = Node(
         package='ros_gz_image',
         executable='image_bridge',
         arguments=['/x500_1/camera', '/x500_2/camera', '/x500_3/camera'], #'/x500_1/camera_info', '/x500_2/camera_info', '/x500_3/camera_info'
@@ -63,6 +63,6 @@ def generate_launch_description():
                               description='Open RQt.'),
         DeclareLaunchArgument('image_topic', default_value='/x500_1/camera',
                               description='Topic to start viewing in RQt.'),
-        bridge,
+        im_bridge,
         rqt
     ])

@@ -1,6 +1,10 @@
 /**:
     ros__parameters:
+      env: 'phys'
+      
       load_id: 1
+      load_pose_type: 'quasi-static' # quasi-static, visual, ground_truth
+      evaluate: false # If you want to evaluate the tracking performance of the load
 
       first_drone_num: 1
       num_drones: 1 #3
@@ -9,3 +13,4 @@
       fully_auto: false
       
       drone_order: [1] #[1, 2, 3] #ACW from load's x axis
+      

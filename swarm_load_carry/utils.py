@@ -33,6 +33,11 @@ def q_to_normalized_np(q: np.quaternion): #quaternion.array):
 
     return np.array([q_norm.w, q_norm.x, q_norm.y, q_norm.z])
 
+# Extract a particular pose from a PoseArray message
+#TODO: Improve this to be more general/not require known index
+def extract_pose_from_pose_array_msg(pose_array, index):
+    return pose_array.poses[index]
+
 
 ## GEOMETRY
 

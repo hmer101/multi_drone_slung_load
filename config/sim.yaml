@@ -1,6 +1,10 @@
 /**:
     ros__parameters:
+      env: 'sim'
+      
       load_id: 1
+      load_pose_type: 'ground_truth' # quasi-static, visual, ground_truth
+      evaluate: true # If you want to evaluate the tracking performance of the load
 
       first_drone_num: 1
       num_drones: 3
