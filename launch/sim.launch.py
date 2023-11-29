@@ -6,6 +6,7 @@ from launch import LaunchDescription
 from launch.actions import ExecuteProcess, IncludeLaunchDescription
 from launch_ros.actions import Node
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+#from launch.substitutions import LaunchConfiguration
 
 ENV='sim'
 TERM_CMD= '' #'gnome-terminal --tab --'
@@ -34,7 +35,8 @@ def generate_launch_description():
     slung_pose_estimation_visual = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('slung_pose_estimation'), 'launch'),
-         '/estimator.launch.py'])
+         '/estimator.launch.py']),
+         launch_arguments={'env': '{ENV}'}.items()
       )
 
     load = ExecuteProcess(

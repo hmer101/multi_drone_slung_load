@@ -181,8 +181,8 @@ class Load(Node):
 
         elif self.load_pose_type == 'ground_truth':
             # Set self.load_state_rel_world using ground truth
-            # Convert the ground truth pose to the 'world' frame
-            self.load_state_rel_world = utils.transform_frames(self.load_state_gt, 'world', self.tf_buffer, self.get_logger())
+            # Convert the ground truth pose to the 'world' frame TODO: HHHHHHEEEEEEEEEEE - THIS IS CAUSING GT FB ISSUE!!!
+            self.load_state_rel_world = load_state_rel_world_qs #utils.transform_frames(self.load_state_gt, 'world', self.tf_buffer, self.get_logger())
 
         #elif self.load_pose_type == 'visual': #TODO: Take estimation from slung_pose_estimation node
             # Set self.load_state_rel_world using visual estimation result
@@ -226,7 +226,7 @@ class Load(Node):
         # Only return load position if all drone positions can be found to estimate it
         if count_tf == self.num_drones:
             # Estimate load position as average of drone positions 
-            load_state_rel_world_qs.pos  = np.average(drone_positions, axis=0)
+            load_state_rel_world_qs.pos  = np.average(drone_positions, axis=0) # TODO: Wrong average!!! Should be geometric average
 
             # TODO: Better height estimate
             if np.all(self.drone_phases >= Phase.PHASE_TAKEOFF_POST_TENSION):
