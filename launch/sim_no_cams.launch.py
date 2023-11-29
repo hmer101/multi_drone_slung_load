@@ -19,22 +19,10 @@ def generate_launch_description():
          '/drones.launch.py'])
       )
     
-    image_bridge = IncludeLaunchDescription(
-      PythonLaunchDescriptionSource([os.path.join(
-         get_package_share_directory('swarm_load_carry'), 'launch'),
-         '/image_bridge.launch.py'])
-      )
-    
     gz_bridge = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('swarm_load_carry'), 'launch'),
          '/gz_bridge.launch.py'])
-      )
-    
-    slung_pose_estimation_visual = IncludeLaunchDescription(
-      PythonLaunchDescriptionSource([os.path.join(
-         get_package_share_directory('slung_pose_estimation'), 'launch'),
-         '/estimator.launch.py'])
       )
 
     load = ExecuteProcess(
@@ -53,9 +41,7 @@ def generate_launch_description():
 
     ## RUN LAUNCH FILES
     return LaunchDescription([
-        image_bridge,
         gz_bridge,
-        slung_pose_estimation_visual,
         drones,
         load,
         gcs    

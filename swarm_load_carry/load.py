@@ -28,6 +28,9 @@ PUB_LOOP_TIMER_PERIOD=0.1
 
 HEIGHT_DRONE_REL_LOAD=2 #m
 
+#q_list = ft.quaternion_from_euler(0, 0, np.pi/2)
+#DRONE_1_ORIENT_REL_LOAD = np.quaternion(*q_list) # Drone initial orientation relative to load #TODO: Find better way to set load_initial frame orientation
+
 t_MARKER_REL_LOAD = np.array([0.0, 0.0, 0.1]) # Marker translation relative to load center
 R_MARKER_REL_LOAD = np.array([0.0, 0.0, 0.0]) # Marker rotation relative to load
 
@@ -98,7 +101,7 @@ class Load(Node):
             qos_profile)
         
         # Subscribe to ground truth load feedback if we are using ground truth, or evaluating the system
-        if self.load_pose_type == 'ground_truth' or self.evaluate == 'true':
+        if self.load_pose_type == 'ground_truth' or self.evaluate == True:
             if self.env == 'sim':
                 self.sub_load_pose_gt = self.create_subscription(
                     PoseArray,
@@ -168,10 +171,13 @@ class Load(Node):
 
     # Loop on timer to publish actual load pose
     def clbk_publoop(self):       
+        # Get quasi-static load pose estimate for setting load initial TF relative to world
+        load_state_rel_world_qs = self.calc_load_pose_quasi_static()
+        
         # Publish load pose with selected method
         if self.load_pose_type == 'quasi-static':
             # Set self.load_state_rel_world using quasi-static method
-            self.calc_load_pose_quasi_static()
+            self.load_state_rel_world = load_state_rel_world_qs
 
         elif self.load_pose_type == 'ground_truth':
             # Set self.load_state_rel_world using ground truth
@@ -181,11 +187,11 @@ class Load(Node):
         #elif self.load_pose_type == 'visual': #TODO: Take estimation from slung_pose_estimation node
             # Set self.load_state_rel_world using visual estimation result
 
-        # Publish load pose if it has been set
-        if self.load_state_rel_world != None:
+        # Publish load pose if it has been set and if the initial load pose has been set
+        if load_state_rel_world_qs != None and self.load_state_rel_world != None:
             # If all drones are in load setup phase, reset load's init pose
             if np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD):
-                self.set_tf_init_pose()
+                self.set_tf_init_pose(load_state_rel_world_qs)
 
             # Publish load relative to load initial position
             load_rel_load_init = utils.transform_frames(self.load_state_rel_world, f'{self.get_name()}_init', self.tf_buffer, self.get_logger())
@@ -196,6 +202,8 @@ class Load(Node):
 
     ## HELPER FUNCTIONS
     def calc_load_pose_quasi_static(self):
+        load_state_rel_world_qs = State('world', CS_type.ENU)
+
         # Retrieve drone information 
         drone_positions = np.zeros((self.num_drones, 3))
         drone_orientations = np.array([np.quaternion(*q) for q in np.zeros((self.num_drones, 4))])
@@ -215,25 +223,29 @@ class Load(Node):
 
                 count_tf += 1
 
-        # Only broadcast load position if all drone positions can be found to estimate it
+        # Only return load position if all drone positions can be found to estimate it
         if count_tf == self.num_drones:
             # Estimate load position as average of drone positions 
-            self.load_state_rel_world.pos  = np.average(drone_positions, axis=0)
+            load_state_rel_world_qs.pos  = np.average(drone_positions, axis=0)
 
             # TODO: Better height estimate
             if np.all(self.drone_phases >= Phase.PHASE_TAKEOFF_POST_TENSION):
-                self.load_state_rel_world.pos[2] -= HEIGHT_DRONE_REL_LOAD 
-                self.load_state_rel_world.pos[2] = max(self.load_state_rel_world.pos[2], 0.0) # Ensure load doesn't go below ground
+                load_state_rel_world_qs.pos[2] -= HEIGHT_DRONE_REL_LOAD 
+                load_state_rel_world_qs.pos[2] = max(self.load_state_rel_world.pos[2], 0.0) # Ensure load doesn't go below ground
             else: 
-                self.load_state_rel_world.pos[2] = 0.0
+                load_state_rel_world_qs.pos[2] = 0.0
 
             # Estimate load orientation #TODO: Better orientation estimation method
-            self.load_state_rel_world.att_q = drone_orientations[0] #np.quaternion(*drone_orientations[0, :])
+            load_state_rel_world_qs.att_q = drone_orientations[0] #np.quaternion(*drone_orientations[0, :])
 
-    def set_tf_init_pose(self):
+            return load_state_rel_world_qs
+        else:
+            return None
+
+    def set_tf_init_pose(self, load_initial_state_rel_world):
         # Set initial pose
-        self.load_initial_state_rel_world.pos = np.copy(self.load_state_rel_world.pos)
-        self.load_initial_state_rel_world.att_q = self.load_state_rel_world.att_q.copy()
+        self.load_initial_state_rel_world.pos =  np.copy(load_initial_state_rel_world.pos)
+        self.load_initial_state_rel_world.att_q = load_initial_state_rel_world.att_q.copy()
         
         # Publish static transform for init pose (relative to world)
         # As CS is in ENU, always aligned

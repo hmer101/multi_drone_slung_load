@@ -99,10 +99,6 @@ class Drone(Node):
         # Load
         self.load_desired_local_state = State(f'{self.load_name}_init', CS_type.ENU)
 
-        # Transforms
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
-
         
         ## TIMERS
         timer_period = MAIN_TIMER_PERIOD
@@ -125,6 +121,9 @@ class Drone(Node):
         )
 
         ## TFS
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+
         self.tf_static_broadcaster_init_pose = StaticTransformBroadcaster(self)
         self.tf_static_broadcaster_cam_rel_drone = StaticTransformBroadcaster(self)
         self.tf_static_broadcaster_world_rel_gt = StaticTransformBroadcaster(self)
@@ -192,7 +191,7 @@ class Drone(Node):
         # Ground truth
         self.sub_vehicle_pose_gt = None
 
-        if self.load_pose_type == 'ground_truth' or self.evaluate == 'true':
+        if self.load_pose_type == 'ground_truth' or self.evaluate == True:
             if self.env == 'sim':               
                 self.sub_vehicle_pose_gt = self.create_subscription(
                     PoseArray,
@@ -664,7 +663,7 @@ class Drone(Node):
 
         # If using ground truth
         # Set transform from ground truth to world
-        if self.load_pose_type == 'ground_truth' or self.evaluate == 'true':
+        if self.load_pose_type == 'ground_truth' or self.evaluate == True:
             utils.broadcast_tf(self.get_clock().now().to_msg(), 'ground_truth', 'world', self.vehicle_state_gt.pos, self.vehicle_state_gt.att_q, self.tf_static_broadcaster_world_rel_gt)
 
      
