@@ -127,8 +127,8 @@ def transform_orientation(q_BA, q_CB):
 
 
 # Create a new state object that represents an input state transformed into frame2 
-def transform_frames(state, frame2_name, tf_buffer, logger):
-    state2 = State(f'{frame2_name}', CS_type.ENU)
+def transform_frames(state, frame2_name, tf_buffer, logger, cs_out_type=CS_type.XYZ):
+    state2 = State(f'{frame2_name}', cs_out_type)
 
     # Find the transform
     tf_f1_rel_f2 = lookup_tf(frame2_name, state.frame, tf_buffer, rclpy.time.Time(), logger)
@@ -166,7 +166,7 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
     
     ## GET LOAD DESIRED STATE
     # Convert load desired state into world frame
-    load_desired_state_rel_world = transform_frames(load_desired_local_state, 'world', tf_buffer, logger)
+    load_desired_state_rel_world = transform_frames(load_desired_local_state, 'world', tf_buffer, logger, cs_out_type=CS_type.ENU)
     
     if load_desired_state_rel_world == None:
         return None
@@ -179,7 +179,7 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
     vehicle_desired_state_rel_world.att_q = transform_orientation(vehicle_desired_state_rel_load.att_q, load_desired_state_rel_world.att_q)                             #load_desired_state_rel_world.att_q, vehicle_desired_state_rel_load.att_q)
 
     # Transform relative to drone_init
-    vehicle_desired_state_rel_drone_init = transform_frames(vehicle_desired_state_rel_world, f'{drone_name}_init', tf_buffer, logger)
+    vehicle_desired_state_rel_drone_init = transform_frames(vehicle_desired_state_rel_world, f'{drone_name}_init', tf_buffer, logger, cs_out_type=CS_type.ENU)
     
 
     ## CONVERT TO TRAJECTORY MSG

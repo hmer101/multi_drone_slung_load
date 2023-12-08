@@ -28,6 +28,8 @@ from swarm_load_carry_interfaces.msg import Phase, GlobalPose
 
 MAIN_TIMER_PERIOD=0.1 # sec
 
+HEIGHT_DRONE_CS_REL_GND=0 #0.24 # m
+
 HEIGHT_DRONE_REL_LOAD=2 # m
 HEIGHT_LOAD_PRE_TENSION=-0.2
 POS_THRESHOLD=0.3
@@ -46,8 +48,8 @@ LAND_PRE_DISARM_CNT_THRESHOLD=3/MAIN_TIMER_PERIOD
 FULLY_AUTO_PRE_TAKEOFF_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
 
 
-t_CAM_REL_PX4 = np.array([0.1, -0.3, -0.025]) # Camera translation relative to PX4 (i.e. drone body)
-R_CAM_REL_PX4 = np.array([0.0, np.pi/2, 0.0]) # Camera rotation relative to PX4 (i.e. drone body)
+t_CAM_REL_PX4 = np.array([-0.1, 0.03, -0.025]) # Camera translation relative to PX4 (i.e. drone body)
+R_CAM_REL_PX4 = np.array([np.pi, 0.0, -np.pi/2]) # Camera rotation relative to PX4 (i.e. drone body)
 
 
 # Node to encapsulate drone information and actions
@@ -126,6 +128,7 @@ class Drone(Node):
 
         self.tf_static_broadcaster_init_pose = StaticTransformBroadcaster(self)
         self.tf_static_broadcaster_cam_rel_drone = StaticTransformBroadcaster(self)
+        self.tf_static_broadcaster_cam_rel_drone_gt = StaticTransformBroadcaster(self)
         self.tf_static_broadcaster_world_rel_gt = StaticTransformBroadcaster(self)
         self.tf_broadcaster = TransformBroadcaster(self)
 
@@ -634,6 +637,7 @@ class Drone(Node):
         q_list = ft.quaternion_from_euler(R_CAM_REL_PX4[0], R_CAM_REL_PX4[1], R_CAM_REL_PX4[2])
         r_cam_rel_px4 = np.quaternion(*q_list)
         utils.broadcast_tf(self.get_clock().now().to_msg(), f'drone{self.drone_id}', f'camera{self.drone_id}', t_CAM_REL_PX4, r_cam_rel_px4, self.tf_static_broadcaster_cam_rel_drone)
+        utils.broadcast_tf(self.get_clock().now().to_msg(), f'drone{self.drone_id}_gt', f'camera{self.drone_id}_gt', t_CAM_REL_PX4, r_cam_rel_px4, self.tf_static_broadcaster_cam_rel_drone_gt)
 
         # Send complete message
         self.flag_local_init_pose_set = True 
@@ -647,7 +651,7 @@ class Drone(Node):
         trans_E, trans_N, trans_U = pm.geodetic2enu(self.vehicle_initial_global_state.pos[0], self.vehicle_initial_global_state.pos[1], self.vehicle_initial_global_state.pos[2], origin_state_lla.pos[0], origin_state_lla.pos[1], origin_state_lla.pos[2]) 
         
         # Set local init pose (relative to base CS)
-        self.vehicle_initial_state_rel_world.pos = np.array([trans_E, trans_N, trans_U])
+        self.vehicle_initial_state_rel_world.pos = np.array([trans_E, trans_N, trans_U+HEIGHT_DRONE_CS_REL_GND])
         self.vehicle_initial_state_rel_world.att_q = self.vehicle_initial_global_state.att_q.copy() #TODO: If required to set relative to world, need extra flag to ensure inital att is set before sending global init pose
 
         # Broadcast tf
@@ -655,7 +659,7 @@ class Drone(Node):
 
     def set_local_init_pose_first_drone(self):
         # Set local initial state
-        self.vehicle_initial_state_rel_world.pos = np.array([0.0, 0.0, 0.0])
+        self.vehicle_initial_state_rel_world.pos = np.array([0.0, 0.0, HEIGHT_DRONE_CS_REL_GND])
         self.vehicle_initial_state_rel_world.att_q = self.vehicle_initial_global_state.att_q.copy()
 
         # Broadcast tf
