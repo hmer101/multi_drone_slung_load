@@ -82,7 +82,6 @@ class Drone(Node):
 
         # Vehicle
         self.vehicle_status = None  # Current state of the FMU
-
         self.phase = Phase.PHASE_UNASSIGNED        # Desired phase (action to perform when in offboard mode. Use 'phase' to differentiate from 'mode' of the FMU)
 
         self.vehicle_local_state = State(f'{self.get_name()}_init', CS_type.ENU)
