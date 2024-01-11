@@ -5,10 +5,12 @@ from ament_index_python.packages import get_package_share_directory
 from launch_ros.actions import Node
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess
+from launch.substitutions import LaunchConfiguration, PythonExpression
 
 DEFAULT_LOAD_ID=1
 DEFAULT_ENV='phys'
 
+# Note "odd" launchfile as using some parameters before runtime
 def generate_launch_description():
     ## LAUNCH ARGUMENTS
     launch_arg_load_id = DeclareLaunchArgument(
@@ -27,11 +29,8 @@ def generate_launch_description():
     env = DEFAULT_ENV
     for arg in sys.argv:
         if arg.startswith("env:="):
-            env = int(arg.split(":=")[1])
+            env = str(arg.split(":=")[1])
 
-
-    ## GET PARAMETERS
-    config = None
 
     if env=="sim":
       config = os.path.join(
@@ -44,7 +43,7 @@ def generate_launch_description():
         get_package_share_directory('swarm_load_carry'),
         'config',
         'phys.yaml'
-        ) 
+        )
 
     ## LAUNCH
     return LaunchDescription([

@@ -18,7 +18,7 @@ def generate_launch_description():
     env = DEFAULT_ENV
     for arg in sys.argv:
         if arg.startswith("env:="):
-            env = int(arg.split(":=")[1])
+            env = str(arg.split(":=")[1])
 
     ## GET PARAMETERS
     config = None

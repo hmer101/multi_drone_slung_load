@@ -1,5 +1,6 @@
 import math
-import quaternionic as qt
+#import quaternionic as quaternion
+import quaternion 
 import rclpy
 
 import numpy as np
@@ -12,6 +13,7 @@ from px4_msgs.msg import TrajectorySetpoint
 from tf2_ros import TransformException
 
 from swarm_load_carry.state import State, CS_type
+from swarm_load_carry_interfaces.srv import PhaseChange
 
 ## STRING HANDLING 
 
@@ -26,10 +28,15 @@ def extract_instance_from_connection(connection):
 
 ## CONVERSIONS
 # Normalize a quaternion and return the equivalent numpy representation
-def q_to_normalized_np(q: qt.array):
-    q_norm = q.normalized
+def q_to_normalized_np(q: np.quaternion): #quaternion.array):
+    q_norm = q.normalized()
 
     return np.array([q_norm.w, q_norm.x, q_norm.y, q_norm.z])
+
+# Extract a particular pose from a PoseArray message
+#TODO: Improve this to be more general/not require known index
+def extract_pose_from_pose_array_msg(pose_array, index):
+    return pose_array.poses[index]
 
 
 ## GEOMETRY
@@ -97,16 +104,18 @@ def lookup_tf(target_frame, source_frame, tf_buffer, time, logger):
             source_frame,
             time)
     except TransformException as ex:
-        logger.warn(f'Could not find transform: {source_frame} to {target_frame}: {ex}')
+        logger.warn(f'Could not find frame transform: {target_frame} to {source_frame}: {ex}')
+        pass
     
     return t
 
 
 # Transform a position of an item (A) from one frame (B) into another (C) given the position of the item in frame B (p_BA), position of B rel C (p_CB)
 # and the orientation of B rel C (q_CB)
-def transform_position(p_BA: np.ndarray[(3,), float], p_CB: np.ndarray[(3,), float], q_CB):
+def transform_position(p_BA: np.ndarray[(3,), float], p_CB: np.ndarray[(3,), float], q_CB, logger):
     # Perform translation between frames that are both rotated and translated 
-    p_CA = q_CB.rotate(p_BA) + p_CB
+    p_BA_rotated = q_CB*(np.quaternion(0, *p_BA))*q_CB.inverse()
+    p_CA = np.array([p_BA_rotated.x, p_BA_rotated.y, p_BA_rotated.z]) + p_CB
 
     return p_CA
 
@@ -118,8 +127,8 @@ def transform_orientation(q_BA, q_CB):
 
 
 # Create a new state object that represents an input state transformed into frame2 
-def transform_frames(state, frame2_name, tf_buffer, logger):
-    state2 = State(f'{frame2_name}', CS_type.ENU)
+def transform_frames(state, frame2_name, tf_buffer, logger, cs_out_type=CS_type.XYZ):
+    state2 = State(f'{frame2_name}', cs_out_type)
 
     # Find the transform
     tf_f1_rel_f2 = lookup_tf(frame2_name, state.frame, tf_buffer, rclpy.time.Time(), logger)
@@ -134,15 +143,15 @@ def transform_frames(state, frame2_name, tf_buffer, logger):
                             tf_f1_rel_f2.transform.translation.y, 
                             tf_f1_rel_f2.transform.translation.z])
         
-        q_f2f1 = qt.array([tf_f1_rel_f2.transform.rotation.w, 
+        q_f2f1 = np.quaternion(tf_f1_rel_f2.transform.rotation.w, 
                           tf_f1_rel_f2.transform.rotation.x,
                           tf_f1_rel_f2.transform.rotation.y,
-                          tf_f1_rel_f2.transform.rotation.z])
+                          tf_f1_rel_f2.transform.rotation.z)
 
         # Perform transform
-        state2.pos = transform_position(state.pos, p_f2f1, q_f2f1)
+        state2.pos = transform_position(state.pos, p_f2f1, q_f2f1, logger)
         state2.att_q = transform_orientation(state.att_q, q_f2f1)
-        
+
     return state2
 
 
@@ -157,7 +166,7 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
     
     ## GET LOAD DESIRED STATE
     # Convert load desired state into world frame
-    load_desired_state_rel_world = transform_frames(load_desired_local_state, 'world', tf_buffer, logger)
+    load_desired_state_rel_world = transform_frames(load_desired_local_state, 'world', tf_buffer, logger, cs_out_type=CS_type.ENU)
     
     if load_desired_state_rel_world == None:
         return None
@@ -166,11 +175,11 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
     # Note: cannot use transform_frames() directly as requires load desired, not actual current TF
     vehicle_desired_state_rel_world = State('world', CS_type.ENU)
     
-    vehicle_desired_state_rel_world.pos = transform_position(vehicle_desired_state_rel_load.pos, load_desired_state_rel_world.pos, load_desired_state_rel_world.att_q) #transform_position(load_desired_state_rel_world.pos, vehicle_desired_pos_rel_load_rot, )
+    vehicle_desired_state_rel_world.pos = transform_position(vehicle_desired_state_rel_load.pos, load_desired_state_rel_world.pos, load_desired_state_rel_world.att_q, logger) #transform_position(load_desired_state_rel_world.pos, vehicle_desired_pos_rel_load_rot, )
     vehicle_desired_state_rel_world.att_q = transform_orientation(vehicle_desired_state_rel_load.att_q, load_desired_state_rel_world.att_q)                             #load_desired_state_rel_world.att_q, vehicle_desired_state_rel_load.att_q)
 
     # Transform relative to drone_init
-    vehicle_desired_state_rel_drone_init = transform_frames(vehicle_desired_state_rel_world, f'{drone_name}_init', tf_buffer, logger)
+    vehicle_desired_state_rel_drone_init = transform_frames(vehicle_desired_state_rel_world, f'{drone_name}_init', tf_buffer, logger, cs_out_type=CS_type.ENU)
     
 
     ## CONVERT TO TRAJECTORY MSG
@@ -233,3 +242,28 @@ def gen_traj_msg_vel(desired_velocity, timestamp):
     trajectory_msg.velocity[2] = -desired_velocity[2]
 
     return trajectory_msg
+
+
+## DRONE CONTROL
+# Change the phase of a drone
+def phase_change(cli_phase_change, phase_desired):
+    # Prepare request
+    phase_req = PhaseChange.Request()
+    phase_req.phase_request.phase = phase_desired
+    
+    # Send request
+    phase_future = cli_phase_change.call_async(phase_req)
+
+    return phase_future
+
+def change_phase_all_drones(node, num_drones, cli_array_phase_change, phase_desired, wait_for_response=True):
+    # Send request
+    phase_future = [None] * num_drones
+
+    for i in range(num_drones):
+        phase_future[i] = phase_change(cli_array_phase_change[i], phase_desired)
+
+    # Wait for response
+    if wait_for_response:
+        for i in range(num_drones):
+            rclpy.spin_until_future_complete(node, phase_future[i])

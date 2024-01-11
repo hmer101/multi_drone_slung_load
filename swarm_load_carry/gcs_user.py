@@ -10,6 +10,8 @@ from rclpy.qos import QoSProfile
 import numpy as np
 from rclpy.node import Node
 
+import utils
+
 from swarm_load_carry_interfaces.srv import PhaseChange
 from swarm_load_carry_interfaces.msg import Phase
 from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
@@ -53,23 +55,6 @@ class GCSUser(Node):
     ## CALLBACKS
 
     ## MISSION CONTROL
-    # Change the phase of all drones
-    def phase_change(self, phase_desired):
-        # Prepare request
-        phase_req = PhaseChange.Request()
-        phase_req.phase_request.phase = phase_desired
-        
-        # Send request
-        phase_future = [None] * self.num_drones
-
-        for i in range(self.num_drones):
-            phase_future[i] = self.cli_phase_change[i].call_async(phase_req)
-
-        # Wait for response
-        for i in range(self.num_drones):
-            rclpy.spin_until_future_complete(self, phase_future[i])
-
-
     # Take in user commands for the drones
     def user_commands(self):
         cmd = None
@@ -79,17 +64,17 @@ class GCSUser(Node):
 
             match(cmd):
                 case 't':
-                    self.phase_change(Phase.PHASE_SETUP)
+                    utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_SETUP_DRONE)
                 case 'm':
-                    self.phase_change(Phase.PHASE_MISSION_START)
+                    utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_MISSION_START)
                 case 'l':
-                    self.phase_change(Phase.PHASE_LAND_START)
+                    utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_LAND_START)
                 # case 'r':
                 #     self.phase_change(Phase.PHASE_RTL_START)
                 case 'h':
-                    self.phase_change(Phase.PHASE_HOLD)
+                    utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_HOLD)
                 case 'k':
-                    self.phase_change(Phase.PHASE_KILL)
+                    utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_KILL)
 
 
 def main(args=None):

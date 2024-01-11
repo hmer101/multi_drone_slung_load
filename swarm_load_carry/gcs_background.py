@@ -10,8 +10,9 @@ from rclpy.qos import QoSProfile
 from rclpy.node import Node
 
 import numpy as np
-import quaternionic as qt
-import pymap3d as pm
+import quaternion as quaternion
+
+#import pymap3d as pm
 
 import utils
 
@@ -21,7 +22,7 @@ from tf2_ros.transform_listener import TransformListener
 
 from swarm_load_carry.state import State, CS_type
 
-from swarm_load_carry_interfaces.srv import SetLocalPose, GetGlobalInitPose
+from swarm_load_carry_interfaces.srv import SetLocalPose, GetGlobalInitPose, PhaseChange
 from swarm_load_carry_interfaces.msg import Phase
 
 from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
@@ -29,10 +30,14 @@ from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
 DEFAULT_DRONE_NUM=1
 DEFAULT_FIRST_DRONE_NUM=1
 DEFAULT_LOAD_ID=1
+DEFAULT_FULLY_AUTO=False
 
-HEIGHT_DRONE_REL_LOAD=1.5 #2 #m
+HEIGHT_DRONE_REL_LOAD=2 #m
+MAX_LOAD_TAKEOFF_HEIGHT=4 #m
 
 MAIN_TIMER_PERIOD=0.2 # s
+
+FULLY_AUTO_MISSION_CNT_THRESHOLD=10/MAIN_TIMER_PERIOD
 
 class GCSBackground(Node):
 
@@ -51,9 +56,11 @@ class GCSBackground(Node):
         self.declare_parameter('first_drone_num', DEFAULT_FIRST_DRONE_NUM)
         self.declare_parameter('load_id', DEFAULT_LOAD_ID)
         self.declare_parameter('drone_order', [1, 2, 3])
+        self.declare_parameter('fully_auto', DEFAULT_FULLY_AUTO)
         
         self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
         self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
+        self.fully_auto = self.get_parameter('fully_auto').get_parameter_value().bool_value
         self.load_id = self.get_parameter('load_id').get_parameter_value().integer_value
         self.drone_order = self.get_parameter('drone_order').get_parameter_value().integer_array_value
 
@@ -73,6 +80,7 @@ class GCSBackground(Node):
 
         # Timers
         self.timer = self.create_timer(MAIN_TIMER_PERIOD, self.clbk_cmdloop)
+        self.cnt_phase_ticks = 0
 
         ## PUBLISHERS
         self.pub_load_attitude_desired = self.create_publisher(VehicleAttitudeSetpoint, f'load_{self.load_id}/in/desired_attitude', qos_profile)
@@ -100,6 +108,7 @@ class GCSBackground(Node):
 
         ## SERVICES
         ## CLIENTS
+        # Set drone poses relative to load
         self.cli_set_drone_poses_rel_load = [None] * self.num_drones
 
         for i in range(self.first_drone_num, self.num_drones+self.first_drone_num):
@@ -108,6 +117,15 @@ class GCSBackground(Node):
 
             while not self.cli_set_drone_poses_rel_load[i-self.first_drone_num].wait_for_service(timeout_sec=1.0):
                 self.get_logger().info(f'Waiting for set pose rel load service: drone {i}')
+
+        # Phase change
+        self.cli_phase_change = [None] * self.num_drones
+        #self.phase_future = [None] * self.num_drones
+
+        for i in range(self.first_drone_num, self.num_drones+self.first_drone_num):
+            self.cli_phase_change[i-self.first_drone_num] = self.create_client(PhaseChange,f'/px4_{i}/phase_change')
+            while not self.cli_phase_change[i-self.first_drone_num].wait_for_service(timeout_sec=1.0):
+                self.get_logger().info(f'Waiting for offboard ROS start service {i}')
 
         self.get_logger().info('Setup complete')
 
@@ -134,37 +152,58 @@ class GCSBackground(Node):
                         self.get_logger().info(f'Waiting for drone {i}\'s pose rel load to be set')
                         return
         
-        # TAKEOFF
-        if np.all(self.drone_phases == Phase.PHASE_SETUP):
+        # PHASES
+        # Reset GCS and set drones to takeoff once GCS setup is complete
+        if np.all(self.drone_phases == Phase.PHASE_SETUP_GCS):
             self.reset_pre_arm()
 
+        # TAKEOFF
         elif np.all(self.drone_phases == Phase.PHASE_TAKEOFF_POST_TENSION):
             # Rise slowly - tension will engage
-            self.load_desired_local_state.pos = np.array([0.0, 0.0, self.load_desired_local_state.pos[2] + 0.1*MAIN_TIMER_PERIOD])
+            self.load_desired_local_state.pos = np.array([0.0, 0.0, min(self.load_desired_local_state.pos[2] + 0.1*MAIN_TIMER_PERIOD, MAX_LOAD_TAKEOFF_HEIGHT)])
+
+        elif np.all(self.drone_phases == Phase.PHASE_TAKEOFF_END) and self.fully_auto:
+            # In fully auto, set drones to mission start phase once takeoff complete
+            utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_MISSION_START)
+
+            self.get_logger().info(f'In fully auto mode. Takeoff complete. Starting mission.')
 
         elif np.all(self.drone_phases == Phase.PHASE_MISSION_START):
             # Perform mission - currently move load in circle
-            v_lin = 1 # m/s
+            v_lin = 0.5 # m/s
 
-            r = 10 # m
+            r = 2 #10 # m
             omega = v_lin/r # rad/s
             dt = MAIN_TIMER_PERIOD # s
 
             # Move load in circle
-            self.load_desired_local_state.pos = np.array([r*(np.cos(self.mission_theta)-1), r*np.sin(self.mission_theta), self.load_desired_local_state.pos[2]])
-            q_list = ft.quaternion_from_euler(0.0, 0.0, ft.quaternion_get_yaw(self.load_initial_local_state.att_q) + self.mission_theta)
-            self.load_desired_local_state.att_q = qt.array(q_list)
+            self.load_desired_local_state.pos = np.array([r*(np.cos(self.mission_theta)-1), r*np.sin(self.mission_theta), self.load_desired_local_state.pos[2]]) #np.array([self.mission_theta, 0, self.load_desired_local_state.pos[2]]) 
+            
+            load_init_yaw = ft.quaternion_get_yaw([self.load_initial_local_state.att_q.w, self.load_initial_local_state.att_q.x, self.load_initial_local_state.att_q.y, self.load_initial_local_state.att_q.z])
+            q_list = ft.quaternion_from_euler(0.0, 0.0, load_init_yaw + self.mission_theta)
+            self.load_desired_local_state.att_q = np.quaternion(*q_list)
 
             # Update theta
             self.mission_theta = self.mission_theta + omega*dt
+
+            self.cnt_phase_ticks += 1
+
+            # If fully auto, transition to land phase when mission complete
+            if self.fully_auto and self.cnt_phase_ticks > FULLY_AUTO_MISSION_CNT_THRESHOLD:
+                for i in range(self.num_drones):
+                    utils.phase_change(self.cli_phase_change[i], Phase.PHASE_LAND_START)
+                        
+                self.get_logger().info(f'In fully auto mode. Mission complete. Transitioning to land phase.')
+                self.cnt_phase_ticks = 0
+            
         
         elif np.all(self.drone_phases == Phase.PHASE_LAND_DESCENT):
             # Lower slowly - tension will disengage
             self.load_desired_local_state.pos = np.array([self.load_desired_local_state.pos[0], self.load_desired_local_state.pos[1], self.load_desired_local_state.pos[2] - 0.3*MAIN_TIMER_PERIOD]) #- 0.1
 
         elif np.all(self.drone_phases == Phase.PHASE_LAND_POST_LOAD_DOWN):
-            self.set_drone_arrangement(1.3, np.array([1, 1, 1]), np.array([0, -np.pi*(1-2/self.num_drones), np.pi*(1-2/self.num_drones)]))
-        
+            self.set_drone_arrangement(1.3, np.array([1, 1, 1]), np.array([0, np.pi*(2/self.num_drones), -np.pi*(2/self.num_drones)]))
+
         self.send_desired_pose()
 
         
@@ -187,10 +226,10 @@ class GCSBackground(Node):
                                                         tf_load_rel_load_init.transform.translation.y,
                                                         tf_load_rel_load_init.transform.translation.z])
         
-        self.load_initial_local_state.att_q = qt.array([tf_load_rel_load_init.transform.rotation.w,
+        self.load_initial_local_state.att_q = np.quaternion(tf_load_rel_load_init.transform.rotation.w,
                                                         tf_load_rel_load_init.transform.rotation.x,
                                                         tf_load_rel_load_init.transform.rotation.y,
-                                                        tf_load_rel_load_init.transform.rotation.z])
+                                                        tf_load_rel_load_init.transform.rotation.z)
 
         # Set load desired state
         # As attitude is in ENU, initial desired local attitude must be the same as starting attitude
@@ -198,7 +237,7 @@ class GCSBackground(Node):
         self.load_desired_local_state.att_q = self.load_initial_local_state.att_q.copy() 
 
         # Set drone arrangement around load
-        self.set_drone_arrangement(1, np.array([HEIGHT_DRONE_REL_LOAD, HEIGHT_DRONE_REL_LOAD, HEIGHT_DRONE_REL_LOAD]), np.array([0, -np.pi*(1-2/self.num_drones), np.pi*(1-2/self.num_drones)]))
+        self.set_drone_arrangement(1, np.array([HEIGHT_DRONE_REL_LOAD, HEIGHT_DRONE_REL_LOAD, HEIGHT_DRONE_REL_LOAD]), np.array([0, np.pi*(2/self.num_drones), -np.pi*(2/self.num_drones)])) 
 
         # Set variables related to mission
         self.mission_theta = 0.0
@@ -225,7 +264,7 @@ class GCSBackground(Node):
             pos_req.transform_stamped.transform.translation.z = float(ref_points_ordered[i][2])
 
             # Set yaw
-            q_des = qt.array(ft.quaternion_from_euler(0.0, 0.0, yaw_ordered[i]))
+            q_des = np.quaternion(*ft.quaternion_from_euler(0.0, 0.0, yaw_ordered[i]))
 
             pos_req.transform_stamped.transform.rotation.x = float(q_des.x)
             pos_req.transform_stamped.transform.rotation.y = float(q_des.y)
