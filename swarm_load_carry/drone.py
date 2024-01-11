@@ -68,7 +68,7 @@ class Drone(Node):
 
         # Vehicle
         self.nav_state = VehicleStatus.NAVIGATION_STATE_MAX     # Actual mode of the FMU
-        self.arm_state = VehicleStatus.ARMING_STATE_DISARMED    # Actual arming state of FMU
+        self.arm_state = VehicleStatus.ARMING_STATE_INIT    # Actual arming state of FMU
         self.phase = Phase.PHASE_UNASSIGNED        # Desired phase (action to perform when in offboard mode. Use 'phase' to differentiate from 'mode' of the FMU)
 
         self.vehicle_local_state = State(f'{self.get_name()}_init', CS_type.ENU)
