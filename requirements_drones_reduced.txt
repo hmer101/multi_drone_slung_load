@@ -64,6 +64,7 @@ mpmath==1.2.1
 nav-msgs==4.2.3
 numba==0.56.4
 numpy==1.22.2
+numpy-quaternion==2022.4.3
 nunavut==1.9.0
 osrf-pycommon==2.0.2
 packaging==21.3
@@ -96,7 +97,7 @@ qt-gui==2.2.2
 qt-gui-cpp==2.2.2
 qt-gui-py-common==2.2.2
 quality-of-service-demo-py==0.20.3
-quaternionic==1.0.6
+#quaternionic==1.0.6
 rcl-interfaces==1.2.1
 #rclpy==3.3.8
 rcutils==5.1.4
