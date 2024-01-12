@@ -17,7 +17,13 @@ def generate_launch_description():
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('swarm_load_carry'), 'launch'),
          '/drones.launch.py'])
-      )
+        )
+
+    gz_bridge_clock = IncludeLaunchDescription(
+      PythonLaunchDescriptionSource([os.path.join(
+         get_package_share_directory('swarm_load_carry'), 'launch'),
+         '/gz_bridge_clock.launch.py'])
+        )
 
     load = ExecuteProcess(
             cmd=[[
@@ -36,6 +42,7 @@ def generate_launch_description():
     ## RUN LAUNCH FILES
     return LaunchDescription([
         drones,
+        gz_bridge_clock,
         load,
         gcs    
     ])

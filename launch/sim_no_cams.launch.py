@@ -22,7 +22,7 @@ def generate_launch_description():
     gz_bridge = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('swarm_load_carry'), 'launch'),
-         '/gz_bridge.launch.py'])
+         '/gz_bridge_gt.launch.py'])
       )
 
     load = ExecuteProcess(
