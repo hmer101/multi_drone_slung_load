@@ -466,7 +466,7 @@ class Drone(Node):
                     self.get_logger().info(f'Load setup complete')
 
                     return
-                
+
                 self.cnt_phase_ticks += 1
 
             # Wait for GCS to be set up
