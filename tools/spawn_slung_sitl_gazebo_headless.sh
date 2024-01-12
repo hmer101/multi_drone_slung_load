@@ -16,7 +16,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 GZ_DIR="$(dirname "$SCRIPT_DIR")/gz"
 
 # Options
-HEADLESS="" #"HEADLESS=1"
+HEADLESS="HEADLESS=1"
 
 # Constants
 PI=3.141592654

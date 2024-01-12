@@ -6,7 +6,6 @@ from launch import LaunchDescription
 from launch.actions import ExecuteProcess, IncludeLaunchDescription
 from launch_ros.actions import Node
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-#from launch.substitutions import LaunchConfiguration
 
 ENV='sim'
 TERM_CMD= '' #'gnome-terminal --tab --'
@@ -18,25 +17,6 @@ def generate_launch_description():
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('swarm_load_carry'), 'launch'),
          '/drones.launch.py'])
-      )
-    
-    image_bridge = IncludeLaunchDescription(
-      PythonLaunchDescriptionSource([os.path.join(
-         get_package_share_directory('swarm_load_carry'), 'launch'),
-         '/image_bridge.launch.py'])
-      )
-    
-    gz_bridge = IncludeLaunchDescription(
-      PythonLaunchDescriptionSource([os.path.join(
-         get_package_share_directory('swarm_load_carry'), 'launch'),
-         '/gz_bridge.launch.py'])
-      )
-    
-    slung_pose_estimation_visual = IncludeLaunchDescription(
-      PythonLaunchDescriptionSource([os.path.join(
-         get_package_share_directory('slung_pose_estimation'), 'launch'),
-         '/estimator.launch.py']),
-         launch_arguments={'env': '{ENV}'}.items()
       )
 
     load = ExecuteProcess(
@@ -55,9 +35,6 @@ def generate_launch_description():
 
     ## RUN LAUNCH FILES
     return LaunchDescription([
-        image_bridge,
-        gz_bridge,
-        slung_pose_estimation_visual,
         drones,
         load,
         gcs    
