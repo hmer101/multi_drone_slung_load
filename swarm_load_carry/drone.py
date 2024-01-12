@@ -65,6 +65,7 @@ class Drone(Node):
         # Parameters
         self.declare_parameter('env', 'phys')
         self.declare_parameter('num_drones', 1)
+        self.declare_parameter('num_cameras', 0)
         self.declare_parameter('first_drone_num', 1)
         self.declare_parameter('load_id', 1)
         self.declare_parameter('load_pose_type', 'quasi-static')
@@ -73,6 +74,7 @@ class Drone(Node):
 
         self.env = self.get_parameter('env').get_parameter_value().string_value
         self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
+        self.num_cameras = self.get_parameter('num_cameras').get_parameter_value().integer_value
         self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
         self.fully_auto = self.get_parameter('fully_auto').get_parameter_value().bool_value
         self.load_id = self.get_parameter('load_id').get_parameter_value().integer_value
@@ -633,10 +635,11 @@ class Drone(Node):
 
         # Publish other static transforms
         # Camera relative to drone
-        q_list = ft.quaternion_from_euler(R_CAM_REL_PX4[0], R_CAM_REL_PX4[1], R_CAM_REL_PX4[2])
-        r_cam_rel_px4 = np.quaternion(*q_list)
-        utils.broadcast_tf(self.get_clock().now().to_msg(), f'drone{self.drone_id}', f'camera{self.drone_id}', t_CAM_REL_PX4, r_cam_rel_px4, self.tf_static_broadcaster_cam_rel_drone)
-        utils.broadcast_tf(self.get_clock().now().to_msg(), f'drone{self.drone_id}_gt', f'camera{self.drone_id}_gt', t_CAM_REL_PX4, r_cam_rel_px4, self.tf_static_broadcaster_cam_rel_drone_gt)
+        if self.num_cameras > 0:
+            q_list = ft.quaternion_from_euler(R_CAM_REL_PX4[0], R_CAM_REL_PX4[1], R_CAM_REL_PX4[2])
+            r_cam_rel_px4 = np.quaternion(*q_list)
+            utils.broadcast_tf(self.get_clock().now().to_msg(), f'drone{self.drone_id}', f'camera{self.drone_id}', t_CAM_REL_PX4, r_cam_rel_px4, self.tf_static_broadcaster_cam_rel_drone)
+            utils.broadcast_tf(self.get_clock().now().to_msg(), f'drone{self.drone_id}_gt', f'camera{self.drone_id}_gt', t_CAM_REL_PX4, r_cam_rel_px4, self.tf_static_broadcaster_cam_rel_drone_gt)
 
         # Send complete message
         self.flag_local_init_pose_set = True 
