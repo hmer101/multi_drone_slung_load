@@ -1,7 +1,7 @@
 /**:
     ros__parameters:
       env: 'sim'
-      use_sim_time: true
+      use_sim_time: false #true
       
       load_id: 1
       load_pose_type: 'quasi-static' # quasi-static, visual, ground_truth
