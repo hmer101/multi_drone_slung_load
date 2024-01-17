@@ -16,9 +16,6 @@ from swarm_load_carry_interfaces.srv import PhaseChange
 from swarm_load_carry_interfaces.msg import Phase
 from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
 
-DEFAULT_DRONE_NUM=1
-DEFAULT_FIRST_DRONE_NUM=1
-DEFAULT_LOAD_ID=1
 
 class GCSUser(Node):
 
@@ -31,8 +28,8 @@ class GCSUser(Node):
         self.get_logger().info(f'Name: {self.get_name()}')
 
         ## PARAMETERS
-        self.declare_parameter('num_drones', DEFAULT_DRONE_NUM)
-        self.declare_parameter('first_drone_num', DEFAULT_FIRST_DRONE_NUM)
+        self.declare_parameter('num_drones', 3)
+        self.declare_parameter('first_drone_num', 1)
 
         self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
         self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value

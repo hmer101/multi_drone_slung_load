@@ -3,15 +3,42 @@
       env: 'sim'
       use_sim_time: false #true
       
+      ## LOAD SETTINGS
       load_id: 1
       load_pose_type: 'quasi-static' # quasi-static, visual, ground_truth
       evaluate: false # If you want to evaluate the tracking performance of the load
       show_markers: 0 # Show the detected markers 0 = No, 1 = Yes all, 2 = Drone 1 only # TODO: Replace with ENUM?
 
+      ## DRONE SETTINGS
       first_drone_num: 1
       num_drones: 3
       num_cameras: 0 # 0 if cameras are off
-      
-      fully_auto: false
-
+    
       drone_order: [1, 2, 3] #ACW from load's x axis
+
+      ## PHASE SETTINGS 
+      fully_auto: false
+      
+      # Heights/distances/dimensions
+      height_drone_cs_rel_gnd: 0 #0.24 # m
+      height_drone_rel_load: 2 # m
+      height_load_pre_tension: -0.2 # m
+      pos_threshold: 0.3 # m
+
+      takeoff_height_load: 1.0 #m
+
+      t_cam_rel_pixhawk: [-0.1, 0.03, -0.025] # Camera translation relative to PX4 (i.e. drone body)
+      R_cam_rel_pixhawk: [np.pi, 0.0, -np.pi/2] # Camera rotation relative to PX4 (i.e. drone body)
+
+      # Timings
+      timer_period_drone: 0.1 # sec
+      timer_period_gcs_background: 0.2 # sec
+
+      cnt_threshold_drone_setup: 5/timer_period_drone # Tried 3, sometimes issues (weird circling issue of drone 2)
+      cnt_threshold_takeoff_start: 3/timer_period_drone # INCREASE IF NEEDED
+      cnt_threshold_takeoff_pre_tension: 5/timer_period_drone
+      cnt_threshold_fully_auto_pre_takeoff: 5/timer_period_drone
+      cnt_threshold_land_pre_descent: 5/timer_period_drone
+      cnt_threshold_land_post_load_down: 5/timer_period_drone
+      cnt_threshold_land_pre_disarm: 3/timer_period_drone
+      
