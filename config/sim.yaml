@@ -20,25 +20,26 @@
       fully_auto: false
       
       # Heights/distances/dimensions
-      height_drone_cs_rel_gnd: 0 #0.24 # m
-      height_drone_rel_load: 2 # m
+      height_drone_cs_rel_gnd: 0.0 #0.24 # m
+      height_drone_rel_load: 2.0 # m
       height_load_pre_tension: -0.2 # m
       pos_threshold: 0.3 # m
 
       takeoff_height_load: 1.0 #m
 
       t_cam_rel_pixhawk: [-0.1, 0.03, -0.025] # Camera translation relative to PX4 (i.e. drone body)
-      R_cam_rel_pixhawk: [np.pi, 0.0, -np.pi/2] # Camera rotation relative to PX4 (i.e. drone body)
+      R_cam_rel_pixhawk: [3.141592654, 0.0, -1.570796327] # Camera rotation relative to PX4 (i.e. drone body)
 
       # Timings
+      # Note cnt thresholds are linked to the timer periods
       timer_period_drone: 0.1 # sec
       timer_period_gcs_background: 0.2 # sec
 
-      cnt_threshold_drone_setup: 5/timer_period_drone # Tried 3, sometimes issues (weird circling issue of drone 2)
-      cnt_threshold_takeoff_start: 3/timer_period_drone # INCREASE IF NEEDED
-      cnt_threshold_takeoff_pre_tension: 5/timer_period_drone
-      cnt_threshold_fully_auto_pre_takeoff: 5/timer_period_drone
-      cnt_threshold_land_pre_descent: 5/timer_period_drone
-      cnt_threshold_land_post_load_down: 5/timer_period_drone
-      cnt_threshold_land_pre_disarm: 3/timer_period_drone
+      cnt_threshold_drone_setup: 50 #5/timer_period_drone # Tried 3, sometimes issues (weird circling issue of drone 2)
+      cnt_threshold_takeoff_start: 30 #3/timer_period_drone # INCREASE IF NEEDED
+      cnt_threshold_takeoff_pre_tension: 50
+      cnt_threshold_fully_auto_pre_takeoff: 50
+      cnt_threshold_land_pre_descent: 50
+      cnt_threshold_land_post_load_down: 50
+      cnt_threshold_land_pre_disarm: 30
       

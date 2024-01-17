@@ -284,6 +284,9 @@ class GCSBackground(Node):
         setpoint_msg_att.q_d = [float(q_d.w), float(q_d.x), float(q_d.y), float(q_d.z)]
         self.pub_load_attitude_desired.publish(setpoint_msg_att)
 
+        # Print desired pose
+        self.get_logger().info(f'Desired load pose: {self.load_desired_local_state.pos}, {self.load_desired_local_state.att_q}')
+
 
 def main(args=None):
     # Create node

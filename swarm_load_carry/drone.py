@@ -26,31 +26,6 @@ from px4_msgs.msg import VehicleAttitude, VehicleLocalPosition, OffboardControlM
 from swarm_load_carry_interfaces.srv import PhaseChange, SetLocalPose # Note must build workspace and restart IDE before custom packages are found by python
 from swarm_load_carry_interfaces.msg import Phase, GlobalPose
 
-#MAIN_TIMER_PERIOD=0.1 # sec
-
-#HEIGHT_DRONE_CS_REL_GND=0 #0.24 # m
-
-#HEIGHT_DRONE_REL_LOAD=2 # m
-#HEIGHT_LOAD_PRE_TENSION=-0.2
-#POS_THRESHOLD=0.3
-
-#TAKEOFF_HEIGHT_LOAD=1.0 #m 
-
-#SETUP_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD # Tried 3, sometimes issues (weird circling issue of drone 2)
-
-#TAKEOFF_START_CNT_THRESHOLD=3/MAIN_TIMER_PERIOD # INCREASE IF NEEDED
-#TAKEOFF_PRE_TENSION_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
-
-#LAND_PRE_DESCENT_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
-#LAND_POST_LOAD_DOWN_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
-#LAND_PRE_DISARM_CNT_THRESHOLD=3/MAIN_TIMER_PERIOD
-
-#FULLY_AUTO_PRE_TAKEOFF_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
-
-
-#t_CAM_REL_PX4 = np.array([-0.1, 0.03, -0.025]) # Camera translation relative to PX4 (i.e. drone body)
-#R_CAM_REL_PX4 = np.array([np.pi, 0.0, -np.pi/2]) # Camera rotation relative to PX4 (i.e. drone body)
-
 
 # Node to encapsulate drone information and actions
 class Drone(Node):
@@ -75,8 +50,8 @@ class Drone(Node):
         
         self.declare_parameter('fully_auto', False)
         
-        self.declare_parameter('height_drone_cs_rel_gnd', 0)
-        self.declare_parameter('height_drone_rel_load', 2)
+        self.declare_parameter('height_drone_cs_rel_gnd', 0.0)
+        self.declare_parameter('height_drone_rel_load', 2.0)
         self.declare_parameter('height_load_pre_tension', -0.2)
         self.declare_parameter('pos_threshold', 0.3)
 
