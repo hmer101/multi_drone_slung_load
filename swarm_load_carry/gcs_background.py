@@ -27,12 +27,6 @@ from swarm_load_carry_interfaces.msg import Phase
 
 from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
 
-#HEIGHT_DRONE_REL_LOAD=2 #m
-#MAX_LOAD_TAKEOFF_HEIGHT=4 #m
-
-#MAIN_TIMER_PERIOD=0.2 # s
-
-#FULLY_AUTO_MISSION_CNT_THRESHOLD=50 #10/MAIN_TIMER_PERIOD
 
 class GCSBackground(Node):
 

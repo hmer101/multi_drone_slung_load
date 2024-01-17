@@ -24,19 +24,6 @@ from geometry_msgs.msg import Pose, PoseArray
 from swarm_load_carry.state import State, CS_type
 from swarm_load_carry_interfaces.msg import Phase
 
-#PUB_LOOP_TIMER_PERIOD=0.1
-
-#HEIGHT_DRONE_CS_REL_GND=0 #0.24 # m
-#HEIGHT_LOAD_CS_REL_GND=0 #0.1 #0.1 # m
-#HEIGHT_DRONE_REL_LOAD=1.5 #2 #m
-
-
-#q_list = ft.quaternion_from_euler(0, 0, np.pi/2)
-#DRONE_1_ORIENT_REL_LOAD = np.quaternion(*q_list) # Drone initial orientation relative to load #TODO: Find better way to set load_initial frame orientation
-
-#t_MARKER_REL_LOAD = np.array([0.0, 0.0, 0.1]) # Marker translation relative to load center
-#R_MARKER_REL_LOAD = np.array([0.0, 0.0, np.pi/2]) # Marker rotation relative to load
-
 # Could make subclasses for different load types (e.g. camera etc.)
 class Load(Node):
     def __init__(self):
