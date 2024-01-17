@@ -24,18 +24,18 @@ from geometry_msgs.msg import Pose, PoseArray
 from swarm_load_carry.state import State, CS_type
 from swarm_load_carry_interfaces.msg import Phase
 
-PUB_LOOP_TIMER_PERIOD=0.1
+#PUB_LOOP_TIMER_PERIOD=0.1
 
-HEIGHT_DRONE_CS_REL_GND=0 #0.24 # m
-HEIGHT_LOAD_CS_REL_GND=0 #0.1 #0.1 # m
-HEIGHT_DRONE_REL_LOAD=1.5 #2 #m
+#HEIGHT_DRONE_CS_REL_GND=0 #0.24 # m
+#HEIGHT_LOAD_CS_REL_GND=0 #0.1 #0.1 # m
+#HEIGHT_DRONE_REL_LOAD=1.5 #2 #m
 
 
 #q_list = ft.quaternion_from_euler(0, 0, np.pi/2)
 #DRONE_1_ORIENT_REL_LOAD = np.quaternion(*q_list) # Drone initial orientation relative to load #TODO: Find better way to set load_initial frame orientation
 
-t_MARKER_REL_LOAD = np.array([0.0, 0.0, 0.1]) # Marker translation relative to load center
-R_MARKER_REL_LOAD = np.array([0.0, 0.0, np.pi/2]) # Marker rotation relative to load
+#t_MARKER_REL_LOAD = np.array([0.0, 0.0, 0.1]) # Marker translation relative to load center
+#R_MARKER_REL_LOAD = np.array([0.0, 0.0, np.pi/2]) # Marker rotation relative to load
 
 # Could make subclasses for different load types (e.g. camera etc.)
 class Load(Node):
@@ -56,11 +56,30 @@ class Load(Node):
         self.declare_parameter('first_drone_num', 1)
         self.declare_parameter('evaluate', False)
 
+        self.declare_parameter('t_marker_rel_load', [0.0, 0.0, 0.1])
+        self.declare_parameter('R_marker_rel_load', [0.0, 0.0, np.pi/2])
+
+        self.declare_parameter('height_drone_cs_rel_gnd', 0.0)
+        self.declare_parameter('height_load_cs_rel_gnd', 0.0)
+        self.declare_parameter('height_drone_rel_load', 1.5)
+
+        self.declare_parameter('timer_period_load', 0.2)
+
         self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
         self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
         self.env = self.get_parameter('env').get_parameter_value().string_value
         self.load_pose_type = self.get_parameter('load_pose_type').get_parameter_value().string_value
         self.evaluate = self.get_parameter('evaluate').get_parameter_value().bool_value
+
+        self.t_marker_rel_load = np.array(self.get_parameter('t_marker_rel_load').get_parameter_value().double_array_value)
+        self.R_marker_rel_load = np.array(self.get_parameter('R_marker_rel_load').get_parameter_value().double_array_value)
+
+        self.height_drone_cs_rel_gnd = self.get_parameter('height_drone_cs_rel_gnd').get_parameter_value().double_value
+        self.height_load_cs_rel_gnd = self.get_parameter('height_load_cs_rel_gnd').get_parameter_value().double_value
+        self.height_drone_rel_load = self.get_parameter('height_drone_rel_load').get_parameter_value().double_value
+
+        self.timer_period_load = self.get_parameter('timer_period_load').get_parameter_value().double_value
+        
 
         qos_profile = QoSProfile(
             reliability=qos.ReliabilityPolicy.BEST_EFFORT,
@@ -86,7 +105,7 @@ class Load(Node):
         self.drone_phases = np.array([-1] * self.num_drones)
 
         ## TIMERS
-        self.timer = self.create_timer(PUB_LOOP_TIMER_PERIOD, self.clbk_publoop)
+        self.timer = self.create_timer(self.timer_period_load, self.clbk_publoop)
 
         ## PUBLISHERS
         
@@ -233,14 +252,14 @@ class Load(Node):
             load_state_rel_world_qs.pos  = np.average(drone_positions, axis=0) # TODO: Wrong average!!! Should be geometric average
 
             # TODO: Better height estimate
-            min_height = HEIGHT_LOAD_CS_REL_GND - HEIGHT_DRONE_CS_REL_GND
+            min_height = self.height_load_cs_rel_gnd - self.height_drone_cs_rel_gnd
 
             # TODO: Better height estimate
             if np.all(self.drone_phases >= Phase.PHASE_TAKEOFF_POST_TENSION):
-                load_state_rel_world_qs.pos[2] -= HEIGHT_DRONE_REL_LOAD 
+                load_state_rel_world_qs.pos[2] -= self.height_drone_rel_load 
                 load_state_rel_world_qs.pos[2] = max(self.load_state_rel_world.pos[2], min_height) # Ensure load doesn't go below ground
             else: 
-                load_state_rel_world_qs.pos[2] = HEIGHT_LOAD_CS_REL_GND - HEIGHT_DRONE_CS_REL_GND
+                load_state_rel_world_qs.pos[2] = self.height_load_cs_rel_gnd - self.height_drone_cs_rel_gnd
 
             # Estimate load orientation #TODO: Better orientation estimation method
             load_state_rel_world_qs.att_q = drone_orientations[0] #np.quaternion(*drone_orientations[0, :])
@@ -260,10 +279,10 @@ class Load(Node):
 
         # Publish other static transforms
         # Marker relative to load
-        q_list = ft.quaternion_from_euler(R_MARKER_REL_LOAD[0], R_MARKER_REL_LOAD[1], R_MARKER_REL_LOAD[2])
+        q_list = ft.quaternion_from_euler(self.R_marker_rel_load[0], self.R_marker_rel_load[1], self.R_marker_rel_load[2])
         r_marker_rel_load = np.quaternion(*q_list)
-        utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}', f'load_marker{self.load_id}', t_MARKER_REL_LOAD, r_marker_rel_load, self.tf_static_broadcaster_marker_rel_load)
-        utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_gt', f'load_marker{self.load_id}_gt', t_MARKER_REL_LOAD, r_marker_rel_load, self.tf_static_broadcaster_marker_rel_load_gt)
+        utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}', f'load_marker{self.load_id}', self.t_marker_rel_load, r_marker_rel_load, self.tf_static_broadcaster_marker_rel_load)
+        utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_gt', f'load_marker{self.load_id}_gt', self.t_marker_rel_load, r_marker_rel_load, self.tf_static_broadcaster_marker_rel_load_gt)
 
         # Send complete message
         self.get_logger().info('Initial pose TF set')
