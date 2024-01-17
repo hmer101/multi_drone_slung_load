@@ -26,30 +26,30 @@ from px4_msgs.msg import VehicleAttitude, VehicleLocalPosition, OffboardControlM
 from swarm_load_carry_interfaces.srv import PhaseChange, SetLocalPose # Note must build workspace and restart IDE before custom packages are found by python
 from swarm_load_carry_interfaces.msg import Phase, GlobalPose
 
-MAIN_TIMER_PERIOD=0.1 # sec
+#MAIN_TIMER_PERIOD=0.1 # sec
 
-HEIGHT_DRONE_CS_REL_GND=0 #0.24 # m
+#HEIGHT_DRONE_CS_REL_GND=0 #0.24 # m
 
-HEIGHT_DRONE_REL_LOAD=2 # m
-HEIGHT_LOAD_PRE_TENSION=-0.2
-POS_THRESHOLD=0.3
+#HEIGHT_DRONE_REL_LOAD=2 # m
+#HEIGHT_LOAD_PRE_TENSION=-0.2
+#POS_THRESHOLD=0.3
 
-TAKEOFF_HEIGHT_LOAD=1.0 #m 
+#TAKEOFF_HEIGHT_LOAD=1.0 #m 
 
-SETUP_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD # Tried 3, sometimes issues (weird circling issue of drone 2)
+#SETUP_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD # Tried 3, sometimes issues (weird circling issue of drone 2)
 
-TAKEOFF_START_CNT_THRESHOLD=3/MAIN_TIMER_PERIOD # INCREASE IF NEEDED
-TAKEOFF_PRE_TENSION_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
+#TAKEOFF_START_CNT_THRESHOLD=3/MAIN_TIMER_PERIOD # INCREASE IF NEEDED
+#TAKEOFF_PRE_TENSION_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
 
-LAND_PRE_DESCENT_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
-LAND_POST_LOAD_DOWN_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
-LAND_PRE_DISARM_CNT_THRESHOLD=3/MAIN_TIMER_PERIOD
+#LAND_PRE_DESCENT_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
+#LAND_POST_LOAD_DOWN_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
+#LAND_PRE_DISARM_CNT_THRESHOLD=3/MAIN_TIMER_PERIOD
 
-FULLY_AUTO_PRE_TAKEOFF_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
+#FULLY_AUTO_PRE_TAKEOFF_CNT_THRESHOLD=5/MAIN_TIMER_PERIOD
 
 
-t_CAM_REL_PX4 = np.array([-0.1, 0.03, -0.025]) # Camera translation relative to PX4 (i.e. drone body)
-R_CAM_REL_PX4 = np.array([np.pi, 0.0, -np.pi/2]) # Camera rotation relative to PX4 (i.e. drone body)
+#t_CAM_REL_PX4 = np.array([-0.1, 0.03, -0.025]) # Camera translation relative to PX4 (i.e. drone body)
+#R_CAM_REL_PX4 = np.array([np.pi, 0.0, -np.pi/2]) # Camera rotation relative to PX4 (i.e. drone body)
 
 
 # Node to encapsulate drone information and actions
@@ -62,26 +62,74 @@ class Drone(Node):
         self.ns = self.get_namespace()
         self.drone_id = int(str(self.ns)[-1])
 
-        # Parameters
+        ## PARAMETERS
         self.declare_parameter('env', 'phys')
+
+        self.declare_parameter('load_id', 1)
+        self.declare_parameter('load_pose_type', 'quasi-static')
+        self.declare_parameter('evaluate', False)
+
         self.declare_parameter('num_drones', 1)
         self.declare_parameter('num_cameras', 0)
         self.declare_parameter('first_drone_num', 1)
-        self.declare_parameter('load_id', 1)
-        self.declare_parameter('load_pose_type', 'quasi-static')
+        
         self.declare_parameter('fully_auto', False)
-        self.declare_parameter('evaluate', False)
+        
+        self.declare_parameter('height_drone_cs_rel_gnd', 0)
+        self.declare_parameter('height_drone_rel_load', 2)
+        self.declare_parameter('height_load_pre_tension', -0.2)
+        self.declare_parameter('pos_threshold', 0.3)
+
+        self.declare_parameter('takeoff_height_load', 1.0)
+
+        self.declare_parameter('t_cam_rel_pixhawk', [-0.1, 0.03, -0.025])
+        self.declare_parameter('R_cam_rel_pixhawk', [np.pi, 0.0, -np.pi/2])
+
+        self.declare_parameter('timer_period_drone', 0.1)
+
+        self.declare_parameter('cnt_threshold_drone_setup', 50) # Defaults set when timer_period_drone = 0.1
+        self.declare_parameter('cnt_threshold_takeoff_start', 30)
+        self.declare_parameter('cnt_threshold_takeoff_pre_tension', 50)
+        self.declare_parameter('cnt_threshold_fully_auto_pre_takeoff', 50)
+        self.declare_parameter('cnt_threshold_land_pre_descent', 50)
+        self.declare_parameter('cnt_threshold_land_post_load_down', 50)
+        self.declare_parameter('cnt_threshold_land_pre_disarm', 30)
+
 
         self.env = self.get_parameter('env').get_parameter_value().string_value
-        self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
-        self.num_cameras = self.get_parameter('num_cameras').get_parameter_value().integer_value
-        self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
-        self.fully_auto = self.get_parameter('fully_auto').get_parameter_value().bool_value
+
         self.load_id = self.get_parameter('load_id').get_parameter_value().integer_value
         self.load_name = f'load{self.load_id}'
         self.load_pose_type = self.get_parameter('load_pose_type').get_parameter_value().string_value
         self.evaluate = self.get_parameter('evaluate').get_parameter_value().bool_value
 
+        self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
+        self.num_cameras = self.get_parameter('num_cameras').get_parameter_value().integer_value
+        self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
+        
+        self.fully_auto = self.get_parameter('fully_auto').get_parameter_value().bool_value
+        
+        self.height_drone_cs_rel_gnd = self.get_parameter('height_drone_cs_rel_gnd').get_parameter_value().double_value
+        self.height_drone_rel_load = self.get_parameter('height_drone_rel_load').get_parameter_value().double_value
+        self.height_load_pre_tension = self.get_parameter('height_load_pre_tension').get_parameter_value().double_value
+        self.pos_threshold = self.get_parameter('pos_threshold').get_parameter_value().double_value
+
+        self.takeoff_height_load = self.get_parameter('takeoff_height_load').get_parameter_value().double_value
+
+        self.t_cam_rel_pixhawk = np.array(self.get_parameter('t_cam_rel_pixhawk').get_parameter_value().double_array_value)
+        self.R_cam_rel_pixhawk = np.array(self.get_parameter('R_cam_rel_pixhawk').get_parameter_value().double_array_value)
+
+        self.timer_period_drone = self.get_parameter('timer_period_drone').get_parameter_value().double_value
+
+        self.cnt_threshold_drone_setup = self.get_parameter('cnt_threshold_drone_setup').get_parameter_value().integer_value
+        self.cnt_threshold_takeoff_start = self.get_parameter('cnt_threshold_takeoff_start').get_parameter_value().integer_value
+        self.cnt_threshold_takeoff_pre_tension = self.get_parameter('cnt_threshold_takeoff_pre_tension').get_parameter_value().integer_value
+        self.cnt_threshold_fully_auto_pre_takeoff = self.get_parameter('cnt_threshold_fully_auto_pre_takeoff').get_parameter_value().integer_value
+        self.cnt_threshold_land_pre_descent = self.get_parameter('cnt_threshold_land_pre_descent').get_parameter_value().integer_value
+        self.cnt_threshold_land_post_load_down = self.get_parameter('cnt_threshold_land_post_load_down').get_parameter_value().integer_value
+        self.cnt_threshold_land_pre_disarm = self.get_parameter('cnt_threshold_land_pre_disarm').get_parameter_value().integer_value
+
+        ## VARIABLES
         # Vehicle
         self.vehicle_status = None  # Current state of the FMU
         self.phase = Phase.PHASE_UNASSIGNED        # Desired phase (action to perform when in offboard mode. Use 'phase' to differentiate from 'mode' of the FMU)
@@ -104,8 +152,7 @@ class Drone(Node):
 
         
         ## TIMERS
-        timer_period = MAIN_TIMER_PERIOD
-        self.timer = self.create_timer(timer_period, self.clbk_cmdloop)
+        self.timer = self.create_timer(self.timer_period_drone, self.clbk_cmdloop)
         self.cnt_phase_ticks = 0
 
         ### ROS2
@@ -395,7 +442,7 @@ class Drone(Node):
         if self.fully_auto and self.phase == Phase.PHASE_UNASSIGNED and self.vehicle_status is not None:
             # Counter starts when attempt to put into offboard mode by RC
             if self.vehicle_status.nav_state_user_intention == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-                if self.cnt_phase_ticks >= FULLY_AUTO_PRE_TAKEOFF_CNT_THRESHOLD:
+                if self.cnt_phase_ticks >= self.cnt_threshold_fully_auto_pre_takeoff:
                     self.phase = Phase.PHASE_SETUP_DRONE
                     self.cnt_phase_ticks = 0
 
@@ -429,7 +476,7 @@ class Drone(Node):
                     #self.flag_reset_pre_arm_complete = False
                     self.reset_pre_arm()
                 
-                elif self.cnt_phase_ticks > SETUP_CNT_THRESHOLD: #Note: Tried flag (self.flag_reset_pre_arm_complete) but didn't work. Perhaps other processes on PX4 need time to reset (i.e. to get to reset what is published on the global pose topic)
+                elif self.cnt_phase_ticks > self.cnt_threshold_drone_setup: #Note: Tried flag (self.flag_reset_pre_arm_complete) but didn't work. Perhaps other processes on PX4 need time to reset (i.e. to get to reset what is published on the global pose topic)
                     #self.get_logger().info(f'flag_gps_home_set: {self.flag_gps_home_set}, self.flag_local_init_pose_set: {self.flag_local_init_pose_set}')
                     
                     # Set initial poses when ready
@@ -462,7 +509,7 @@ class Drone(Node):
                 tf_load_init_rel_world = utils.lookup_tf('world', f'{self.load_name}_init', self.tf_buffer, rclpy.time.Time(), self.get_logger())
 
                 # Exit setup only once load's initial pose has been set
-                if tf_load_init_rel_world != None and self.cnt_phase_ticks > SETUP_CNT_THRESHOLD:
+                if tf_load_init_rel_world != None and self.cnt_phase_ticks > self.cnt_threshold_drone_setup:
                     self.cnt_phase_ticks = 0
                     self.phase = Phase.PHASE_SETUP_GCS
                     self.get_logger().info(f'Load setup complete')
@@ -483,25 +530,25 @@ class Drone(Node):
             # Run takeoff
             case Phase.PHASE_TAKEOFF_START:               
                 # Override trajectory msg for straight-up takeoff in first phase
-                trajectory_msg = utils.gen_traj_msg_straight_up(HEIGHT_LOAD_PRE_TENSION+HEIGHT_DRONE_REL_LOAD, self.vehicle_local_state.att_q, timestamp)
+                trajectory_msg = utils.gen_traj_msg_straight_up(self.height_load_pre_tension+self.height_drone_rel_load, self.vehicle_local_state.att_q, timestamp)
 
                 # Send takeoff setpoint
                 self.pub_trajectory.publish(trajectory_msg)
 
                 # Update counter for arm phase
-                if self.cnt_phase_ticks <=TAKEOFF_START_CNT_THRESHOLD:                   
+                if self.cnt_phase_ticks <=self.cnt_threshold_takeoff_start:                   
                     self.cnt_phase_ticks += 1
 
                 # Continue to send setpoint whilst taking off
                 if self.vehicle_status.arming_state==VehicleStatus.ARMING_STATE_ARMED and self.vehicle_status.nav_state==VehicleStatus.NAVIGATION_STATE_OFFBOARD:
                     # Takeoff to pre-tension level. Only transition once pre-tension level reached and pose rel load set
-                    if tf_drone_rel_world.transform.translation.z>=(HEIGHT_LOAD_PRE_TENSION+HEIGHT_DRONE_REL_LOAD-POS_THRESHOLD): 
+                    if tf_drone_rel_world.transform.translation.z>=(self.height_load_pre_tension+self.height_drone_rel_load-self.pos_threshold): 
                         self.phase = Phase.PHASE_TAKEOFF_PRE_TENSION
                         self.cnt_phase_ticks = 0  
                         self.get_logger().info(f'Pre-tension level reached')        
 
                 # Arm vehicle (and switch to offboard mode) when offboard message has been published for long enough, and if not already armed or in offboard mode
-                elif self.cnt_phase_ticks >= TAKEOFF_START_CNT_THRESHOLD:                   
+                elif self.cnt_phase_ticks >= self.cnt_threshold_takeoff_start:                   
                     # Set in offboard mode
                     if self.vehicle_status.nav_state!=VehicleStatus.NAVIGATION_STATE_OFFBOARD:
                         offboard_ros.engage_offboard_mode(self.pub_vehicle_command, timestamp)
@@ -516,7 +563,7 @@ class Drone(Node):
                 self.pub_trajectory.publish(trajectory_msg)
 
                 # Wait before attempt to pick up load as get into formation
-                if self.cnt_phase_ticks < TAKEOFF_PRE_TENSION_CNT_THRESHOLD:
+                if self.cnt_phase_ticks < self.cnt_threshold_takeoff_pre_tension:
                     self.cnt_phase_ticks += 1
                 else:
                     self.phase = Phase.PHASE_TAKEOFF_POST_TENSION
@@ -526,7 +573,7 @@ class Drone(Node):
 
             case Phase.PHASE_TAKEOFF_POST_TENSION:
                 #Takeoff complete
-                if tf_drone_rel_world.transform.translation.z>=(TAKEOFF_HEIGHT_LOAD+HEIGHT_DRONE_REL_LOAD-POS_THRESHOLD):     
+                if tf_drone_rel_world.transform.translation.z>=(self.takeoff_height_load+self.height_drone_rel_load-self.pos_threshold):     
                     self.phase = Phase.PHASE_TAKEOFF_END 
                     
                     self.get_logger().info(f'TAKEOFF COMPLETE')
@@ -548,7 +595,7 @@ class Drone(Node):
 
             # Run land 
             case Phase.PHASE_LAND_START:
-                if self.cnt_phase_ticks < LAND_PRE_DESCENT_CNT_THRESHOLD:
+                if self.cnt_phase_ticks < self.cnt_threshold_land_pre_descent:
                     self.cnt_phase_ticks += 1
                 else:
                     self.phase = Phase.PHASE_LAND_DESCENT
@@ -559,7 +606,7 @@ class Drone(Node):
                 self.pub_trajectory.publish(trajectory_msg)
             
             case Phase.PHASE_LAND_DESCENT:
-                if tf_drone_rel_world.transform.translation.z<=(HEIGHT_LOAD_PRE_TENSION+HEIGHT_DRONE_REL_LOAD-POS_THRESHOLD):
+                if tf_drone_rel_world.transform.translation.z<=(self.height_load_pre_tension+self.height_drone_rel_load-self.pos_threshold):
                     self.phase = Phase.PHASE_LAND_POST_LOAD_DOWN
                     self.get_logger().info(f'Load placed on ground') 
 
@@ -568,7 +615,7 @@ class Drone(Node):
 
 
             case Phase.PHASE_LAND_POST_LOAD_DOWN:
-                if self.cnt_phase_ticks <LAND_POST_LOAD_DOWN_CNT_THRESHOLD:
+                if self.cnt_phase_ticks <self.cnt_threshold_land_post_load_down:
                     self.cnt_phase_ticks += 1
                 else: 
                     self.phase = Phase.PHASE_LAND_END
@@ -584,7 +631,7 @@ class Drone(Node):
             case Phase.PHASE_LAND_END:
                 # Disarm when landed
                 if tf_drone_rel_world.transform.translation.z<=0.05:
-                    if self.cnt_phase_ticks <LAND_PRE_DISARM_CNT_THRESHOLD:
+                    if self.cnt_phase_ticks <self.cnt_threshold_land_pre_disarm:
                         self.cnt_phase_ticks += 1
                     else:
                         offboard_ros.disarm(self.pub_vehicle_command, timestamp)
@@ -636,10 +683,10 @@ class Drone(Node):
         # Publish other static transforms
         # Camera relative to drone
         if self.num_cameras > 0:
-            q_list = ft.quaternion_from_euler(R_CAM_REL_PX4[0], R_CAM_REL_PX4[1], R_CAM_REL_PX4[2])
-            r_cam_rel_px4 = np.quaternion(*q_list)
-            utils.broadcast_tf(self.get_clock().now().to_msg(), f'drone{self.drone_id}', f'camera{self.drone_id}', t_CAM_REL_PX4, r_cam_rel_px4, self.tf_static_broadcaster_cam_rel_drone)
-            utils.broadcast_tf(self.get_clock().now().to_msg(), f'drone{self.drone_id}_gt', f'camera{self.drone_id}_gt', t_CAM_REL_PX4, r_cam_rel_px4, self.tf_static_broadcaster_cam_rel_drone_gt)
+            q_list = ft.quaternion_from_euler(self.R_cam_rel_pixhawk[0], self.R_cam_rel_pixhawk[1], self.R_cam_rel_pixhawk[2])
+            r_cam_rel_pixhawk = np.quaternion(*q_list)
+            utils.broadcast_tf(self.get_clock().now().to_msg(), f'drone{self.drone_id}', f'camera{self.drone_id}', self.t_cam_rel_pixhawk, r_cam_rel_pixhawk, self.tf_static_broadcaster_cam_rel_drone)
+            utils.broadcast_tf(self.get_clock().now().to_msg(), f'drone{self.drone_id}_gt', f'camera{self.drone_id}_gt', self.t_cam_rel_pixhawk, r_cam_rel_pixhawk, self.tf_static_broadcaster_cam_rel_drone_gt)
 
         # Send complete message
         self.flag_local_init_pose_set = True 
@@ -653,7 +700,7 @@ class Drone(Node):
         trans_E, trans_N, trans_U = pm.geodetic2enu(self.vehicle_initial_global_state.pos[0], self.vehicle_initial_global_state.pos[1], self.vehicle_initial_global_state.pos[2], origin_state_lla.pos[0], origin_state_lla.pos[1], origin_state_lla.pos[2]) 
         
         # Set local init pose (relative to base CS)
-        self.vehicle_initial_state_rel_world.pos = np.array([trans_E, trans_N, trans_U+HEIGHT_DRONE_CS_REL_GND])
+        self.vehicle_initial_state_rel_world.pos = np.array([trans_E, trans_N, trans_U+self.height_drone_cs_rel_gnd])
         self.vehicle_initial_state_rel_world.att_q = self.vehicle_initial_global_state.att_q.copy() #TODO: If required to set relative to world, need extra flag to ensure inital att is set before sending global init pose
 
         # Broadcast tf
@@ -661,7 +708,7 @@ class Drone(Node):
 
     def set_local_init_pose_first_drone(self):
         # Set local initial state
-        self.vehicle_initial_state_rel_world.pos = np.array([0.0, 0.0, HEIGHT_DRONE_CS_REL_GND])
+        self.vehicle_initial_state_rel_world.pos = np.array([0.0, 0.0, self.height_drone_cs_rel_gnd])
         self.vehicle_initial_state_rel_world.att_q = self.vehicle_initial_global_state.att_q.copy()
 
         # Broadcast tf

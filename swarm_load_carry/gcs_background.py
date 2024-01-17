@@ -27,11 +27,6 @@ from swarm_load_carry_interfaces.msg import Phase
 
 from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
 
-DEFAULT_DRONE_NUM=1
-DEFAULT_FIRST_DRONE_NUM=1
-DEFAULT_LOAD_ID=1
-DEFAULT_FULLY_AUTO=False
-
 HEIGHT_DRONE_REL_LOAD=2 #m
 MAX_LOAD_TAKEOFF_HEIGHT=4 #m
 
@@ -52,11 +47,11 @@ class GCSBackground(Node):
             depth=1
         )
 
-        self.declare_parameter('num_drones', DEFAULT_DRONE_NUM)
-        self.declare_parameter('first_drone_num', DEFAULT_FIRST_DRONE_NUM)
-        self.declare_parameter('load_id', DEFAULT_LOAD_ID)
+        self.declare_parameter('num_drones', 3)
+        self.declare_parameter('first_drone_num', 1)
+        self.declare_parameter('load_id', 1)
         self.declare_parameter('drone_order', [1, 2, 3])
-        self.declare_parameter('fully_auto', DEFAULT_FULLY_AUTO)
+        self.declare_parameter('fully_auto', False)
         
         self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
         self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
