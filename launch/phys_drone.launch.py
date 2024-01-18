@@ -33,7 +33,7 @@ def generate_launch_description():
         drone,
         ExecuteProcess(
             cmd=[[
-                f'gnome-terminal --tab -- bash -c "MicroXRCEAgent udp4 -p 8888"',
+                f'bash -c "MicroXRCEAgent udp4 -p 8888"', #gnome-terminal --tab -- 
             ]],
             shell=True
         )])
