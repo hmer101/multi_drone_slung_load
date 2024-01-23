@@ -22,7 +22,7 @@ from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
 from geometry_msgs.msg import Pose, PoseArray
-from px4_msgs.msg import VehicleAttitude, VehicleLocalPosition, OffboardControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint, VehicleGlobalPosition
+from px4_msgs.msg import VehicleAttitude, VehicleLocalPosition, OffboardControlMode, VehicleControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint, VehicleGlobalPosition
 from swarm_load_carry_interfaces.srv import PhaseChange, SetLocalPose # Note must build workspace and restart IDE before custom packages are found by python
 from swarm_load_carry_interfaces.msg import Phase, GlobalPose
 
@@ -132,7 +132,9 @@ class Drone(Node):
         ## VARIABLES
         # Vehicle
         self.vehicle_status = None  # Current state of the FMU
+        self.offboard_enabled = False  # If the FMU has offboard control enabled
         self.phase = Phase.PHASE_UNASSIGNED        # Desired phase (action to perform when in offboard mode. Use 'phase' to differentiate from 'mode' of the FMU)
+        self.phase_restore = Phase.PHASE_UNASSIGNED # Phase to restore to after dropping out of offboard mode 
 
         self.vehicle_local_state = State(f'{self.get_name()}_init', CS_type.ENU)
 
@@ -198,6 +200,12 @@ class Drone(Node):
             VehicleStatus,
             f'{self.ns}/fmu/out/vehicle_status',
             self.clbk_vehicle_status,
+            qos_profile)
+        
+        self.status_sub = self.create_subscription(
+            VehicleControlMode,
+            f'{self.ns}/fmu/out/vehicle_control_mode',
+            self.clbk_vehicle_control_mode,
             qos_profile)
 
         self.sub_attitude = self.create_subscription(
@@ -297,6 +305,9 @@ class Drone(Node):
     ## CALLBACKS
     def clbk_vehicle_status(self, msg):
         self.vehicle_status = msg
+
+    def clbk_vehicle_control_mode(self, msg):
+        self.offboard_enabled = msg.flag_control_offboard_enabled
 
     def clbk_vehicle_attitude(self, msg):
         # Original q from FRD->NED
@@ -426,7 +437,22 @@ class Drone(Node):
         return response
 
 
-    def clbk_cmdloop(self):       
+    def clbk_cmdloop(self):  
+        # Safety switch for switching out of offboard mode and back into offboard mode
+        if self.vehicle_status is not None:    
+            # If taken out of offboard mode by RC, and not pre-setup (in unassigned phase), switch to hold phase
+            if self.vehicle_status.nav_state_user_intention != VehicleStatus.NAVIGATION_STATE_OFFBOARD and self.phase != Phase.PHASE_UNASSIGNED:
+                self.phase_restore = self.phase
+                self.phase = Phase.PHASE_HOLD
+                self.get_logger().info(f'Offboard mode switched off. Switching to hold phase.')
+
+            # If only just put into offboard mode by RC, and a phase to restore has been set, restore to that phase
+            elif self.vehicle_status.nav_state_user_intention == VehicleStatus.NAVIGATION_STATE_OFFBOARD and self.phase_restore != Phase.PHASE_UNASSIGNED:
+                self.phase = self.phase_restore
+                self.phase_restore = Phase.PHASE_UNASSIGNED
+                self.get_logger().info(f'Offboard mode switched on. Restoring to phase {self.phase}.')
+
+
         # Continually publish offboard mode heartbeat (note need setpoint published too to stay in offboard mode)
         timestamp = int(self.get_clock().now().nanoseconds/1000)
         offboard_ros.publish_offboard_control_heartbeat_signal(self.pub_offboard_mode, 'pos', timestamp)
