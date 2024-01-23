@@ -45,6 +45,7 @@ class GCSBackground(Node):
         self.declare_parameter('load_id', 1)
         self.declare_parameter('drone_order', [1, 2, 3])
         self.declare_parameter('fully_auto', False)
+
         self.declare_parameter('height_drone_rel_load', 1.5)
         self.declare_parameter('max_load_takeoff_height', 4.0)
 
