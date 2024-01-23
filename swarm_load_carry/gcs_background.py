@@ -205,7 +205,12 @@ class GCSBackground(Node):
             self.load_desired_local_state.pos = np.array([self.load_desired_local_state.pos[0], self.load_desired_local_state.pos[1], self.load_desired_local_state.pos[2] - 0.3*self.timer_period_gcs_background]) #- 0.1
 
         elif np.all(self.drone_phases == Phase.PHASE_LAND_POST_LOAD_DOWN):
-            self.set_drone_arrangement(1.3, np.array([1, 1, 1]), np.array([0, np.pi*(2/self.num_drones), -np.pi*(2/self.num_drones)]))
+            # Spread drones out
+            self.set_drone_arrangement(1.3, np.array([self.height_drone_rel_load-0.1, self.height_drone_rel_load-0.1, self.height_drone_rel_load-0.1]), np.array([0, np.pi*(2/self.num_drones), -np.pi*(2/self.num_drones)]))
+
+        elif np.all(self.drone_phases == Phase.PHASE_LAND_DRONES):
+            # Slowly land drones
+            self.load_desired_local_state.pos = np.array([self.load_desired_local_state.pos[0], self.load_desired_local_state.pos[1], self.load_desired_local_state.pos[2] - 0.3*self.timer_period_gcs_background])
 
         self.send_desired_pose()
 

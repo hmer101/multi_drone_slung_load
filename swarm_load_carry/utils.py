@@ -201,13 +201,13 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
 
 
 # Generate trajectory message that gives setpoint at a specific height and orientation
-def gen_traj_msg_straight_up(takeoff_height, takeoff_q, timestamp):
+def gen_traj_msg_straight_up(takeoff_height, takeoff_q, timestamp, takeoff_N=0.0, takeoff_E=0.0):
     trajectory_msg = TrajectorySetpoint()
     trajectory_msg.timestamp = timestamp
 
     # Set position straight up
-    trajectory_msg.position[0] = 0.0
-    trajectory_msg.position[1] = 0.0
+    trajectory_msg.position[0] = takeoff_N
+    trajectory_msg.position[1] = takeoff_E
     trajectory_msg.position[2] = -takeoff_height
 
     # Get yaw in NED from takeoff_q

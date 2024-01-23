@@ -67,6 +67,7 @@ class Drone(Node):
         self.declare_parameter('cnt_threshold_fully_auto_pre_takeoff', 50)
         self.declare_parameter('cnt_threshold_land_pre_descent', 50)
         self.declare_parameter('cnt_threshold_land_post_load_down', 50)
+        self.declare_parameter('cnt_threshold_land_drones', 50)
         self.declare_parameter('cnt_threshold_land_pre_disarm', 30)
 
 
@@ -101,6 +102,7 @@ class Drone(Node):
         self.cnt_threshold_fully_auto_pre_takeoff = self.get_parameter('cnt_threshold_fully_auto_pre_takeoff').get_parameter_value().integer_value
         self.cnt_threshold_land_pre_descent = self.get_parameter('cnt_threshold_land_pre_descent').get_parameter_value().integer_value
         self.cnt_threshold_land_post_load_down = self.get_parameter('cnt_threshold_land_post_load_down').get_parameter_value().integer_value
+        self.cnt_threshold_land_drones = self.get_parameter('cnt_threshold_land_drones').get_parameter_value().integer_value
         self.cnt_threshold_land_pre_disarm = self.get_parameter('cnt_threshold_land_pre_disarm').get_parameter_value().integer_value
 
         ## VARIABLES
@@ -413,9 +415,11 @@ class Drone(Node):
 
     def clbk_cmdloop(self):  
         # Safety switch for switching out of offboard mode and back into offboard mode
-        if self.vehicle_status is not None:    
-            # If taken out of offboard mode by RC, and not pre-setup (in unassigned phase), switch to hold phase
-            if self.vehicle_status.nav_state_user_intention != VehicleStatus.NAVIGATION_STATE_OFFBOARD and self.phase != Phase.PHASE_UNASSIGNED:
+        if self.vehicle_status is not None: # and if self.env == 'phys':
+            # If taken out of offboard mode by RC, and not pre-setup, switch to hold phase
+            # Don't include land drones phase as intentionally switch out of offboard mode here
+            if self.vehicle_status.nav_state_user_intention != VehicleStatus.NAVIGATION_STATE_OFFBOARD \
+                and self.phase >= Phase.PHASE_TAKEOFF_START and self.phase != Phase.PHASE_HOLD and self.phase != Phase.PHASE_KILL and self.phase != Phase.PHASE_LAND_DRONES and self.phase != Phase.PHASE_LAND_END:
                 self.phase_restore = self.phase
                 self.phase = Phase.PHASE_HOLD
                 self.get_logger().info(f'Offboard mode switched off. Switching to hold phase.')
@@ -618,13 +622,25 @@ class Drone(Node):
                 if self.cnt_phase_ticks <self.cnt_threshold_land_post_load_down:
                     self.cnt_phase_ticks += 1
                 else: 
-                    self.phase = Phase.PHASE_LAND_END
+                    self.phase = Phase.PHASE_LAND_DRONES
                     self.cnt_phase_ticks = 0
                     self.get_logger().info(f'Ready to set drones down') 
 
+                # Send spread out setpoint
+                self.pub_trajectory.publish(trajectory_msg)
+
+
+            case Phase.PHASE_LAND_DRONES:
+                if self.cnt_phase_ticks <self.cnt_threshold_land_drones:
+                    self.cnt_phase_ticks += 1
+                else: 
+                    self.phase = Phase.PHASE_LAND_END
+                    self.cnt_phase_ticks = 0
+                    self.get_logger().info(f'Ready to disarm') 
+
                     offboard_ros.land(self.pub_vehicle_command, timestamp) 
 
-                # Send spread out setpoint
+                # Send landing setpoint
                 self.pub_trajectory.publish(trajectory_msg)
 
 

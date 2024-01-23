@@ -48,5 +48,6 @@
       cnt_threshold_fully_auto_pre_takeoff: 50
       cnt_threshold_land_pre_descent: 50
       cnt_threshold_land_post_load_down: 50
+      cnt_threshold_land_drones: 60
       cnt_threshold_land_pre_disarm: 30
       
