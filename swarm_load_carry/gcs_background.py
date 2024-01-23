@@ -27,7 +27,6 @@ from swarm_load_carry_interfaces.msg import Phase
 
 from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
 
-
 class GCSBackground(Node):
 
     def __init__(self):
