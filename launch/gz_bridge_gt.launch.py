@@ -29,13 +29,19 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():   
+    gz_bridge_clock = IncludeLaunchDescription(
+      PythonLaunchDescriptionSource([os.path.join(
+         get_package_share_directory('swarm_load_carry'), 'launch'),
+         '/gz_bridge_clock.launch.py'])
+      )
+    
     # Gz - ROS Bridge for publishing ground truth poses
-    bridge = Node(
+    bridge_gt = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
         arguments=[
             # Clock (IGN -> ROS2)
-            '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
+            #'/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
 
             # Load 1 (IGN -> ROS2)
             '/model/swarm/model/load/pose_static@geometry_msgs/msg/PoseArray[gz.msgs.Pose_V',
@@ -57,5 +63,6 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        bridge
+        gz_bridge_clock,
+        bridge_gt
     ])

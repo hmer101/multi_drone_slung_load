@@ -69,7 +69,8 @@ def publish_offboard_control_heartbeat_signal(pub_offboard_mode, what_control, t
     msg.acceleration = False
     msg.attitude = False
     msg.body_rate = False
-    msg.actuator = False
+    msg.thrust_and_torque = False
+    msg.direct_actuator = False
 
     match what_control:
         case 'pos':
