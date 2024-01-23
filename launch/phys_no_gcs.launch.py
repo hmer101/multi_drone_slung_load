@@ -3,14 +3,16 @@ import os, yaml
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, IncludeLaunchDescription
+from launch.actions import ExecuteProcess
 from launch_ros.actions import Node
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration, PythonExpression
 
 ENV='phys'
 
 def generate_launch_description():
     ## Get parameters 
+    drone_id_env = os.environ.get('DRONE_ID', 1) # Note must first set environment variable with export DRONE_ID=1
+
     config = os.path.join(
       get_package_share_directory('swarm_load_carry'),
       'config',
@@ -21,7 +23,6 @@ def generate_launch_description():
         params = yaml.safe_load(file)
     
     load_id = params["/**"]["ros__parameters"]["load_id"]
-    this_drone_num = params["/**"]["ros__parameters"]["this_drone_num"]
     first_drone_num = params["/**"]["ros__parameters"]["first_drone_num"]
 
     ## INCLUDE LAUNCH FILES
@@ -56,7 +57,7 @@ def generate_launch_description():
     launch_description = [drone]
 
     # Only launch load and gcs_background on 1st drone (drones must be networked)
-    if this_drone_num == first_drone_num:
+    if int(drone_id_env) == first_drone_num:
         launch_description.append(load)
         launch_description.append(gcs_background)
         #launch_description.append(gcs_user)

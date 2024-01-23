@@ -25,6 +25,7 @@
       height_drone_rel_load: 2.0 # m
       height_load_pre_tension: -0.2 # m
       height_max_load_takeoff: 4 #m
+
       pos_threshold: 0.3 # m
 
       takeoff_height_load: 1.0 #m

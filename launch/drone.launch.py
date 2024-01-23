@@ -5,6 +5,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch_ros.actions import Node
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration, PythonExpression
 
 DEFAULT_DRONE_ID=1
 DEFAULT_ENV='phys'
@@ -18,11 +19,8 @@ def generate_launch_description():
       'env', default_value=str(DEFAULT_ENV)
     )
 
-    # Get arguments
-    drone_id = DEFAULT_DRONE_ID
-    for arg in sys.argv:
-        if arg.startswith("drone_id:="):
-            drone_id = int(arg.split(":=")[1])
+    # Get arguments  
+    drone_id = LaunchConfiguration('drone_id')
 
     env = DEFAULT_ENV
     for arg in sys.argv:
@@ -53,8 +51,8 @@ def generate_launch_description():
         Node(
          package='swarm_load_carry',
          executable='drone',
-         namespace=f'/px4_{drone_id}',
-         name=f'drone{drone_id}',
+         namespace=PythonExpression(["'/px4_' + str(", drone_id, ")"]),
+         name=PythonExpression(["'drone' + str(", drone_id, ")"]),
          output='screen',
          parameters=[config]
         )
