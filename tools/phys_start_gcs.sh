@@ -39,7 +39,7 @@ do
 	drone_count=$((drone_count + 1))
 
 
-done < ../config/phys_drones_info.txt #Note this file needs a blank line at the end 
+done < ../config/phys_drones_info.txt #Note this file needs a blank line at the end. Contains 'device_uuid main_container_id' for each drone on a new line
 
 
 # Run GCS ROS2 launch

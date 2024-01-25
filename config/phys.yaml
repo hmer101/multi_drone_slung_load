@@ -1,17 +1,52 @@
 /**:
     ros__parameters:
       env: 'phys'
-      
+           
+      ## LOAD SETTINGS
       load_id: 1
       load_pose_type: 'quasi-static' # quasi-static, visual, ground_truth
       evaluate: false # If you want to evaluate the tracking performance of the load
-      show_markers: 0 # Show the detected markers 0 = No, 1 = Yes, all, 2 = Drone 1 only
+      show_markers: 0 # Show the detected markers 0 = No, 1 = Yes all, 2 = Drone 1 only # TODO: Replace with ENUM?
 
+      ## DRONE SETTINGS
       first_drone_num: 1
-      num_drones: 1 #3
-      this_drone_num: 1
+      num_drones: 3
+      num_cameras: 0 # 0 if cameras are off
+    
+      drone_order: [1] #, 2, 3] #ACW from load's x axis
 
+      ## PHASE SETTINGS 
       fully_auto: false
       
-      drone_order: [1] #[1, 2, 3] #ACW from load's x axis
+      # Heights/distances/dimensions
+      height_drone_cs_rel_gnd: 0.0 #0.24 # m
+      height_load_cs_rel_gnd: 0.0 #0.1 # m
+      height_drone_rel_load: 2.0 # m
+      height_load_pre_tension: -0.2 # m
+      height_max_load_takeoff: 4 #m
+
+      pos_threshold: 0.3 # m
+
+      takeoff_height_load: 1.0 #m
+
+      t_cam_rel_pixhawk: [-0.1, 0.03, -0.025] # Camera translation relative to PX4 (i.e. drone body)
+      R_cam_rel_pixhawk: [3.141592654, 0.0, -1.570796327] # Camera rotation relative to PX4 (i.e. drone body)
+
+      t_marker_rel_load: [0.0, 0.0, 0.1] # Marker translation relative to load
+      R_marker_rel_load: [0.0, 0.0, 1.570796327] # Marker rotation relative to load
+
+      # Timings
+      # Note cnt thresholds are linked to the timer periods
+      timer_period_drone: 0.1 # sec
+      timer_period_gcs_background: 0.2 # sec
+      timer_period_load: 0.1 # sec
+
+      cnt_threshold_drone_setup: 50 #5/timer_period_drone # Tried 3, sometimes issues (weird circling issue of drone 2)
+      cnt_threshold_takeoff_start: 30 #3/timer_period_drone # INCREASE IF NEEDED
+      cnt_threshold_takeoff_pre_tension: 50
+      cnt_threshold_fully_auto_pre_takeoff: 50
+      cnt_threshold_land_pre_descent: 50
+      cnt_threshold_land_post_load_down: 50
+      cnt_threshold_land_drones: 60
+      cnt_threshold_land_pre_disarm: 30
       
