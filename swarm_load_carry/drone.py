@@ -481,7 +481,7 @@ class Drone(Node):
                     self.reset_pre_arm()
                 
                 elif self.cnt_phase_ticks > self.cnt_threshold_drone_setup: #Note: Tried flag (self.flag_reset_pre_arm_complete) but didn't work. Perhaps other processes on PX4 need time to reset (i.e. to get to reset what is published on the global pose topic)
-                    #self.get_logger().info(f'flag_gps_home_set: {self.flag_gps_home_set}, self.flag_local_init_pose_set: {self.flag_local_init_pose_set}')
+                    self.get_logger().info(f'flag_gps_home_set: {self.flag_gps_home_set}, self.flag_local_init_pose_set: {self.flag_local_init_pose_set}')
                     
                     # Set initial poses when ready
                     if self.flag_gps_home_set and not self.flag_local_init_pose_set:                    
