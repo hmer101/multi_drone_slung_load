@@ -10,7 +10,7 @@
 
       ## DRONE SETTINGS
       first_drone_num: 1
-      num_drones: 3
+      num_drones: 1
       num_cameras: 0 # 0 if cameras are off
     
       drone_order: [1] #, 2, 3] #ACW from load's x axis

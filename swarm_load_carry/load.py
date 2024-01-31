@@ -244,7 +244,7 @@ class Load(Node):
             # TODO: Better height estimate
             if np.all(self.drone_phases >= Phase.PHASE_TAKEOFF_POST_TENSION):
                 load_state_rel_world_qs.pos[2] -= self.height_drone_rel_load 
-                load_state_rel_world_qs.pos[2] = max(self.load_state_rel_world.pos[2], min_height) # Ensure load doesn't go below ground
+                load_state_rel_world_qs.pos[2] = max(load_state_rel_world_qs.pos[2], min_height) # Ensure load doesn't go below ground
             else: 
                 load_state_rel_world_qs.pos[2] = self.height_load_cs_rel_gnd - self.height_drone_cs_rel_gnd
 

@@ -118,17 +118,16 @@ class GCSBackground(Node):
             # Desired poses rel load
             self.cli_set_drone_poses_rel_load[i-self.first_drone_num] = self.create_client(SetLocalPose,f'/px4_{i}/desired_pose_rel_load')
 
-            while not self.cli_set_drone_poses_rel_load[i-self.first_drone_num].wait_for_service(timeout_sec=1.0):
+            while not self.cli_set_drone_poses_rel_load[i-self.first_drone_num].wait_for_service(timeout_sec=3.0): #1.0
                 self.get_logger().info(f'Waiting for set pose rel load service: drone {i}')
 
         # Phase change
         self.cli_phase_change = [None] * self.num_drones
-        #self.phase_future = [None] * self.num_drones
 
         for i in range(self.first_drone_num, self.num_drones+self.first_drone_num):
             self.cli_phase_change[i-self.first_drone_num] = self.create_client(PhaseChange,f'/px4_{i}/phase_change')
-            while not self.cli_phase_change[i-self.first_drone_num].wait_for_service(timeout_sec=1.0):
-                self.get_logger().info(f'Waiting for offboard ROS start service {i}')
+            while not self.cli_phase_change[i-self.first_drone_num].wait_for_service(timeout_sec=3.0): #1.0
+                self.get_logger().info(f'Waiting for phase change service: drone {i}')  
 
         self.get_logger().info('Setup complete')
 

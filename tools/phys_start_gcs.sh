@@ -13,6 +13,7 @@ line_num=0  # Initialize a line counter
 gnome-terminal --tab -- bash -c "/home/harvey/.appImage/QGroundControl.AppImage" #; exec bash"
 
 # Balena SSH into drones and view the logs
+# Note must be on same network as drones (BilabRover_2.4GHz)
 while IFS= read -r line
 do
 	# Start at START_DRONE_NUM and end at NUM_DRONES
