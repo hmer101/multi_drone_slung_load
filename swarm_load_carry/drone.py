@@ -554,11 +554,11 @@ class Drone(Node):
                 # Arm vehicle (and switch to offboard mode) when offboard message has been published for long enough, and if not already armed or in offboard mode
                 elif self.cnt_phase_ticks >= self.cnt_threshold_takeoff_start:                   
                     # Set in offboard mode
-                    if self.vehicle_status.nav_state!=VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-                        offboard_ros.engage_offboard_mode(self.pub_vehicle_command, timestamp)
+                    # if self.vehicle_status.nav_state!=VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+                    #     offboard_ros.engage_offboard_mode(self.pub_vehicle_command, timestamp)
 
                     # Arm (once in offboard mode)
-                    elif self.vehicle_status.arming_state!=VehicleStatus.ARMING_STATE_ARMED:
+                    if self.vehicle_status.arming_state!=VehicleStatus.ARMING_STATE_ARMED: #elif
                         offboard_ros.arm(self.pub_vehicle_command, timestamp)
 
 
@@ -638,7 +638,7 @@ class Drone(Node):
                     self.cnt_phase_ticks = 0
                     self.get_logger().info(f'Ready to disarm') 
 
-                    offboard_ros.land(self.pub_vehicle_command, timestamp) 
+                    #offboard_ros.land(self.pub_vehicle_command, timestamp) 
 
                 # Send landing setpoint
                 self.pub_trajectory.publish(trajectory_msg)
@@ -650,8 +650,8 @@ class Drone(Node):
                     if self.cnt_phase_ticks <self.cnt_threshold_land_pre_disarm:
                         self.cnt_phase_ticks += 1
                     else:
-                        offboard_ros.disarm(self.pub_vehicle_command, timestamp)
-                        offboard_ros.disengage_offboard_mode(self.pub_vehicle_command, timestamp)
+                        #offboard_ros.disengage_offboard_mode(self.pub_vehicle_command, timestamp)
+                        #offboard_ros.disarm(self.pub_vehicle_command, timestamp)
                         self.phase = Phase.PHASE_UNASSIGNED
                         self.cnt_phase_ticks = 0
 
