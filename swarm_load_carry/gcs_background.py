@@ -182,9 +182,9 @@ class GCSBackground(Node):
         elif np.all(self.drone_phases == Phase.PHASE_MISSION_START):
             ## Perform mission - currently move load in circle
             # Parameters
-            v_lin = 5.0 #0.5 # m/s
+            v_lin = 0.5 # m/s
 
-            r = 10 #2 #10 # m
+            r = 2 #10 # m
             omega = v_lin/r # rad/s
             dt = self.timer_period_gcs_background # s
 
@@ -213,14 +213,24 @@ class GCSBackground(Node):
 
             #         count_tf += 1
 
-            self.load_desired_local_state, yaw_change_desired_altered = self.formation_control_load(x_load_d, self.load_desired_local_state_prev.pos, omega*dt, self.mission_theta, dt)
+            # TODO: Make this work
+            #self.load_desired_local_state, yaw_change_desired_altered = self.formation_control_load(x_load_d, self.load_desired_local_state_prev.pos, omega*dt, self.mission_theta, dt)
+
 
 
             # TODO: Use drone feedback for collision prevention
 
 
+            # TODO: Remove this temp without formation feedback
+            self.load_desired_local_state.pos = x_load_d
+            
+            load_init_yaw = ft.quaternion_get_yaw([self.load_initial_local_state.att_q.w, self.load_initial_local_state.att_q.x, self.load_initial_local_state.att_q.y, self.load_initial_local_state.att_q.z])
+            q_list = ft.quaternion_from_euler(0.0, 0.0, load_init_yaw + self.mission_theta)
+            self.load_desired_local_state.att_q = np.quaternion(*q_list)
+
+
             # Update theta
-            self.mission_theta = self.mission_theta + yaw_change_desired_altered
+            self.mission_theta = self.mission_theta + omega*dt #yaw_change_desired_altered
 
             self.cnt_phase_ticks += 1
 
@@ -253,14 +263,14 @@ class GCSBackground(Node):
 
 
     ## HELPERS
-    def formation_control_load(self, x_load_desired, x_load_prev, yaw_change_desired, yaw_desired_prev, dt):
+    def formation_control_load(self, x_load_desired, x_load_desired_prev, yaw_change_desired, yaw_desired_prev, dt):
         # Get current load position
         t_load = utils.lookup_tf(f'load{self.load_id}_init', f'load{self.load_id}', self.tf_buffer, rclpy.time.Time(), self.get_logger())
         x_load = np.array([t_load.transform.translation.x, t_load.transform.translation.y, t_load.transform.translation.z])
 
         # Calculate desired load velocity
         #self.get_logger().info(f'x_load_desired: {x_load_desired}, x_load_prev: {x_load_prev}')
-        x_dot_load_desired_nom = (x_load_desired - x_load_prev)/dt
+        x_dot_load_desired_nom = (x_load_desired - x_load_desired_prev)/dt
         self.get_logger().info(f'x_dot_load_desired_nom: {x_dot_load_desired_nom}')
 
         # Alter desired load velocity to maintain formation using current load position feedback 
@@ -269,16 +279,16 @@ class GCSBackground(Node):
 
         self.get_logger().info(f'x_dot_load_desired: {x_dot_load_desired}')
 
-        x_load_desired_altered = x_load_desired + x_dot_load_desired*dt
+        x_load_desired_altered = x_load_desired_prev + x_dot_load_desired*dt #x_load_desired
 
 
         # Attitude
         load_init_yaw = ft.quaternion_get_yaw([self.load_initial_local_state.att_q.w, self.load_initial_local_state.att_q.x, self.load_initial_local_state.att_q.y, self.load_initial_local_state.att_q.z])
 
-        if np.linalg.norm(x_load_desired - x_load_prev) == 0.0:
+        if np.linalg.norm(x_load_desired - x_load_desired_prev) == 0.0:
             yaw_change_desired_altered = 0.0
         else:
-            yaw_change_desired_altered = (np.linalg.norm(x_load_desired_altered - x_load_prev)/np.linalg.norm(x_load_desired - x_load_prev))*yaw_change_desired
+            yaw_change_desired_altered = (np.linalg.norm(x_load_desired_altered - x_load_desired_prev)/np.linalg.norm(x_load_desired - x_load_desired_prev))*yaw_change_desired
         
         q_list = ft.quaternion_from_euler(0.0, 0.0, load_init_yaw + yaw_desired_prev + yaw_change_desired_altered) 
         att_load_desired_altered = np.quaternion(*q_list)
