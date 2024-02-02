@@ -89,10 +89,10 @@ python-qt-binding==1.1.2
 pytz==2022.6
 pyulog==1.0.0
 PyYAML==6.0
-qt-dotgraph==2.2.2
-qt-gui==2.2.2
-qt-gui-cpp==2.2.2
-qt-gui-py-common==2.2.2
+#qt-dotgraph==2.2.2
+#qt-gui==2.2.2
+#qt-gui-cpp==2.2.2
+#qt-gui-py-common==2.2.2
 quality-of-service-demo-py==0.20.3
 rcl-interfaces==1.2.1
 rcutils==5.1.4
