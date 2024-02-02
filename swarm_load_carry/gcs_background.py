@@ -44,6 +44,8 @@ class GCSBackground(Node):
         self.declare_parameter('first_drone_num', 1)
         self.declare_parameter('load_id', 1)
         self.declare_parameter('drone_order', [1, 2, 3])
+        self.declare_parameter('kp_formation_load', 0.0)
+        self.declare_parameter('r_drones_max_safety', 0.1)
         self.declare_parameter('fully_auto', False)
 
         self.declare_parameter('height_drone_rel_load', 1.5)
@@ -55,9 +57,11 @@ class GCSBackground(Node):
         
         self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
         self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
-        self.fully_auto = self.get_parameter('fully_auto').get_parameter_value().bool_value
         self.load_id = self.get_parameter('load_id').get_parameter_value().integer_value
         self.drone_order = self.get_parameter('drone_order').get_parameter_value().integer_array_value
+        self.kp_formation_load = self.get_parameter('kp_formation_load').get_parameter_value().double_value
+        self.r_drones_max_safety = self.get_parameter('r_drones_max_safety').get_parameter_value().double_value
+        self.fully_auto = self.get_parameter('fully_auto').get_parameter_value().bool_value
 
         self.height_drone_rel_load = self.get_parameter('height_drone_rel_load').get_parameter_value().double_value
         self.max_load_takeoff_height = self.get_parameter('max_load_takeoff_height').get_parameter_value().double_value
@@ -74,6 +78,7 @@ class GCSBackground(Node):
 
         ## VARIABLES
         self.load_desired_local_state = State(f'load{self.load_id}_init', CS_type.ENU)
+        self.load_desired_local_state_prev = State(f'load{self.load_id}_init', CS_type.ENU)
         self.load_initial_local_state = State(f'load{self.load_id}_init', CS_type.ENU)
 
         self.drone_phases = np.array([-1] * self.num_drones)
@@ -100,8 +105,8 @@ class GCSBackground(Node):
                 Phase,
                 f'/px4_{i}/out/current_phase',
                 callback,
-                qos_profile)
-        
+                qos_profile)       
+
         ## TFs
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -134,6 +139,10 @@ class GCSBackground(Node):
 
     ## CALLBACKS
     def clbk_cmdloop(self):
+        # Store previous load pose
+        self.load_desired_local_state_prev = self.load_desired_local_state #.pos = self.load_desired_local_state.pos
+        #self.load_desired_local_state_prev.att_q = self.load_desired_local_state.att_q
+        
         # Publish different setpoints depending on what phase the drones are in. 
         # If drones phases don't match, simply hold position
 
@@ -171,22 +180,47 @@ class GCSBackground(Node):
             self.get_logger().info(f'In fully auto mode. Takeoff complete. Starting mission.')
 
         elif np.all(self.drone_phases == Phase.PHASE_MISSION_START):
-            # Perform mission - currently move load in circle
-            v_lin = 0.5 # m/s
+            ## Perform mission - currently move load in circle
+            # Parameters
+            v_lin = 5.0 #0.5 # m/s
 
-            r = 2 #10 # m
+            r = 10 #2 #10 # m
             omega = v_lin/r # rad/s
             dt = self.timer_period_gcs_background # s
 
             # Move load in circle
-            self.load_desired_local_state.pos = np.array([r*(np.cos(self.mission_theta)-1), r*np.sin(self.mission_theta), self.load_desired_local_state.pos[2]]) #np.array([self.mission_theta, 0, self.load_desired_local_state.pos[2]]) 
+            # Position (x_load_d = x_load_d_prev + x_dot_load_d_nom*dt)
+            x_load_d = np.array([r*(np.cos(self.mission_theta)-1), r*np.sin(self.mission_theta), self.load_desired_local_state.pos[2]]) 
             
-            load_init_yaw = ft.quaternion_get_yaw([self.load_initial_local_state.att_q.w, self.load_initial_local_state.att_q.x, self.load_initial_local_state.att_q.y, self.load_initial_local_state.att_q.z])
-            q_list = ft.quaternion_from_euler(0.0, 0.0, load_init_yaw + self.mission_theta)
-            self.load_desired_local_state.att_q = np.quaternion(*q_list)
+            # Use load feedback for formation control
+
+            # # Retrieve drone information 
+            # drone_positions = np.zeros((self.num_drones, 3))
+            # drone_orientations = np.array([np.quaternion(*q) for q in np.zeros((self.num_drones, 4))])
+
+            # # Store position and orientation of each drone relative to world
+            # count_tf = 0
+
+            # for i in range(self.num_drones):
+            #     target_frame = 'world'
+            #     source_frame = f'drone{i+self.first_drone_num}'
+                
+            #     t = utils.lookup_tf(target_frame, source_frame, self.tf_buffer, rclpy.time.Time(), self.get_logger())
+
+            #     if t != None:
+            #         drone_positions[i, :] = [t.transform.translation.x, t.transform.translation.y, t.transform.translation.z]
+            #         drone_orientations[i] = np.quaternion(t.transform.rotation.w, t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z)
+
+            #         count_tf += 1
+
+            self.load_desired_local_state, yaw_change_desired_altered = self.formation_control_load(x_load_d, self.load_desired_local_state_prev.pos, omega*dt, self.mission_theta, dt)
+
+
+            # TODO: Use drone feedback for collision prevention
+
 
             # Update theta
-            self.mission_theta = self.mission_theta + omega*dt
+            self.mission_theta = self.mission_theta + yaw_change_desired_altered
 
             self.cnt_phase_ticks += 1
 
@@ -219,6 +253,48 @@ class GCSBackground(Node):
 
 
     ## HELPERS
+    def formation_control_load(self, x_load_desired, x_load_prev, yaw_change_desired, yaw_desired_prev, dt):
+        # Get current load position
+        t_load = utils.lookup_tf(f'load{self.load_id}_init', f'load{self.load_id}', self.tf_buffer, rclpy.time.Time(), self.get_logger())
+        x_load = np.array([t_load.transform.translation.x, t_load.transform.translation.y, t_load.transform.translation.z])
+
+        # Calculate desired load velocity
+        #self.get_logger().info(f'x_load_desired: {x_load_desired}, x_load_prev: {x_load_prev}')
+        x_dot_load_desired_nom = (x_load_desired - x_load_prev)/dt
+        self.get_logger().info(f'x_dot_load_desired_nom: {x_dot_load_desired_nom}')
+
+        # Alter desired load velocity to maintain formation using current load position feedback 
+        self.get_logger().info(f'x_load_desired: {x_load_desired}, x_load: {x_load}')
+        x_dot_load_desired = x_dot_load_desired_nom - self.kp_formation_load*(x_load_desired - x_load)
+
+        self.get_logger().info(f'x_dot_load_desired: {x_dot_load_desired}')
+
+        x_load_desired_altered = x_load_desired + x_dot_load_desired*dt
+
+
+        # Attitude
+        load_init_yaw = ft.quaternion_get_yaw([self.load_initial_local_state.att_q.w, self.load_initial_local_state.att_q.x, self.load_initial_local_state.att_q.y, self.load_initial_local_state.att_q.z])
+
+        if np.linalg.norm(x_load_desired - x_load_prev) == 0.0:
+            yaw_change_desired_altered = 0.0
+        else:
+            yaw_change_desired_altered = (np.linalg.norm(x_load_desired_altered - x_load_prev)/np.linalg.norm(x_load_desired - x_load_prev))*yaw_change_desired
+        
+        q_list = ft.quaternion_from_euler(0.0, 0.0, load_init_yaw + yaw_desired_prev + yaw_change_desired_altered) 
+        att_load_desired_altered = np.quaternion(*q_list)
+
+        #self.get_logger().info(f'x_load_desired_altered: {x_load_desired_altered}, att_load_desired_altered: {att_load_desired_altered}, yaw_change_desired_altered: {yaw_change_desired_altered}')
+        load_desired_state = State(f'load{self.load_id}_init', CS_type.ENU, pos=x_load_desired_altered, att=att_load_desired_altered)
+        #self.get_logger().info(f'load_desired_state: {load_desired_state.to_string()}')
+
+        return load_desired_state, yaw_change_desired_altered
+
+        #self.r_drones_max_safety
+
+        
+        
+
+
     def reset_pre_arm(self):
         # Get current load orientation
         tf_load_rel_load_init = utils.lookup_tf(f'load{self.load_id}_init', f'load{self.load_id}', self.tf_buffer, rclpy.time.Time(), self.get_logger())
