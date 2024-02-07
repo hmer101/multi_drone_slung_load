@@ -214,24 +214,7 @@ class Load(Node):
     def calc_load_pose_quasi_static(self):
         load_state_rel_world_qs = State('world', CS_type.ENU)
 
-        # Retrieve drone information 
-        drone_positions = np.zeros((self.num_drones, 3))
-        drone_orientations = np.array([np.quaternion(*q) for q in np.zeros((self.num_drones, 4))])
-
-        # Store position and orientation of each drone relative to world
-        count_tf = 0
-
-        for i in range(self.num_drones):
-            target_frame = 'world'
-            source_frame = f'drone{i+self.first_drone_num}'
-            
-            t = utils.lookup_tf(target_frame, source_frame, self.tf_buffer, rclpy.time.Time(), self.get_logger())
-
-            if t != None:
-                drone_positions[i, :] = [t.transform.translation.x, t.transform.translation.y, t.transform.translation.z]
-                drone_orientations[i] = np.quaternion(t.transform.rotation.w, t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z)
-
-                count_tf += 1
+        drone_positions, drone_orientations, count_tf = utils.get_drone_poses(self.num_drones, self.first_drone_num, self.tf_buffer, self.get_logger())
 
         # Only return load position if all drone positions can be found to estimate it
         if count_tf == self.num_drones:

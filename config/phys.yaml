@@ -16,8 +16,8 @@
       drone_order: [2] #[1, 2, 3] #ACW from load's x axis
 
       ## FORMATION CONTROL
-      kp_formation_load: 0.0
-      r_drones_max_safety: 0.5 # m
+      kp_formation_load: 0.5
+      #r_drones_max_safety: 0.5 # m
 
       ## PHASE SETTINGS 
       fully_auto: false
@@ -28,6 +28,10 @@
       height_drone_rel_load: 2.0 # m
       height_load_pre_tension: -0.2 # m
       height_max_load_takeoff: 4 #m
+
+      r_drones_rel_load: 1.0 # m
+      d_drones_rel_min: 1.0 # m
+      d_drones_rel_max: 1.5 # m
 
       pos_threshold: 0.3 # m
 

@@ -4,8 +4,8 @@
 # Author: Harvey Merton
 # Date: 01/25/24
 
-NUM_DRONES=3  # Set the maximum number of drones to launch
-START_DRONE_NUM=1  # Set the starting drone number
+NUM_DRONES=1 #3  # Set the maximum number of drones to launch
+START_DRONE_NUM=2 #1  # Set the starting drone number
 drone_count=0  # Initialize a counter for launched drones
 line_num=0  # Initialize a line counter
 

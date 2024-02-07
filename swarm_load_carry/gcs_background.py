@@ -50,6 +50,9 @@ class GCSBackground(Node):
 
         self.declare_parameter('height_drone_rel_load', 1.5)
         self.declare_parameter('max_load_takeoff_height', 4.0)
+        self.declare_parameter('r_drones_rel_load', 1.0)
+        self.declare_parameter('d_drones_rel_min', 1.0)
+        self.declare_parameter('d_drones_rel_max', 1.5)
 
         self.declare_parameter('timer_period_gcs_background', 0.2)
 
@@ -65,6 +68,9 @@ class GCSBackground(Node):
 
         self.height_drone_rel_load = self.get_parameter('height_drone_rel_load').get_parameter_value().double_value
         self.max_load_takeoff_height = self.get_parameter('max_load_takeoff_height').get_parameter_value().double_value
+        self.r_drones_rel_load = self.get_parameter('r_drones_rel_load').get_parameter_value().double_value
+        self.d_drones_rel_min = self.get_parameter('d_drones_rel_min').get_parameter_value().double_value
+        self.d_drones_rel_max = self.get_parameter('d_drones_rel_max').get_parameter_value().double_value
 
         self.timer_period_gcs_background = self.get_parameter('timer_period_gcs_background').get_parameter_value().double_value
 
@@ -107,6 +113,9 @@ class GCSBackground(Node):
                 callback,
                 qos_profile)       
 
+        # Drone current positions
+            
+
         ## TFs
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -140,8 +149,7 @@ class GCSBackground(Node):
     ## CALLBACKS
     def clbk_cmdloop(self):
         # Store previous load pose
-        self.load_desired_local_state_prev = self.load_desired_local_state #.pos = self.load_desired_local_state.pos
-        #self.load_desired_local_state_prev.att_q = self.load_desired_local_state.att_q
+        self.load_desired_local_state_prev = self.load_desired_local_state
         
         # Publish different setpoints depending on what phase the drones are in. 
         # If drones phases don't match, simply hold position
@@ -180,57 +188,9 @@ class GCSBackground(Node):
             self.get_logger().info(f'In fully auto mode. Takeoff complete. Starting mission.')
 
         elif np.all(self.drone_phases == Phase.PHASE_MISSION_START):
-            ## Perform mission - currently move load in circle
-            # Parameters
-            v_lin = 0.5 # m/s
-
-            r = 2 #10 # m
-            omega = v_lin/r # rad/s
-            dt = self.timer_period_gcs_background # s
-
-            # Move load in circle
-            # Position (x_load_d = x_load_d_prev + x_dot_load_d_nom*dt)
-            x_load_d = np.array([r*(np.cos(self.mission_theta)-1), r*np.sin(self.mission_theta), self.load_desired_local_state.pos[2]]) 
-            
-            # Use load feedback for formation control
-
-            # # Retrieve drone information 
-            # drone_positions = np.zeros((self.num_drones, 3))
-            # drone_orientations = np.array([np.quaternion(*q) for q in np.zeros((self.num_drones, 4))])
-
-            # # Store position and orientation of each drone relative to world
-            # count_tf = 0
-
-            # for i in range(self.num_drones):
-            #     target_frame = 'world'
-            #     source_frame = f'drone{i+self.first_drone_num}'
-                
-            #     t = utils.lookup_tf(target_frame, source_frame, self.tf_buffer, rclpy.time.Time(), self.get_logger())
-
-            #     if t != None:
-            #         drone_positions[i, :] = [t.transform.translation.x, t.transform.translation.y, t.transform.translation.z]
-            #         drone_orientations[i] = np.quaternion(t.transform.rotation.w, t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z)
-
-            #         count_tf += 1
-
-            # TODO: Make this work
-            #self.load_desired_local_state, yaw_change_desired_altered = self.formation_control_load(x_load_d, self.load_desired_local_state_prev.pos, omega*dt, self.mission_theta, dt)
-
-
-
-            # TODO: Use drone feedback for collision prevention
-
-
-            # TODO: Remove this temp without formation feedback
-            self.load_desired_local_state.pos = x_load_d
-            
-            load_init_yaw = ft.quaternion_get_yaw([self.load_initial_local_state.att_q.w, self.load_initial_local_state.att_q.x, self.load_initial_local_state.att_q.y, self.load_initial_local_state.att_q.z])
-            q_list = ft.quaternion_from_euler(0.0, 0.0, load_init_yaw + self.mission_theta)
-            self.load_desired_local_state.att_q = np.quaternion(*q_list)
-
-
-            # Update theta
-            self.mission_theta = self.mission_theta + omega*dt #yaw_change_desired_altered
+            ## Perform mission
+            #self.load_desired_local_state_prev = self.load_desired_local_state
+            self.load_desired_local_state = self.mission_circle(2.0, 0.5/2, self.timer_period_gcs_background)
 
             self.cnt_phase_ticks += 1
 
@@ -249,7 +209,7 @@ class GCSBackground(Node):
 
         elif np.all(self.drone_phases == Phase.PHASE_LAND_POST_LOAD_DOWN):
             # Spread drones out
-            self.set_drone_arrangement(1.3, np.array([self.height_drone_rel_load-0.1, self.height_drone_rel_load-0.1, self.height_drone_rel_load-0.1]), np.array([0, np.pi*(2/self.num_drones), -np.pi*(2/self.num_drones)]))
+            self.set_drone_arrangement(self.r_drones_rel_load + 0.3, np.array([self.height_drone_rel_load-0.1, self.height_drone_rel_load-0.1, self.height_drone_rel_load-0.1]), np.array([0, np.pi*(2/self.num_drones), -np.pi*(2/self.num_drones)]))
 
         elif np.all(self.drone_phases == Phase.PHASE_LAND_DRONES):
             # Slowly land drones
@@ -263,6 +223,22 @@ class GCSBackground(Node):
 
 
     ## HELPERS
+    def mission_circle(self, r, omega, dt):
+        # Increment for first count (so desired vel is not 0)
+        if self.cnt_phase_ticks == 0:
+            self.mission_theta += omega*dt
+
+        # Use load feedback for formation control
+        x_load_d = np.array([r*(np.cos(self.mission_theta)-1), r*np.sin(self.mission_theta), self.load_desired_local_state.pos[2]]) # Desired position (x_load_d = x_load_d_prev + x_dot_load_d_nom*dt)
+        load_desired_local_state, yaw_change_desired_altered = self.formation_control_load(x_load_d, self.load_desired_local_state_prev.pos, omega*dt, self.mission_theta, dt) # Formation control slows desired load position change down if too far away
+
+        # Update theta
+        self.mission_theta = self.mission_theta + yaw_change_desired_altered #omega*dt #yaw_change_desired_altered
+
+        return load_desired_local_state
+
+
+
     def formation_control_load(self, x_load_desired, x_load_desired_prev, yaw_change_desired, yaw_desired_prev, dt):
         # Get current load position
         t_load = utils.lookup_tf(f'load{self.load_id}_init', f'load{self.load_id}', self.tf_buffer, rclpy.time.Time(), self.get_logger())
@@ -271,14 +247,31 @@ class GCSBackground(Node):
         # Calculate desired load velocity
         #self.get_logger().info(f'x_load_desired: {x_load_desired}, x_load_prev: {x_load_prev}')
         x_dot_load_desired_nom = (x_load_desired - x_load_desired_prev)/dt
-        self.get_logger().info(f'x_dot_load_desired_nom: {x_dot_load_desired_nom}')
+        #self.get_logger().info(f'x_dot_load_desired_nom: {x_dot_load_desired_nom}')
 
         # Alter desired load velocity to maintain formation using current load position feedback 
-        self.get_logger().info(f'x_load_desired: {x_load_desired}, x_load: {x_load}')
+        #self.get_logger().info(f'x_load_desired: {x_load_desired}, x_load: {x_load}')
         x_dot_load_desired = x_dot_load_desired_nom - self.kp_formation_load*(x_load_desired - x_load)
 
-        self.get_logger().info(f'x_dot_load_desired: {x_dot_load_desired}')
+        ## SAFETY SWITCH - If drones are too far out of desired positions, stop load movement
+        # Retrieve current drone pose information 
+        drone_positions, drone_orientations, count_tf = utils.get_drone_poses(self.num_drones, self.first_drone_num, self.tf_buffer, self.get_logger())
 
+        # If drones are too close or too far from each other, stop load movement
+        #drone_dist_expected = utils.regular_polygon_side_length(self.num_drones, self.r_drones_rel_load)
+
+        if count_tf < self.num_drones:
+            self.get_logger().info(f'Not all drones found. Stopping load movement.')
+            x_dot_load_desired = np.array([0.0, 0.0, 0.0])
+        else:
+            for i in range(self.num_drones):
+                for j in range(i+1, self.num_drones):
+                    if utils.dist_euler_3D(drone_positions[i], drone_positions[j]) < self.d_drones_rel_min or utils.dist_euler_3D(drone_positions[i], drone_positions[j]) > self.d_drones_rel_max:
+                        self.get_logger().info(f'Drones too close/far from each other at {utils.dist_euler_3D(drone_positions[i], drone_positions[j])} m. Stopping load movement.')
+                        x_dot_load_desired = np.array([0.0, 0.0, 0.0])
+                        break
+
+        self.get_logger().info(f'x_dot_load_desired: {x_dot_load_desired}')
         x_load_desired_altered = x_load_desired_prev + x_dot_load_desired*dt #x_load_desired
 
 
@@ -330,7 +323,7 @@ class GCSBackground(Node):
         self.load_desired_local_state.att_q = self.load_initial_local_state.att_q.copy() 
 
         # Set drone arrangement around load
-        self.set_drone_arrangement(1, np.array([self.height_drone_rel_load, self.height_drone_rel_load, self.height_drone_rel_load]), np.array([0, np.pi*(2/self.num_drones), -np.pi*(2/self.num_drones)])) 
+        self.set_drone_arrangement(self.r_drones_rel_load, np.array([self.height_drone_rel_load, self.height_drone_rel_load, self.height_drone_rel_load]), np.array([0, np.pi*(2/self.num_drones), -np.pi*(2/self.num_drones)])) 
 
         # Set variables related to mission
         self.mission_theta = 0.0

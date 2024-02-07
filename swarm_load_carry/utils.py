@@ -69,6 +69,9 @@ def generate_points_cylinder(num_points, r, z):
     return positions
 
 
+def regular_polygon_side_length(num_sides, radius):
+    return radius*(2*(1-math.cos(2*math.pi/num_sides)))**0.5
+
 
 ## TRANSFORMS
 
@@ -153,6 +156,29 @@ def transform_frames(state, frame2_name, tf_buffer, logger, cs_out_type=CS_type.
         state2.att_q = transform_orientation(state.att_q, q_f2f1)
 
     return state2
+
+
+## FEEDBACK
+def get_drone_poses(num_drones, first_drone_num, tf_buffer, logger):
+    drone_positions = np.zeros((num_drones, 3))
+    drone_orientations = np.array([np.quaternion(*q) for q in np.zeros((num_drones, 4))])
+
+    # Store position and orientation of each drone relative to world
+    count_tf = 0
+
+    for i in range(num_drones):
+        target_frame = 'world'
+        source_frame = f'drone{i+first_drone_num}'
+        
+        t = lookup_tf(target_frame, source_frame, tf_buffer, rclpy.time.Time(), logger)
+
+        if t != None:
+            drone_positions[i, :] = [t.transform.translation.x, t.transform.translation.y, t.transform.translation.z]
+            drone_orientations[i] = np.quaternion(t.transform.rotation.w, t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z)
+
+            count_tf += 1
+
+    return drone_positions, drone_orientations, count_tf
 
 
 ## TRAJECTORY GENERATION
