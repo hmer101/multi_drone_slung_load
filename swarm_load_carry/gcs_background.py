@@ -111,10 +111,7 @@ class GCSBackground(Node):
                 Phase,
                 f'/px4_{i}/out/current_phase',
                 callback,
-                qos_profile)       
-
-        # Drone current positions
-            
+                qos_profile)                 
 
         ## TFs
         self.tf_buffer = Buffer()
@@ -229,11 +226,13 @@ class GCSBackground(Node):
             self.mission_theta += omega*dt
 
         # Use load feedback for formation control
+        # Formation control slows desired load position change down if too far away
         x_load_d = np.array([r*(np.cos(self.mission_theta)-1), r*np.sin(self.mission_theta), self.load_desired_local_state.pos[2]]) # Desired position (x_load_d = x_load_d_prev + x_dot_load_d_nom*dt)
-        load_desired_local_state, yaw_change_desired_altered = self.formation_control_load(x_load_d, self.load_desired_local_state_prev.pos, omega*dt, self.mission_theta, dt) # Formation control slows desired load position change down if too far away
+        #load_desired_local_state, yaw_change_desired_altered = self.formation_control_load(x_load_d, self.load_desired_local_state_prev.pos, omega*dt, self.mission_theta, dt) # For turning while moving in circle 
+        load_desired_local_state, yaw_change_desired_altered = self.formation_control_load(x_load_d, self.load_desired_local_state_prev.pos, 0.0, 0.0, dt)
 
         # Update theta
-        self.mission_theta = self.mission_theta + yaw_change_desired_altered #omega*dt #yaw_change_desired_altered
+        self.mission_theta = self.mission_theta + omega*dt #TODO: CHANGE BACK TO yaw_change_desired_altered*dt
 
         return load_desired_local_state
 
@@ -245,12 +244,9 @@ class GCSBackground(Node):
         x_load = np.array([t_load.transform.translation.x, t_load.transform.translation.y, t_load.transform.translation.z])
 
         # Calculate desired load velocity
-        #self.get_logger().info(f'x_load_desired: {x_load_desired}, x_load_prev: {x_load_prev}')
         x_dot_load_desired_nom = (x_load_desired - x_load_desired_prev)/dt
-        #self.get_logger().info(f'x_dot_load_desired_nom: {x_dot_load_desired_nom}')
 
         # Alter desired load velocity to maintain formation using current load position feedback 
-        #self.get_logger().info(f'x_load_desired: {x_load_desired}, x_load: {x_load}')
         x_dot_load_desired = x_dot_load_desired_nom - self.kp_formation_load*(x_load_desired - x_load)
 
         ## SAFETY SWITCH - If drones are too far out of desired positions, stop load movement
@@ -272,7 +268,7 @@ class GCSBackground(Node):
                         break
 
         self.get_logger().info(f'x_dot_load_desired: {x_dot_load_desired}')
-        x_load_desired_altered = x_load_desired_prev + x_dot_load_desired*dt #x_load_desired
+        x_load_desired_altered = x_load_desired_prev + x_dot_load_desired*dt
 
 
         # Attitude
@@ -286,16 +282,10 @@ class GCSBackground(Node):
         q_list = ft.quaternion_from_euler(0.0, 0.0, load_init_yaw + yaw_desired_prev + yaw_change_desired_altered) 
         att_load_desired_altered = np.quaternion(*q_list)
 
-        #self.get_logger().info(f'x_load_desired_altered: {x_load_desired_altered}, att_load_desired_altered: {att_load_desired_altered}, yaw_change_desired_altered: {yaw_change_desired_altered}')
+        # Return altered desired load state
         load_desired_state = State(f'load{self.load_id}_init', CS_type.ENU, pos=x_load_desired_altered, att=att_load_desired_altered)
-        #self.get_logger().info(f'load_desired_state: {load_desired_state.to_string()}')
 
-        return load_desired_state, yaw_change_desired_altered
-
-        #self.r_drones_max_safety
-
-        
-        
+        return load_desired_state, yaw_change_desired_altered     
 
 
     def reset_pre_arm(self):

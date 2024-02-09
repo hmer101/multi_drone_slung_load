@@ -11,13 +11,13 @@
 
       ## DRONE SETTINGS
       first_drone_num: 1 #1
-      num_drones: 3
+      num_drones: 2 #3
       num_cameras: 0 # 0 if cameras are off
     
-      drone_order: [1, 2, 3] #ACW from load's x axis
+      drone_order: [1, 2] #[1, 2, 3] #ACW from load's x axis
 
       ## FORMATION CONTROL
-      kp_formation_load: 0.1 #0.5 (for faster, larger radius)
+      kp_formation_load: 0.0 #0.1 #0.5 (for faster, larger radius)
       #r_drones_max_safety: 0.5 # m
 
       ## PHASE SETTINGS 
@@ -30,9 +30,9 @@
       height_load_pre_tension: -0.2 # m
       height_max_load_takeoff: 4 #m
 
-      r_drones_rel_load: 1.0 # m
+      r_drones_rel_load: 1.5 #1.0 # m
       d_drones_rel_min: 1.0 # m
-      d_drones_rel_max: 2.0 # m
+      d_drones_rel_max: 5.0 #2.0 # m
 
       pos_threshold: 0.3 # m
 
