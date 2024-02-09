@@ -9,14 +9,14 @@
       show_markers: 0 # Show the detected markers 0 = No, 1 = Yes all, 2 = Drone 1 only # TODO: Replace with ENUM?
 
       ## DRONE SETTINGS
-      first_drone_num: 3 #1
-      num_drones: 1
+      first_drone_num: 1
+      num_drones: 2
       num_cameras: 0 # 0 if cameras are off
     
-      drone_order: [3] #[1, 2, 3] #ACW from load's x axis
+      drone_order: [1, 2] #[1, 2, 3] #ACW from load's x axis
 
       ## FORMATION CONTROL
-      kp_formation_load: 0.1
+      kp_formation_load: 0.0 #0.1
       #r_drones_max_safety: 0.5 # m
 
       ## PHASE SETTINGS 
@@ -29,9 +29,9 @@
       height_load_pre_tension: -0.2 # m
       height_max_load_takeoff: 4 #m
 
-      r_drones_rel_load: 1.0 # m
+      r_drones_rel_load: 1.5 # m
       d_drones_rel_min: 1.0 # m
-      d_drones_rel_max: 2.0 # m
+      d_drones_rel_max: 5.0 # m
 
       pos_threshold: 0.3 # m
 
