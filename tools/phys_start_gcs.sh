@@ -10,7 +10,7 @@ drone_count=0  # Initialize a counter for launched drones
 line_num=0  # Initialize a line counter
 
 # Start QGC
-gnome-terminal --tab -- bash -c "/home/harvey/.appImage/QGroundControl.AppImage" #; exec bash"
+#gnome-terminal --tab -- bash -c "/home/harvey/.appImage/QGroundControl.AppImage" #; exec bash"
 
 # Balena SSH into drones and view the logs
 # Note must be on same network as drones (BilabRover_2.4GHz)
@@ -31,17 +31,20 @@ do
 	# Extract info from txt file to ssh into drones
 	drone_info=($line)
 	drone_uuid=${drone_info[0]}
-	drone_container_main=${drone_info[1]}
-	
+
+	# Get container info from balena
+	drone_container_main=$(echo 'balena container ls --format '{{.ID}}' | head -n 1'| balena ssh $drone_uuid.local)
+
 	# Note how the 'balena logs' command is 'piped' to the 'balena ssh' command
-	gnome-terminal --tab -- bash -c "echo 'balena logs -f $drone_container_main; exit;' | balena ssh $drone_uuid.local" 
+	gnome-terminal --tab -- bash -c "echo 'balena logs $drone_container_main -f; exit;' | balena ssh $drone_uuid.local"
+	#gnome-terminal --tab -- bash -c "balena logs $drone_uuid.local --service main --tail" # Note this requires the device to be in offline mode and so doesn't give logs. Not using '.local' requires internet connection
 
 	# Increment the drone count
 	drone_count=$((drone_count + 1))
 
 
-done < ../config/phys_drones_info.txt #Note this file needs a blank line at the end. Contains 'device_uuid main_container_id' for each drone on a new line
+done < ../config/phys_drones_uuid.txt #Note this file needs a blank line at the end. Contains 'device_uuid' for each drone on a new line.
 
 
 # Run GCS ROS2 launch
-gnome-terminal -- bash -c "ros2 launch swarm_load_carry phys_gcs.launch.py" #; exec bash"
+#gnome-terminal -- bash -c "ros2 launch swarm_load_carry phys_gcs.launch.py" #; exec bash"
