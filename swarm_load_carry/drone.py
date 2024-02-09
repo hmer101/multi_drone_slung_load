@@ -577,7 +577,7 @@ class Drone(Node):
 
             case Phase.PHASE_TAKEOFF_POST_TENSION:
                 #Takeoff complete
-                if tf_drone_rel_world.transform.translation.z>=(self.takeoff_height_load+self.height_drone_rel_load-self.pos_threshold):     
+                if tf_drone_rel_world.transform.translation.z>=(self.takeoff_height_load+self.height_drone_rel_load-self.pos_threshold):
                     self.phase = Phase.PHASE_TAKEOFF_END 
                     
                     self.get_logger().info(f'TAKEOFF COMPLETE')

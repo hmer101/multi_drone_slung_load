@@ -312,8 +312,8 @@ class GCSBackground(Node):
         self.load_desired_local_state.pos = np.array([0.0, 0.0, 0.0])
         self.load_desired_local_state.att_q = self.load_initial_local_state.att_q.copy() 
 
-        # Set drone arrangement around load
-        self.set_drone_arrangement(self.r_drones_rel_load, np.array([self.height_drone_rel_load, self.height_drone_rel_load, self.height_drone_rel_load]), np.array([0, np.pi*(2/self.num_drones), -np.pi*(2/self.num_drones)])) 
+        # Set drone arrangement around load TODO: RESET TO SAME PLANE
+        self.set_drone_arrangement(self.r_drones_rel_load, np.array([self.height_drone_rel_load, self.height_drone_rel_load*2.0, self.height_drone_rel_load*3.0]), np.array([0, np.pi*(2/self.num_drones), -np.pi*(2/self.num_drones)])) 
 
         # Set variables related to mission
         self.mission_theta = 0.0
