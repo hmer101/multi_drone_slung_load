@@ -45,7 +45,7 @@ class Drone(Node):
 
         self.declare_parameter('num_drones', 1)
         self.declare_parameter('num_cameras', 0)
-        self.declare_parameter('first_drone_num', 1)
+        self.declare_parameter('first_drone_num', 0) #1
         
         self.declare_parameter('fully_auto', False)
         

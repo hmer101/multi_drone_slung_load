@@ -5,12 +5,12 @@
 # Date: 01/25/24
 
 NUM_DRONES=2 #3  # Set the maximum number of drones to launch
-START_DRONE_NUM=1 #1  # Set the starting drone number
+START_DRONE_NUM=2 #1  # Set the starting drone number
 drone_count=0  # Initialize a counter for launched drones
 line_num=0  # Initialize a line counter
 
 # Start QGC
-#gnome-terminal --tab -- bash -c "/home/harvey/.appImage/QGroundControl.AppImage" #; exec bash"
+gnome-terminal --tab -- bash -c "/home/harvey/.appImage/QGroundControl.AppImage" #; exec bash"
 
 # Balena SSH into drones and view the logs
 # Note must be on same network as drones (BilabRover_2.4GHz)
@@ -47,4 +47,4 @@ done < ../config/phys_drones_uuid.txt #Note this file needs a blank line at the 
 
 
 # Run GCS ROS2 launch
-#gnome-terminal -- bash -c "ros2 launch swarm_load_carry phys_gcs.launch.py" #; exec bash"
+gnome-terminal -- bash -c "ros2 launch swarm_load_carry phys_gcs.launch.py" #; exec bash"
