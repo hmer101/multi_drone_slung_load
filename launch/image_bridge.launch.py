@@ -53,7 +53,7 @@ def generate_launch_description():
     im_bridge = Node(
         package='ros_gz_image',
         executable='image_bridge',
-        arguments=['/x500_1/out/camera', '/x500_2/out/camera', '/x500_3/out/camera'], #'/x500_1/camera_info', '/x500_2/camera_info', '/x500_3/camera_info'
+        arguments=['/px4_1/out/camera', '/px4_2/out/camera', '/px4_3/out/camera'], #'/x500_1/camera_info', '/x500_2/camera_info', '/x500_3/camera_info'
         output='screen'
     )
 
@@ -61,7 +61,7 @@ def generate_launch_description():
         #gz_sim,
         DeclareLaunchArgument('rqt', default_value='true',
                               description='Open RQt.'),
-        DeclareLaunchArgument('image_topic', default_value='/x500_1/out/camera',
+        DeclareLaunchArgument('image_topic', default_value='/px4_1/out/camera',
                               description='Topic to start viewing in RQt.'),
         im_bridge,
         rqt

@@ -6,14 +6,15 @@
       load_id: 1
       load_pose_type: 'quasi-static' # quasi-static, visual, ground_truth
       evaluate: false # If you want to evaluate the tracking performance of the load
-      show_markers: 0 # Show the detected markers 0 = No, 1 = Yes all, 2 = Drone 1 only # TODO: Replace with ENUM?
+      show_markers: 1 # Show the detected markers 0 = No, 1 = Yes all, 2 = Drone 1 only # TODO: Replace with ENUM?
+      marker_edge_length: 0.075 # m
 
       ## DRONE SETTINGS
-      first_drone_num: 2 #1
-      num_drones: 2
-      num_cameras: 0 # 0 if cameras are off
+      first_drone_num: 1 #1
+      num_drones: 1
+      num_cameras: 1 # 0 if cameras are off
     
-      drone_order: [2, 3] #[1, 2, 3] #ACW from load's x axis
+      drone_order: [1] #[1, 2, 3] #ACW from load's x axis
 
       ## FORMATION CONTROL
       kp_formation_load: 0.0 #0.1
@@ -57,4 +58,8 @@
       cnt_threshold_land_post_load_down: 50
       cnt_threshold_land_drones: 60
       cnt_threshold_land_pre_disarm: 30
+
+      ## TOPIC NAMES
+      topic_img_rgb: /color/image_raw
+      topic_cam_info_color: /color/camera_info
       
