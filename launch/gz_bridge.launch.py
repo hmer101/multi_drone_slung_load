@@ -73,30 +73,34 @@ def generate_launch_description():
             gz_bridge_args.append(f'/model/swarm/model/x500_{i}/pose_static@geometry_msgs/msg/PoseArray[gz.msgs.Pose_V')
             gz_bridge_remappings.append((f'/model/swarm/model/x500_{i}/pose_static', f'/px4_{i}/out/pose_ground_truth/gz'))
     
+    # Ground truth load (IGN -> ROS2)
     if evaluate:
-        # Remap load ground truth name
+        gz_bridge_args.append('/model/swarm/model/load/pose_static@geometry_msgs/msg/PoseArray[gz.msgs.Pose_V')
         gz_bridge_remappings.append(('/model/swarm/model/load/pose_static', '/load_1/out/pose_ground_truth/gz'))
 
 
     ## CONSTRUCT BRIDGES
+    bridge_nodes = []
+
     # Image bridge
-    im_bridge = Node(
-        package='ros_gz_image',
-        executable='image_bridge',
-        arguments=im_bridge_args,
-        output='screen'
-    )
+    if len(im_bridge_args) > 0:
+        bridge_nodes.append(
+            Node(
+                package='ros_gz_image',
+                executable='image_bridge',
+                arguments=im_bridge_args,
+                output='screen'
+            ))
 
+    # Parameter bridge
     # Note only 1 gz_bridge can be started at a time it seems
-    param_bridge = Node(
-        package='ros_gz_bridge',
-        executable='parameter_bridge',
-        arguments=gz_bridge_args,
-        remappings=gz_bridge_remappings,
-        output='screen'
-    )
+    bridge_nodes.append(
+        Node(
+            package='ros_gz_bridge',
+            executable='parameter_bridge',
+            arguments=gz_bridge_args,
+            remappings=gz_bridge_remappings,
+            output='screen'
+        ))
 
-    return LaunchDescription([
-        im_bridge,
-        param_bridge
-    ])
+    return LaunchDescription(bridge_nodes)

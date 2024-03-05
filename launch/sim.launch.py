@@ -38,12 +38,6 @@ def generate_launch_description():
             shell=True
         )
     
-    slung_pose_estimation_visual = IncludeLaunchDescription(
-      PythonLaunchDescriptionSource([os.path.join(
-         get_package_share_directory('slung_pose_estimation'), 'launch'),
-         '/visual_measurement_multi.launch.py'])
-      ) #'/estimator.launch.py' launch_arguments={'env': 'sim'}.items()
-    
     gz_bridge = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('swarm_load_carry'), 'launch'),
@@ -63,14 +57,19 @@ def generate_launch_description():
             shell=True
         ))
 
+    # Slung load pose estimation
+    # if num_cameras > 0: #and load_pose_type == "visual": 
+    for i in range(first_drone_num, num_cameras+first_drone_num):
+        launch_description.append(ExecuteProcess(
+            cmd=[[
+                f'gnome-terminal --tab -- bash -c "ros2 launch slung_pose_estimation visual_measurement.launch.py drone_id:={i} env:=sim"',
+            ]],
+            shell=True
+        ))
+
     # Load and GCS
     launch_description.append(load)
     launch_description.append(gcs)
-
-
-     # Slung load pose estimation
-    if num_cameras > 0: #and load_pose_type == "visual": 
-      launch_description.append(slung_pose_estimation_visual)
 
     # Gazebo parameter and image bridges
     launch_description.append(gz_bridge)
