@@ -44,7 +44,10 @@ def generate_launch_description():
     
     first_drone_num = params["/**"]["ros__parameters"]["first_drone_num"]
     num_drones = params["/**"]["ros__parameters"]["num_drones"]
+    num_cameras = params["/**"]["ros__parameters"]["num_cameras"]
     
+    evaluate = params["/**"]["ros__parameters"]["evaluate"]
+    load_pose_type = params["/**"]["ros__parameters"]["load_pose_type"]
 
     ## CONSTRUCT ARGUMENT LISTS
     gz_bridge_args = []
@@ -57,18 +60,22 @@ def generate_launch_description():
     
     
     for i in range(first_drone_num, num_drones+first_drone_num):
-        # Camera images (IGN -> ROS2)
-        im_bridge_args.append(f'/px4_{i}{topic_img_rgb}')
+        # Cameras (IGN -> ROS2)
+        if num_cameras > 0: #and load_pose_type == "visual": 
+            # Camera images 
+            im_bridge_args.append(f'/px4_{i}{topic_img_rgb}')
 
-        # Camera info (IGN -> ROS2)
-        gz_bridge_args.append(f'/px4_{i}{topic_cam_info}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo')
-  
+            # Camera info
+            gz_bridge_args.append(f'/px4_{i}{topic_cam_info}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo')
+
         # Ground truth (IGN -> ROS2)
-        gz_bridge_args.append(f'/model/swarm/model/x500_{i}/pose_static@geometry_msgs/msg/PoseArray[gz.msgs.Pose_V')
-        gz_bridge_remappings.append((f'/model/swarm/model/x500_{i}/pose_static', f'/px4_{i}/out/pose_ground_truth/gz'))
-
-    # Remap load ground truth name
-    gz_bridge_remappings.append(('/model/swarm/model/load/pose_static', '/load_1/out/pose_ground_truth/gz'))
+        if evaluate:
+            gz_bridge_args.append(f'/model/swarm/model/x500_{i}/pose_static@geometry_msgs/msg/PoseArray[gz.msgs.Pose_V')
+            gz_bridge_remappings.append((f'/model/swarm/model/x500_{i}/pose_static', f'/px4_{i}/out/pose_ground_truth/gz'))
+    
+    if evaluate:
+        # Remap load ground truth name
+        gz_bridge_remappings.append(('/model/swarm/model/load/pose_static', '/load_1/out/pose_ground_truth/gz'))
 
 
     ## CONSTRUCT BRIDGES

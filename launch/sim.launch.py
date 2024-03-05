@@ -21,16 +21,9 @@ def generate_launch_description():
     num_drones = params["/**"]["ros__parameters"]["num_drones"]
     first_drone_num = params["/**"]["ros__parameters"]["first_drone_num"]
     num_cameras = params["/**"]["ros__parameters"]["num_cameras"]
-    evaluate = params["/**"]["ros__parameters"]["evaluate"]
-    load_pose_type = params["/**"]["ros__parameters"]["load_pose_type"]
+    
 
     ## INCLUDE ALL POSSIBLE LAUNCH TASKS
-    # drones = IncludeLaunchDescription(
-    #   PythonLaunchDescriptionSource([os.path.join(
-    #      get_package_share_directory('swarm_load_carry'), 'launch'),
-    #      '/drones.launch.py'])
-    #   )
-
     load = ExecuteProcess(
             cmd=[[
                 f'gnome-terminal --tab -- bash -c "ros2 launch swarm_load_carry load.launch.py load_id:={1} env:=sim"',
@@ -55,26 +48,7 @@ def generate_launch_description():
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('swarm_load_carry'), 'launch'),
          '/gz_bridge.launch.py'])
-      )
-
-    # image_bridge = IncludeLaunchDescription(
-    #   PythonLaunchDescriptionSource([os.path.join(
-    #      get_package_share_directory('swarm_load_carry'), 'launch'),
-    #      '/image_bridge.launch.py'])
-    #   )
-    
-    # gz_bridge = IncludeLaunchDescription(
-    #   PythonLaunchDescriptionSource([os.path.join(
-    #      get_package_share_directory('swarm_load_carry'), 'launch'),
-    #      '/gz_bridge_gt.launch.py'])
-    #   )
-    
-    # gz_bridge_clock = IncludeLaunchDescription(
-    #   PythonLaunchDescriptionSource([os.path.join(
-    #      get_package_share_directory('swarm_load_carry'), 'launch'),
-    #      '/gz_bridge_clock.launch.py'])
-    #     )
-    
+      )  
 
     ## COMPILE LAUNCH DESCRIPTION FROM SELECTED COMPONENTS (alter sim.yaml to change which components are included)
     launch_description = []
@@ -98,16 +72,8 @@ def generate_launch_description():
     if num_cameras > 0: #and load_pose_type == "visual": 
       launch_description.append(slung_pose_estimation_visual)
 
-
     # Gazebo parameter and image bridges
     launch_description.append(gz_bridge)
-
-    # # Ground truth - required for evaluation
-    # if evaluate:
-    #   launch_description.append(gz_bridge)
-
-    # # Clock bridge for ground truth and camera info
-    # launch_description.append(gz_bridge_clock)
 
 
     ## RUN LAUNCH FILES
