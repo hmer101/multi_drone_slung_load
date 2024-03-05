@@ -19,7 +19,7 @@ def generate_launch_description():
     with open(config, 'r') as file:
         params = yaml.safe_load(file)
     
-    num_cameras = params["/**"]["ros__parameters"]["topic_img_rgb"]
+    num_cameras = params["/**"]["ros__parameters"]["num_cameras"]
 
     ## INCLUDE LAUNCH FILES
     # Launch drone
@@ -27,7 +27,7 @@ def generate_launch_description():
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('swarm_load_carry'), 'launch'),
          '/drone.launch.py']),
-      launch_arguments={'env': 'phys', 'drone_id': drone_id_env}.items()
+      launch_arguments={'env': 'phys', 'drone_id': str(drone_id_env)}.items()
     )
 
     # Add microDDS agent
@@ -40,16 +40,28 @@ def generate_launch_description():
             shell=True
     )]
 
-    # Launch camera if set to do so
-    if drone_id_env <= num_cameras:
+    # Launch camera and visual measurement if set to do so
+    if drone_id_env <= int(num_cameras):
+        # Camera
         camera = IncludeLaunchDescription(
             PythonLaunchDescriptionSource([os.path.join(
                 get_package_share_directory('swarm_load_carry'), 'launch'),
                 '/camera_phys.launch.py']),
-            launch_arguments={'drone_id': drone_id_env}.items()
+            launch_arguments={'drone_id': str(drone_id_env)}.items()
             )
 
         launch_description.append(camera)
+
+        # Visual pose measurement
+        #if load_pose_type == "visual":
+        pose_measurement_visual = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([os.path.join(
+                get_package_share_directory('slung_pose_estimation'), 'launch'),
+                '/visual_measurement.launch.py']),
+            launch_arguments={'drone_id': str(drone_id_env), 'env': 'phys'}.items()
+            )
+        
+        launch_description.append(pose_measurement_visual)
 
     ## RUN LAUNCH FILES and start MicroDDS agent
     return LaunchDescription(launch_description)
