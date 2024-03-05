@@ -22,6 +22,10 @@
 
       ## PHASE SETTINGS 
       fully_auto: false
+
+      # Mission settings
+      mission_circle_r: 2.0 # m
+      mission_circle_v: 0.5 # m/s 
       
       # Heights/distances/dimensions
       height_drone_cs_rel_gnd: 0.0 #0.24 # m

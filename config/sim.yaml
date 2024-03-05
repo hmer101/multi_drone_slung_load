@@ -6,16 +6,16 @@
       ## LOAD SETTINGS
       load_id: 1
       load_pose_type: 'quasi-static' # quasi-static, visual, ground_truth
-      evaluate: false # If you want to evaluate the tracking performance of the load
-      show_markers: 0 # Show the detected markers 0 = No, 1 = Yes all, 2 = Drone 1 only # TODO: Replace with ENUM?
+      evaluate: true # If you want to evaluate the tracking performance of the load
+      show_markers: 2 # Show the detected markers 0 = No, 1 = Yes all, 2 = Drone 1 only # TODO: Replace with ENUM?
       marker_edge_length: 0.08 # m
 
       ## DRONE SETTINGS
-      first_drone_num: 2 #1
-      num_drones: 2 #3
-      num_cameras: 0 # 0 if cameras are off
+      first_drone_num: 1 #1
+      num_drones: 3
+      num_cameras: 3 # 0 if cameras are off
     
-      drone_order: [2, 3] #[1, 2, 3] #ACW from load's x axis
+      drone_order: [1, 2, 3] #[1, 2, 3] #ACW from load's x axis
 
       ## FORMATION CONTROL
       kp_formation_load: 0.0 #0.1 #0.5 (for faster, larger radius)
@@ -24,6 +24,10 @@
       ## PHASE SETTINGS 
       fully_auto: false
       
+      # Mission settings
+      mission_circle_r: 2.0 # m
+      mission_circle_v: 1.0 # m/s 
+
       # Heights/distances/dimensions
       height_drone_cs_rel_gnd: 0.0 #0.24 # m
       height_load_cs_rel_gnd: 0.0 #0.1 # m
@@ -31,9 +35,9 @@
       height_load_pre_tension: -0.2 # m
       height_max_load_takeoff: 4 #m
 
-      r_drones_rel_load: 1.5 #1.0 # m
-      d_drones_rel_min: 1.0 # m
-      d_drones_rel_max: 5.0 #2.0 # m
+      r_drones_rel_load: 1.0 #1.5 #1.0 # m
+      d_drones_rel_min: 0.0 #0.5 #1.0 # m
+      d_drones_rel_max: 100.0 #5.0 #2.0 # m
 
       pos_threshold: 0.3 # m
 
@@ -62,5 +66,5 @@
 
       ## TOPIC NAMES
       topic_img_rgb: /out/camera
-      topic_cam_info_color: /color/camera_info
+      topic_cam_info_color: /out/camera_info
       

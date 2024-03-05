@@ -29,11 +29,12 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():   
-    gz_bridge_clock = IncludeLaunchDescription(
-      PythonLaunchDescriptionSource([os.path.join(
-         get_package_share_directory('swarm_load_carry'), 'launch'),
-         '/gz_bridge_clock.launch.py'])
-      )
+    # Note clock bridge must be started to publish ground truth poses
+    # gz_bridge_clock = IncludeLaunchDescription(
+    #   PythonLaunchDescriptionSource([os.path.join(
+    #      get_package_share_directory('swarm_load_carry'), 'launch'),
+    #      '/gz_bridge_clock.launch.py'])
+    #   )
     
     # Gz - ROS Bridge for publishing ground truth poses
     bridge_gt = Node(
@@ -52,17 +53,22 @@ def generate_launch_description():
             '/model/swarm/model/x500_2/pose_static@geometry_msgs/msg/PoseArray[gz.msgs.Pose_V',
             '/model/swarm/model/x500_3/pose_static@geometry_msgs/msg/PoseArray[gz.msgs.Pose_V',
             
+            # Cameras (IGN -> ROS2)
+            # '/px4_1/out/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
+            # '/px4_2/out/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
+            # '/px4_3/out/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
         ],
         remappings=[
             ('/model/swarm/model/load/pose_static', '/load_1/out/pose_ground_truth/gz'),
-            ('/model/swarm/model/x500_1/pose_static', '/x500_1/out/pose_ground_truth/gz'),
-            ('/model/swarm/model/x500_2/pose_static', '/x500_2/out/pose_ground_truth/gz'),
-            ('/model/swarm/model/x500_3/pose_static', '/x500_3/out/pose_ground_truth/gz'),
+            ('/model/swarm/model/x500_1/pose_static', '/px4_1/out/pose_ground_truth/gz'),
+            ('/model/swarm/model/x500_2/pose_static', '/px4_2/out/pose_ground_truth/gz'),
+            ('/model/swarm/model/x500_3/pose_static', '/px4_3/out/pose_ground_truth/gz'),
         ],
         output='screen'
     )
 
+
     return LaunchDescription([
-        gz_bridge_clock,
+        #gz_bridge_clock,
         bridge_gt
     ])

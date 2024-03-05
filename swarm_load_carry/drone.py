@@ -230,7 +230,7 @@ class Drone(Node):
             if self.env == 'sim':               
                 self.sub_vehicle_pose_gt = self.create_subscription(
                     PoseArray,
-                    f'/x500_{self.drone_id}/out/pose_ground_truth/gz',
+                    f'/px4_{self.drone_id}/out/pose_ground_truth/gz',
                     self.clbk_vehicle_pose_gt,
                     qos_profile_gt)
             else:

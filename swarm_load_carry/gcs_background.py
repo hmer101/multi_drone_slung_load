@@ -54,6 +54,9 @@ class GCSBackground(Node):
         self.declare_parameter('d_drones_rel_min', 1.0)
         self.declare_parameter('d_drones_rel_max', 1.5)
 
+        self.declare_parameter('mission_circle_r', 2.0)
+        self.declare_parameter('mission_circle_v', 0.5)
+
         self.declare_parameter('timer_period_gcs_background', 0.2)
 
         self.declare_parameter('cnt_threshold_fully_auto_pre_takeoff', 50)
@@ -71,6 +74,9 @@ class GCSBackground(Node):
         self.r_drones_rel_load = self.get_parameter('r_drones_rel_load').get_parameter_value().double_value
         self.d_drones_rel_min = self.get_parameter('d_drones_rel_min').get_parameter_value().double_value
         self.d_drones_rel_max = self.get_parameter('d_drones_rel_max').get_parameter_value().double_value
+
+        self.mission_circle_r = self.get_parameter('mission_circle_r').get_parameter_value().double_value
+        self.mission_circle_v = self.get_parameter('mission_circle_v').get_parameter_value().double_value
 
         self.timer_period_gcs_background = self.get_parameter('timer_period_gcs_background').get_parameter_value().double_value
 
@@ -187,7 +193,7 @@ class GCSBackground(Node):
         elif np.all(self.drone_phases == Phase.PHASE_MISSION_START):
             ## Perform mission
             #self.load_desired_local_state_prev = self.load_desired_local_state
-            self.load_desired_local_state = self.mission_circle(2.0, 0.5/2, self.timer_period_gcs_background)
+            self.load_desired_local_state = self.mission_circle(2.0, self.mission_circle_v/self.mission_circle_r, self.timer_period_gcs_background)
 
             self.cnt_phase_ticks += 1
 
@@ -228,11 +234,11 @@ class GCSBackground(Node):
         # Use load feedback for formation control
         # Formation control slows desired load position change down if too far away
         x_load_d = np.array([r*(np.cos(self.mission_theta)-1), r*np.sin(self.mission_theta), self.load_desired_local_state.pos[2]]) # Desired position (x_load_d = x_load_d_prev + x_dot_load_d_nom*dt)
-        #load_desired_local_state, yaw_change_desired_altered = self.formation_control_load(x_load_d, self.load_desired_local_state_prev.pos, omega*dt, self.mission_theta, dt) # For turning while moving in circle 
-        load_desired_local_state, yaw_change_desired_altered = self.formation_control_load(x_load_d, self.load_desired_local_state_prev.pos, 0.0, 0.0, dt)
-
-        # Update theta
-        self.mission_theta = self.mission_theta + omega*dt #TODO: CHANGE BACK TO yaw_change_desired_altered*dt
+        load_desired_local_state, yaw_change_desired_altered = self.formation_control_load(x_load_d, self.load_desired_local_state_prev.pos, omega*dt, self.mission_theta, dt) # For turning while moving in circle 
+        self.mission_theta = self.mission_theta + yaw_change_desired_altered*dt
+        
+        #load_desired_local_state, yaw_change_desired_altered = self.formation_control_load(x_load_d, self.load_desired_local_state_prev.pos, 0.0, 0.0, dt)
+        #self.mission_theta = self.mission_theta + omega*dt #TODO: CHANGE BACK TO yaw_change_desired_altered*dt
 
         return load_desired_local_state
 
@@ -312,8 +318,9 @@ class GCSBackground(Node):
         self.load_desired_local_state.pos = np.array([0.0, 0.0, 0.0])
         self.load_desired_local_state.att_q = self.load_initial_local_state.att_q.copy() 
 
-        # Set drone arrangement around load TODO: RESET TO SAME PLANE
-        self.set_drone_arrangement(self.r_drones_rel_load, np.array([self.height_drone_rel_load, self.height_drone_rel_load*2.0, self.height_drone_rel_load*3.0]), np.array([0, np.pi*(2/self.num_drones), -np.pi*(2/self.num_drones)])) 
+        # Set drone arrangement around load
+        self.set_drone_arrangement(self.r_drones_rel_load, np.array([self.height_drone_rel_load, self.height_drone_rel_load, self.height_drone_rel_load]), np.array([0, np.pi*(2/self.num_drones), -np.pi*(2/self.num_drones)])) 
+        #self.set_drone_arrangement(self.r_drones_rel_load, np.array([self.height_drone_rel_load, self.height_drone_rel_load*2.0, self.height_drone_rel_load*3.0]), np.array([0, np.pi*(2/self.num_drones), -np.pi*(2/self.num_drones)])) 
 
         # Set variables related to mission
         self.mission_theta = 0.0
