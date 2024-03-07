@@ -48,7 +48,10 @@ class Load(Node):
 
         self.declare_parameter('height_drone_cs_rel_gnd', 0.0)
         self.declare_parameter('height_load_cs_rel_gnd', 0.0)
-        self.declare_parameter('height_drone_rel_load', 1.5)
+        self.declare_parameter('r_drones_rel_load', 1.0)
+
+        self.declare_parameter('cable_length', 1.0)
+        self.declare_parameter('load_connection_point_r', 0.0)
 
         self.declare_parameter('timer_period_load', 0.2)
 
@@ -61,13 +64,19 @@ class Load(Node):
         self.t_marker_rel_load = np.array(self.get_parameter('t_marker_rel_load').get_parameter_value().double_array_value)
         self.R_marker_rel_load = np.array(self.get_parameter('R_marker_rel_load').get_parameter_value().double_array_value)
 
+        self.r_drones_rel_load = self.get_parameter('r_drones_rel_load').get_parameter_value().double_value
         self.height_drone_cs_rel_gnd = self.get_parameter('height_drone_cs_rel_gnd').get_parameter_value().double_value
         self.height_load_cs_rel_gnd = self.get_parameter('height_load_cs_rel_gnd').get_parameter_value().double_value
-        self.height_drone_rel_load = self.get_parameter('height_drone_rel_load').get_parameter_value().double_value
+
+        self.cable_length = self.get_parameter('cable_length').get_parameter_value().double_value
+        self.load_connection_point_r = self.get_parameter('load_connection_point_r').get_parameter_value().double_value
 
         self.timer_period_load = self.get_parameter('timer_period_load').get_parameter_value().double_value
         
+        # Calculate height drone rel load
+        self.height_drone_rel_load = utils.drone_height_rel_load(self.cable_length, self.r_drones_rel_load, self.load_connection_point_r)
 
+        # QoS profiles
         qos_profile = QoSProfile(
             reliability=qos.ReliabilityPolicy.BEST_EFFORT,
             durability=qos.DurabilityPolicy.TRANSIENT_LOCAL,

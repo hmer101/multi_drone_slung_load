@@ -46,13 +46,16 @@ class GCSBackground(Node):
         self.declare_parameter('drone_order', [1, 2, 3])
         self.declare_parameter('kp_formation_load', 0.0)
         self.declare_parameter('r_drones_max_safety', 0.1)
-        self.declare_parameter('fully_auto', False)
+        self.declare_parameter('auto_level', 0)
 
-        self.declare_parameter('height_drone_rel_load', 1.5)
-        self.declare_parameter('max_load_takeoff_height', 4.0)
+        #self.declare_parameter('height_drone_rel_load', 1.5)
+        self.declare_parameter('takeoff_height_load_max', 4.0)
         self.declare_parameter('r_drones_rel_load', 1.0)
         self.declare_parameter('d_drones_rel_min', 1.0)
         self.declare_parameter('d_drones_rel_max', 1.5)
+
+        self.declare_parameter('cable_length', 1.0)
+        self.declare_parameter('load_connection_point_r', 0.0)
 
         self.declare_parameter('mission_circle_r', 2.0)
         self.declare_parameter('mission_circle_v', 0.5)
@@ -67,13 +70,16 @@ class GCSBackground(Node):
         self.drone_order = self.get_parameter('drone_order').get_parameter_value().integer_array_value
         self.kp_formation_load = self.get_parameter('kp_formation_load').get_parameter_value().double_value
         self.r_drones_max_safety = self.get_parameter('r_drones_max_safety').get_parameter_value().double_value
-        self.fully_auto = self.get_parameter('fully_auto').get_parameter_value().bool_value
+        self.auto_level = self.get_parameter('auto_level').get_parameter_value().bool_value
 
-        self.height_drone_rel_load = self.get_parameter('height_drone_rel_load').get_parameter_value().double_value
-        self.max_load_takeoff_height = self.get_parameter('max_load_takeoff_height').get_parameter_value().double_value
+        #self.height_drone_rel_load = self.get_parameter('height_drone_rel_load').get_parameter_value().double_value
+        self.takeoff_height_load_max = self.get_parameter('takeoff_height_load_max').get_parameter_value().double_value
         self.r_drones_rel_load = self.get_parameter('r_drones_rel_load').get_parameter_value().double_value
         self.d_drones_rel_min = self.get_parameter('d_drones_rel_min').get_parameter_value().double_value
         self.d_drones_rel_max = self.get_parameter('d_drones_rel_max').get_parameter_value().double_value
+
+        self.cable_length = self.get_parameter('cable_length').get_parameter_value().double_value
+        self.load_connection_point_r = self.get_parameter('load_connection_point_r').get_parameter_value().double_value
 
         self.mission_circle_r = self.get_parameter('mission_circle_r').get_parameter_value().double_value
         self.mission_circle_v = self.get_parameter('mission_circle_v').get_parameter_value().double_value
@@ -81,6 +87,9 @@ class GCSBackground(Node):
         self.timer_period_gcs_background = self.get_parameter('timer_period_gcs_background').get_parameter_value().double_value
 
         self.cnt_threshold_fully_auto_pre_takeoff = self.get_parameter('cnt_threshold_fully_auto_pre_takeoff').get_parameter_value().integer_value
+
+        # Calculate height drone rel load
+        self.height_drone_rel_load = utils.drone_height_rel_load(self.cable_length, self.r_drones_rel_load, self.load_connection_point_r)
 
 
         ## Print information
@@ -182,9 +191,9 @@ class GCSBackground(Node):
         # TAKEOFF
         elif np.all(self.drone_phases == Phase.PHASE_TAKEOFF_POST_TENSION):
             # Rise slowly - tension will engage
-            self.load_desired_local_state.pos = np.array([0.0, 0.0, min(self.load_desired_local_state.pos[2] + 0.1*self.timer_period_gcs_background, self.max_load_takeoff_height)])
+            self.load_desired_local_state.pos = np.array([0.0, 0.0, min(self.load_desired_local_state.pos[2] + 0.05*self.timer_period_gcs_background, self.takeoff_height_load_max)])
 
-        elif np.all(self.drone_phases == Phase.PHASE_TAKEOFF_END) and self.fully_auto:
+        elif np.all(self.drone_phases == Phase.PHASE_TAKEOFF_END) and (self.auto_level == 2):
             # In fully auto, set drones to mission start phase once takeoff complete
             utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_MISSION_START)
 
@@ -192,15 +201,13 @@ class GCSBackground(Node):
 
         elif np.all(self.drone_phases == Phase.PHASE_MISSION_START):
             ## Perform mission
-            #self.load_desired_local_state_prev = self.load_desired_local_state
             self.load_desired_local_state = self.mission_circle(2.0, self.mission_circle_v/self.mission_circle_r, self.timer_period_gcs_background)
 
             self.cnt_phase_ticks += 1
 
             # If fully auto, transition to land phase when mission complete
-            if self.fully_auto and self.cnt_phase_ticks > self.cnt_threshold_fully_auto_pre_takeoff:
-                for i in range(self.num_drones):
-                    utils.phase_change(self.cli_phase_change[i], Phase.PHASE_LAND_START)
+            if (self.auto_level==2) and self.cnt_phase_ticks > self.cnt_threshold_fully_auto_pre_takeoff:
+                utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_LAND_START)
                         
                 self.get_logger().info(f'In fully auto mode. Mission complete. Transitioning to land phase.')
                 self.cnt_phase_ticks = 0
@@ -216,7 +223,7 @@ class GCSBackground(Node):
 
         elif np.all(self.drone_phases == Phase.PHASE_LAND_DRONES):
             # Slowly land drones
-            self.load_desired_local_state.pos = np.array([self.load_desired_local_state.pos[0], self.load_desired_local_state.pos[1], self.load_desired_local_state.pos[2] - 0.3*self.timer_period_gcs_background])
+            self.load_desired_local_state.pos = np.array([self.load_desired_local_state.pos[0], self.load_desired_local_state.pos[1], self.load_desired_local_state.pos[2] - 0.05*self.timer_period_gcs_background])
 
         self.send_desired_pose()
 

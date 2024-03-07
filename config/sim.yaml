@@ -6,14 +6,18 @@
       ## LOAD SETTINGS
       load_id: 1
       load_pose_type: 'quasi-static' # quasi-static, visual, ground_truth
-      evaluate: true # If you want to evaluate the tracking performance of the load
+      evaluate: false # If you want to evaluate the tracking performance of the load
       show_markers: 0 # Show the detected markers 0 = No, 1 = Yes all, 2 = Drone 1 only # TODO: Replace with ENUM?
       marker_edge_length: 0.08 # m
+
+      ## GCS SETTINGS
+      auto_level: 0 # 0 = "Fully manual" - requires checks at intermediate steps, 1 = "semi-automatic" - fewer intermediate steps, 2 = "fully automatic" - turn into offboard mode for completely automatic mission
+      #min_on_gcs: true # Run all nodes possible on the drone swarm rather than GCS
 
       ## DRONE SETTINGS
       first_drone_num: 1 #1
       num_drones: 3
-      num_cameras: 3 # 0 if cameras are off
+      num_cameras: 0 # 0 if cameras are off
     
       drone_order: [1, 2, 3] #[1, 2, 3] #ACW from load's x axis
 
@@ -21,28 +25,31 @@
       kp_formation_load: 0.0 #0.1 #0.5 (for faster, larger radius)
       #r_drones_max_safety: 0.5 # m
 
-      ## PHASE SETTINGS 
-      fully_auto: false
-      
+      ## PHASE SETTINGS      
       # Mission settings
       mission_circle_r: 2.0 # m
-      mission_circle_v: 1.0 # m/s 
+      mission_circle_v: 0.75 # m/s 
 
       # Heights/distances/dimensions
+      # Formation dimensions
       height_drone_cs_rel_gnd: 0.0 #0.24 # m
       height_load_cs_rel_gnd: 0.0 #0.1 # m
-      height_drone_rel_load: 2.0 # m
-      height_load_pre_tension: -0.2 # m
-      height_max_load_takeoff: 4 #m
+      height_load_pre_tension: -0.4 # m
 
-      r_drones_rel_load: 1.0 #1.5 #1.0 # m
+      takeoff_height_load: 1.0 #m
+      takeoff_height_load_max: 3.0 #m # Safety feature - maximum height load will be commanded to take off
+
+      r_drones_rel_load: 1.25 #1.5 #1.0 # m
       d_drones_rel_min: 0.0 #0.5 #1.0 # m
       d_drones_rel_max: 100.0 #5.0 #2.0 # m
 
       pos_threshold: 0.3 # m
 
-      takeoff_height_load: 1.0 #m
+      # Load and cable dimensions
+      cable_length: 2.0 #m
+      load_connection_point_r: 0.08 #m
 
+      # Camera and markers
       t_cam_rel_pixhawk: [-0.1, 0.03, -0.025] # Camera translation relative to PX4 (i.e. drone body)
       R_cam_rel_pixhawk: [3.141592654, 0.0, -1.570796327] # Camera rotation relative to PX4 (i.e. drone body)
 

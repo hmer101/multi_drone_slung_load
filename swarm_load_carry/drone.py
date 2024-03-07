@@ -47,14 +47,17 @@ class Drone(Node):
         self.declare_parameter('num_cameras', 0)
         self.declare_parameter('first_drone_num', 0) #1
         
-        self.declare_parameter('fully_auto', False)
+        self.declare_parameter('auto_level', 0)
         
         self.declare_parameter('height_drone_cs_rel_gnd', 0.0)
-        self.declare_parameter('height_drone_rel_load', 2.0)
         self.declare_parameter('height_load_pre_tension', -0.2)
         self.declare_parameter('pos_threshold', 0.3)
 
+        self.declare_parameter('cable_length', 1.0)
+        self.declare_parameter('load_connection_point_r', 0.0)
+
         self.declare_parameter('takeoff_height_load', 1.0)
+        self.declare_parameter('r_drones_rel_load', 1.0)
 
         self.declare_parameter('t_cam_rel_pixhawk', [-0.1, 0.03, -0.025])
         self.declare_parameter('R_cam_rel_pixhawk', [np.pi, 0.0, -np.pi/2])
@@ -82,14 +85,17 @@ class Drone(Node):
         self.num_cameras = self.get_parameter('num_cameras').get_parameter_value().integer_value
         self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
         
-        self.fully_auto = self.get_parameter('fully_auto').get_parameter_value().bool_value
+        self.auto_level = self.get_parameter('auto_level').get_parameter_value().integer_value
         
         self.height_drone_cs_rel_gnd = self.get_parameter('height_drone_cs_rel_gnd').get_parameter_value().double_value
-        self.height_drone_rel_load = self.get_parameter('height_drone_rel_load').get_parameter_value().double_value
         self.height_load_pre_tension = self.get_parameter('height_load_pre_tension').get_parameter_value().double_value
         self.pos_threshold = self.get_parameter('pos_threshold').get_parameter_value().double_value
 
         self.takeoff_height_load = self.get_parameter('takeoff_height_load').get_parameter_value().double_value
+        self.r_drones_rel_load = self.get_parameter('r_drones_rel_load').get_parameter_value().double_value
+
+        self.cable_length = self.get_parameter('cable_length').get_parameter_value().double_value
+        self.load_connection_point_r = self.get_parameter('load_connection_point_r').get_parameter_value().double_value
 
         self.t_cam_rel_pixhawk = np.array(self.get_parameter('t_cam_rel_pixhawk').get_parameter_value().double_array_value)
         self.R_cam_rel_pixhawk = np.array(self.get_parameter('R_cam_rel_pixhawk').get_parameter_value().double_array_value)
@@ -104,6 +110,9 @@ class Drone(Node):
         self.cnt_threshold_land_post_load_down = self.get_parameter('cnt_threshold_land_post_load_down').get_parameter_value().integer_value
         self.cnt_threshold_land_drones = self.get_parameter('cnt_threshold_land_drones').get_parameter_value().integer_value
         self.cnt_threshold_land_pre_disarm = self.get_parameter('cnt_threshold_land_pre_disarm').get_parameter_value().integer_value
+
+        # Calculate height drone rel load
+        self.height_drone_rel_load = utils.drone_height_rel_load(self.cable_length, self.r_drones_rel_load, self.load_connection_point_r)
 
         ## VARIABLES
         # Vehicle
@@ -388,11 +397,16 @@ class Drone(Node):
 
     def clbk_change_phase(self, request, response):
 
-        # Change phase to the beginning of major phases (minor phases should change automatically within this node)
+        # Change phase to the beginning of major phases (some minor phase transitions are enabled in manual mode, or automatically occur)
         match request.phase_request.phase:
             case Phase.PHASE_SETUP_DRONE:
-                # Takeoff
                 self.phase=Phase.PHASE_SETUP_DRONE
+
+            case Phase.PHASE_TAKEOFF_PRE_TENSION: # Minor
+                self.phase=Phase.PHASE_TAKEOFF_PRE_TENSION
+
+            case Phase.PHASE_TAKEOFF_POST_TENSION: # Minor
+                self.phase=Phase.PHASE_TAKEOFF_POST_TENSION
 
             case Phase.PHASE_MISSION_START:
                 self.phase=Phase.PHASE_MISSION_START
@@ -443,7 +457,7 @@ class Drone(Node):
 
 
         # Start setup and take-off automatically if in fully-auto mode. 
-        if self.fully_auto and self.phase == Phase.PHASE_UNASSIGNED and self.vehicle_status is not None:
+        if (self.auto_level == 2) and self.phase == Phase.PHASE_UNASSIGNED and self.vehicle_status is not None:
             # Counter starts when attempt to put into offboard mode by RC
             if self.vehicle_status.nav_state_user_intention == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
                 if self.cnt_phase_ticks >= self.cnt_threshold_fully_auto_pre_takeoff:
@@ -545,8 +559,8 @@ class Drone(Node):
 
                 # Continue to send setpoint whilst taking off
                 if self.vehicle_status.arming_state==VehicleStatus.ARMING_STATE_ARMED and self.vehicle_status.nav_state==VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-                    # Takeoff to pre-tension level. Only transition once pre-tension level reached and pose rel load set
-                    if tf_drone_rel_world.transform.translation.z>=(self.height_load_pre_tension+self.height_drone_rel_load-self.pos_threshold): 
+                    # Takeoff to pre-tension level. Only transition once pre-tension level reached and pose rel load set. Only transition if not in lowest autonomy level
+                    if tf_drone_rel_world.transform.translation.z>=(self.height_load_pre_tension+self.height_drone_rel_load-self.pos_threshold) and self.auto_level >=1: 
                         self.phase = Phase.PHASE_TAKEOFF_PRE_TENSION
                         self.cnt_phase_ticks = 0  
                         self.get_logger().info(f'Pre-tension level reached')        
@@ -563,16 +577,22 @@ class Drone(Node):
 
 
             case Phase.PHASE_TAKEOFF_PRE_TENSION:
-                # Send takeoff setpoint
+                # Send pre-tension setpoint: in formation but slightly below height
+                desired_state_rel_load_lower_z = self.vehicle_desired_state_rel_load.copy()
+                desired_state_rel_load_lower_z.pos[2] += self.height_load_pre_tension
+
+                trajectory_msg = utils.gen_traj_msg_circle_load(desired_state_rel_load_lower_z, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger())
                 self.pub_trajectory.publish(trajectory_msg)
 
                 # Wait before attempt to pick up load as get into formation
                 if self.cnt_phase_ticks < self.cnt_threshold_takeoff_pre_tension:
                     self.cnt_phase_ticks += 1
                 else:
-                    self.phase = Phase.PHASE_TAKEOFF_POST_TENSION
-                    self.cnt_phase_ticks = 0
-                    self.get_logger().info(f'Takeoff pre-tension complete') 
+                    if self.auto_level >=1: # Only automatically transition if not in lowest autonomy mode
+                        # TODO: Slowly rise to engage tension
+                        self.phase = Phase.PHASE_TAKEOFF_POST_TENSION
+                        self.cnt_phase_ticks = 0
+                        self.get_logger().info(f'Takeoff pre-tension complete') 
                      
 
             case Phase.PHASE_TAKEOFF_POST_TENSION:

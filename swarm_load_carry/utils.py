@@ -73,6 +73,12 @@ def regular_polygon_side_length(num_sides, radius):
     return radius*(2*(1-math.cos(2*math.pi/num_sides)))**0.5
 
 
+# Find the height a drone should be relative to the load connection point to give the desired formation radius
+# Inputs: Cable length, drone formation radius, radius of cable attachment points
+# Outputs: height
+def drone_height_rel_load(cable_length, r_formation, r_cable_attachments):
+    return math.sqrt(cable_length**2 - (r_formation-r_cable_attachments)**2)
+
 ## TRANSFORMS
 
 # Build and send a tf
