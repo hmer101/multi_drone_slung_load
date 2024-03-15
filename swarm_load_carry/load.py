@@ -240,8 +240,20 @@ class Load(Node):
             else: 
                 load_state_rel_world_qs.pos[2] = self.height_load_cs_rel_gnd - self.height_drone_cs_rel_gnd
 
-            # Estimate load orientation #TODO: Better orientation estimation method
-            load_state_rel_world_qs.att_q = drone_orientations[0] #np.quaternion(*drone_orientations[0, :])
+            # Estimate load orientation #TODO: Better orientation estimation method. 
+            # Take the drone's orientation until in formation when the yaw is opposite
+            # if self.drone_phases[0] <= Phase.PHASE_TAKEOFF_START:
+            #     load_state_rel_world_qs.att_q = drone_orientations[0]
+            # else:
+            
+            # Subtract yaw of pi from drone to get load. Note subtraction is done with quaternion multiplication
+            # NOTE: Drone 1 must therefore start pointing towards load otherwise the load's initial orientation will be incorrect!!
+            q_w_d1 = drone_orientations[0]
+            
+            q_d1_L_list = ft.quaternion_from_euler(0, 0, -np.pi)
+            q_d1_L = np.quaternion(*q_d1_L_list)
+
+            load_state_rel_world_qs.att_q = q_w_d1*q_d1_L
 
             return load_state_rel_world_qs
         else:

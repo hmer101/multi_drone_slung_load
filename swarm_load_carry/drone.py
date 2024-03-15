@@ -49,6 +49,9 @@ class Drone(Node):
         
         self.declare_parameter('auto_level', 0)
         
+        #self.declare_parameter('vel_drone', 0.1)
+        self.declare_parameter('yawspeed_drone', 0.393)
+
         self.declare_parameter('height_drone_cs_rel_gnd', 0.0)
         self.declare_parameter('height_load_pre_tension', -0.2)
         self.declare_parameter('pos_threshold', 0.3)
@@ -87,6 +90,9 @@ class Drone(Node):
         
         self.auto_level = self.get_parameter('auto_level').get_parameter_value().integer_value
         
+        #self.vel_drone = self.get_parameter('vel_drone').get_parameter_value().double_value
+        self.yawspeed_drone = self.get_parameter('yawspeed_drone').get_parameter_value().double_value
+
         self.height_drone_cs_rel_gnd = self.get_parameter('height_drone_cs_rel_gnd').get_parameter_value().double_value
         self.height_load_pre_tension = self.get_parameter('height_load_pre_tension').get_parameter_value().double_value
         self.pos_threshold = self.get_parameter('pos_threshold').get_parameter_value().double_value
@@ -469,7 +475,9 @@ class Drone(Node):
 
         # Generate trajectory message for formation used after take-off.
         elif self.phase > Phase.PHASE_SETUP_GCS:
+            # Note speed setpoints are not included by default (include in particular phases below)
             trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger())
+            #trajectory_msg_with_speed = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.vehicle_local_state, v_scalar=self.vel_drone, yawspeed_scalar=self.yawspeed_drone)
 
             if trajectory_msg == None:
                 self.get_logger().warn(f'Load or drone initial position not found. Skipping this command loop.')
@@ -581,18 +589,19 @@ class Drone(Node):
                 desired_state_rel_load_lower_z = self.vehicle_desired_state_rel_load.copy()
                 desired_state_rel_load_lower_z.pos[2] += self.height_load_pre_tension
 
-                trajectory_msg = utils.gen_traj_msg_circle_load(desired_state_rel_load_lower_z, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger())
-                self.pub_trajectory.publish(trajectory_msg)
-
                 # Wait before attempt to pick up load as get into formation
+                # Travel at set yawspeed and direction for this, then at no speed setpoint afterwards
                 if self.cnt_phase_ticks < self.cnt_threshold_takeoff_pre_tension:
                     self.cnt_phase_ticks += 1
-                else:
+                    trajectory_msg = utils.gen_traj_msg_circle_load(desired_state_rel_load_lower_z, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.vehicle_local_state, yawspeed_scalar=self.yawspeed_drone)
+                else:                   
                     if self.auto_level >=1: # Only automatically transition if not in lowest autonomy mode
                         # TODO: Slowly rise to engage tension
                         self.phase = Phase.PHASE_TAKEOFF_POST_TENSION
                         self.cnt_phase_ticks = 0
                         self.get_logger().info(f'Takeoff pre-tension complete') 
+
+                self.pub_trajectory.publish(trajectory_msg)
                      
 
             case Phase.PHASE_TAKEOFF_POST_TENSION:
@@ -614,7 +623,6 @@ class Drone(Node):
             # Run main offboard mission
             case Phase.PHASE_MISSION_START:
                 self.pub_trajectory.publish(trajectory_msg)
-                #self.cnt_phase_ticks += 1
                     
 
             # Run land 

@@ -79,6 +79,30 @@ def regular_polygon_side_length(num_sides, radius):
 def drone_height_rel_load(cable_length, r_formation, r_cable_attachments):
     return math.sqrt(cable_length**2 - (r_formation-r_cable_attachments)**2)
 
+
+## RELATIVE POSES
+
+# Find a normalized direction vector between two points (p2 and p1) specified in the same frame
+def get_norm_dir_vec(p1, p2):
+    p_12 = p2 - p1
+    p_hat_12 = p_12/np.linalg.norm(p_12)
+
+    return p_hat_12
+
+
+# Find the direction of yaw turn that traverses the smaller angle (1 = cw, -1 = ccw)
+def find_shortest_yaw_dir(yaw1, yaw2):
+    # Find the sign of the relative yaw
+    yaw_diff = yaw2-yaw1
+    dir = np.sign(yaw_diff)
+
+    # Change the direction of turn if the yaw is over pi rad
+    if yaw_diff > math.pi:
+        dir = -1*dir
+
+    return dir
+
+
 ## TRANSFORMS
 
 # Build and send a tf
@@ -190,8 +214,61 @@ def get_drone_poses(num_drones, first_drone_num, tf_buffer, logger):
 ## TRAJECTORY GENERATION
 # Note trajectories sent to Pixhawk controller must be in NED co-ordinates relative to initial drone position. ENU -> NED and frame transformations handled here
 
+# Project velocity, acceleration etc. setpoints onto straight lines connecting the previous and desired positions
+# In ROS2 coordinates (ENU)
+def gen_rate_setpoints_straight(drone_desired_local_state, drone_prev_local_state, v_scalar=None, a_scalar=None, yawspeed_scalar=None):
+    rate_desired_setpoints_ros2 = [None, None, None]
+    
+    # Find direction of motion (straight line between previous and current position)
+    dir_desired = get_norm_dir_vec(drone_prev_local_state.pos, drone_desired_local_state.pos)
+        
+    # Velocity
+    if v_scalar is not None:
+        v_local = v_scalar*dir_desired
+
+        rate_desired_setpoints_ros2[0] = np.copy(v_local)
+    
+    # Acceleration
+    if a_scalar is not None:
+        a_local = a_scalar*dir_desired
+
+        rate_desired_setpoints_ros2[1] = np.copy(a_local)
+    
+    # Yawspeed
+    if yawspeed_scalar is not None:
+        # Select direction based on the minimum angle to turn
+        drone_prev_local_state_np = np.array([drone_prev_local_state.att_q.w, drone_prev_local_state.att_q.x, drone_prev_local_state.att_q.y, drone_prev_local_state.att_q.z])
+        drone_desired_local_state_np = np.array([drone_desired_local_state.att_q.w, drone_desired_local_state.att_q.x, drone_desired_local_state.att_q.y, drone_desired_local_state.att_q.z])
+        dir = find_shortest_yaw_dir(ft.quaternion_get_yaw(drone_prev_local_state_np), ft.quaternion_get_yaw(drone_desired_local_state_np))
+
+        # Convert to PX4 coordinates (NED)
+        rate_desired_setpoints_ros2[2] = -1*dir*yawspeed_scalar
+
+    return rate_desired_setpoints_ros2
+
+
+# Add rate setpoints to a trajectory message that has already been generated for a position
+def traj_msg_add_rate_setpoints(traj_msg, rate_desired_setpoints_ros2):
+    # Note: convert all ROS2 to PX4 coordinates
+    # Velocity
+    if rate_desired_setpoints_ros2[0] is not None:
+        traj_msg.velocity[0] = rate_desired_setpoints_ros2[0][1]
+        traj_msg.velocity[1] = rate_desired_setpoints_ros2[0][0]
+        traj_msg.velocity[2] = -rate_desired_setpoints_ros2[0][2]
+    # Acceleration
+    if rate_desired_setpoints_ros2[1] is not None:
+        traj_msg.acceleration[0] = rate_desired_setpoints_ros2[1][1]
+        traj_msg.acceleration[1] = rate_desired_setpoints_ros2[1][0]
+        traj_msg.acceleration[2] = -rate_desired_setpoints_ros2[1][2]
+    # Angular velocity
+    if rate_desired_setpoints_ros2[2] is not None:
+        traj_msg.yawspeed = rate_desired_setpoints_ros2[2]
+    
+    return traj_msg
+
+
 # Make drone follow desired load position, at the desired location relative to the load
-def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_state, drone_name, tf_buffer, timestamp, logger):
+def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_state, drone_name, tf_buffer, timestamp, logger, drone_prev_local_state=None, v_scalar=None, a_scalar=None, yawspeed_scalar=None):
     # Generate trajectory message
     trajectory_msg = TrajectorySetpoint()
     trajectory_msg.timestamp = timestamp
@@ -218,22 +295,29 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
     if vehicle_desired_state_rel_drone_init == None:
         return None
         
-    # Transform to NED into drone_init
+    # Transform to PX4 coordinates (NED)
     pos_drone_desired_px4 = np.array([vehicle_desired_state_rel_drone_init.pos[1], vehicle_desired_state_rel_drone_init.pos[0], -vehicle_desired_state_rel_drone_init.pos[2]])
     q_drone_desired_px4 = ft.ros_to_px4_orientation(q_to_normalized_np(vehicle_desired_state_rel_drone_init.att_q))
 
-    # Generate trajectory message
+    ## GENERATE TRAJECTORY MSG
+    # Position
     trajectory_msg.position[0] = pos_drone_desired_px4[0] 
     trajectory_msg.position[1] = pos_drone_desired_px4[1] 
     trajectory_msg.position[2] = pos_drone_desired_px4[2] 
 
+    # Yaw
     trajectory_msg.yaw = ft.quaternion_get_yaw(q_drone_desired_px4)
+
+    # Add velocity and acceleration targets if applicabletrajectory
+    if drone_prev_local_state != None:
+        rate_desired_setpoints_ros2 = gen_rate_setpoints_straight(vehicle_desired_state_rel_drone_init, drone_prev_local_state, v_scalar, a_scalar, yawspeed_scalar)
+        trajectory_msg = traj_msg_add_rate_setpoints(trajectory_msg, rate_desired_setpoints_ros2)
 
     return trajectory_msg
 
 
 # Generate trajectory message that gives setpoint at a specific height and orientation
-def gen_traj_msg_straight_up(takeoff_height, takeoff_q, timestamp, takeoff_N=0.0, takeoff_E=0.0):
+def gen_traj_msg_straight_up(takeoff_height, takeoff_q, timestamp, takeoff_N=0.0, takeoff_E=0.0, drone_prev_local_state=None, v_scalar=None, a_scalar=None):
     trajectory_msg = TrajectorySetpoint()
     trajectory_msg.timestamp = timestamp
 
@@ -245,6 +329,15 @@ def gen_traj_msg_straight_up(takeoff_height, takeoff_q, timestamp, takeoff_N=0.0
     # Get yaw in NED from takeoff_q
     q_px4 = ft.ros_to_px4_orientation(q_to_normalized_np(takeoff_q))
     trajectory_msg.yaw = ft.quaternion_get_yaw(q_px4)
+
+    # Add rate targets if applicable
+    if drone_prev_local_state != None:
+        # Construct desired state (position as orientation is unchanged for straight up)
+        vehicle_desired_local_state = State(f'droneX_init', CS_type.ENU)
+        vehicle_desired_local_state.pos = np.array([takeoff_E, takeoff_N, takeoff_height])
+
+        rate_desired_setpoints_ros2 = gen_rate_setpoints_straight(vehicle_desired_local_state, drone_prev_local_state, v_scalar, a_scalar, None)
+        trajectory_msg = traj_msg_add_rate_setpoints(trajectory_msg, rate_desired_setpoints_ros2)
 
     return trajectory_msg
 
@@ -287,6 +380,7 @@ def phase_change(cli_phase_change, phase_desired):
     phase_future = cli_phase_change.call_async(phase_req)
 
     return phase_future
+
 
 def change_phase_all_drones(node, num_drones, cli_array_phase_change, phase_desired, wait_for_response=True):
     # Send request

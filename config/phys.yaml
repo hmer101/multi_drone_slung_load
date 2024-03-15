@@ -27,30 +27,40 @@
       ## PHASE SETTINGS 
       # Mission settings
       mission_circle_r: 2.0 # m
-      mission_circle_v: 0.5 # m/s 
+      mission_circle_v: 0.75 # m/s 
       
+      # Drone rate settings
+      vel_load_vertical_slow: 0.05 # m/s
+      vel_load_vertical_fast: 0.3 # m/s
+      #yawspeed_load: 0.393
+
+      vel_drone: 0.1 # m/s
+      yawspeed_drone: 0.393 # rad/s
+
       # Heights/distances/dimensions
       # Formation dimensions
       height_drone_cs_rel_gnd: 0.0 #0.24 # m
       height_load_cs_rel_gnd: 0.0 #0.1 # m
-      height_load_pre_tension: -0.2 # m
+      height_load_pre_tension: -0.4 # m
 
       takeoff_height_load: 1.0 #m
       takeoff_height_load_max: 3.0 #m # Safety feature - maximum height load will be commanded to take off
 
-      r_drones_rel_load: 1.5 # m
-      d_drones_rel_min: 1.0 # m
-      d_drones_rel_max: 5.0 # m
+      r_drones_rel_load: 1.25 # m
+      d_drones_rel_min: 0.0 # m
+      d_drones_rel_max: 100.0 # m
 
       pos_threshold: 0.3 # m
 
+      drone_yaws_rel_load: [3.141592654, -1.0472, 1.0472]
+
       # Load and cable dimensions
-      cable_length: 2.0 #m
+      cable_length: 2.2 #m
       load_connection_point_r: 0.095 #m
 
       # Camera and markers
       t_cam_rel_pixhawk: [-0.1, 0.03, -0.025] # Camera translation relative to PX4 (i.e. drone body)
-      R_cam_rel_pixhawk: [3.141592654, 0.0, -1.570796327] # Camera rotation relative to PX4 (i.e. drone body)
+      R_cam_rel_pixhawk: [-2.0944, 0.0, -1.570796327] # Camera rotation relative to PX4 (i.e. drone body)
 
       t_marker_rel_load: [0.0, 0.0, 0.1] # Marker translation relative to load
       R_marker_rel_load: [0.0, 0.0, 1.570796327] # Marker rotation relative to load
@@ -65,6 +75,7 @@
       cnt_threshold_takeoff_start: 30 #3/timer_period_drone # INCREASE IF NEEDED
       cnt_threshold_takeoff_pre_tension: 50
       cnt_threshold_fully_auto_pre_takeoff: 50
+      cnt_threshold_fully_auto_mission: 50
       cnt_threshold_land_pre_descent: 50
       cnt_threshold_land_post_load_down: 50
       cnt_threshold_land_drones: 60
