@@ -1,7 +1,8 @@
 /**:
     ros__parameters:
       env: 'phys'
-           
+      #use_sim_time: false #true
+
       ## LOAD SETTINGS
       load_id: 1
       load_pose_type: 'quasi-static' # quasi-static, visual, ground_truth
@@ -12,6 +13,7 @@
       ## GCS SETTINGS
       auto_level: 0 # 0 = "Fully manual" - requires checks at intermediate steps, 1 = "semi-automatic" - fewer intermediate steps, 2 = "fully automatic" - turn into offboard mode for completely automatic mission
       min_on_gcs: true # Run all nodes possible on the drone swarm rather than GCS
+      real_load_attached: true # If no load is attached, have to run load node somewhere else 
 
       ## DRONE SETTINGS
       first_drone_num: 1 #1

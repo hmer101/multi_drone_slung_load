@@ -22,6 +22,7 @@ def generate_launch_description():
         params = yaml.safe_load(file)
     
     min_on_gcs = params["/**"]["ros__parameters"]["min_on_gcs"]
+    real_load_attached = params["/**"]["ros__parameters"]["real_load_attached"]
     
     ## INCLUDE LAUNCH FILES    
     gcs = IncludeLaunchDescription(
@@ -51,8 +52,11 @@ def generate_launch_description():
 
     # Only launch load and gcs_background if not launching on drones, otherwise just launch gcs_user
     if not min_on_gcs:
-        launch_description.append(load)
         launch_description.append(gcs)
+
+        if not real_load_attached:
+            launch_description.append(load)
+
     else:
         launch_description.append(gcs_user)
 
