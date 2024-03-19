@@ -4,47 +4,52 @@
 # Author: Harvey Merton
 # Date: 01/25/24
 
-NUM_DRONES=2 #3  # Set the maximum number of drones to launch
-START_DRONE_NUM=2 #1  # Set the starting drone number
-drone_count=0  # Initialize a counter for launched drones
-line_num=0  # Initialize a line counter
+NUM_DRONES=3 # Set the maximum number of drones to launch
+START_DRONE_NUM=1  # Set the starting drone number
+NUM_LOAD=1  # Set the number of loads to be used
+
+# Function to SSH into devices and view logs
+ssh_and_view_logs() {
+    local device_type=$1
+    local num_devices=$2
+    local start_num=$3
+    local uuid_file=$4
+
+    local count=0  # Initialize a counter for launched devices
+    local line_num=0  # Initialize a line counter
+
+    while IFS= read -r line; do
+        # Start at start_num and end at num_devices
+        line_num=$((line_num + 1))
+
+        if [ "$line_num" -lt "$start_num" ]; then
+            continue  # Skip lines until start_num is reached
+        fi
+
+        if [ "$count" -ge "$num_devices" ]; then
+            echo "Maximum number of $device_type ($num_devices) reached. Exiting..."
+            break
+        fi
+
+        # Extract info from txt file to ssh into devices
+        device_uuid=${line}
+
+        # Get container info from balena
+        device_container_main=$(echo 'balena container ls --format "{{.ID}}" | head -n 1' | balena ssh $device_uuid.local)
+
+        # Open gnome-terminal tab to view logs
+        gnome-terminal --tab -- bash -c "echo 'balena logs $device_container_main -f; exit;' | balena ssh $device_uuid.local"
+
+        # Increment the device count
+        count=$((count + 1))
+    done < "$uuid_file"
+}
 
 # Start QGC
-gnome-terminal --tab -- bash -c "/home/harvey/.appImage/QGroundControl.AppImage" #; exec bash"
+gnome-terminal --tab -- bash -c "/home/harvey/.appImage/QGroundControl.AppImage"
 
 # Balena SSH into drones and view the logs
-# Note must be on same network as drones (BilabRover_2.4GHz)
-while IFS= read -r line
-do
-	# Start at START_DRONE_NUM and end at NUM_DRONES
-	line_num=$((line_num + 1))
+ssh_and_view_logs "drones" $NUM_DRONES $START_DRONE_NUM "../config/phys_drones_uuid.txt"
 
-	if [ "$line_num" -lt "$START_DRONE_NUM" ]; then
-		continue  # Skip lines until START_DRONE_NUM is reached
-	fi
-
-	if [ "$drone_count" -ge "$NUM_DRONES" ]; then
-		echo "Maximum number of drones ($NUM_DRONES) reached. Exiting..."
-		break
-	fi
-
-	# Extract info from txt file to ssh into drones
-	drone_info=($line)
-	drone_uuid=${drone_info[0]}
-
-	# Get container info from balena
-	drone_container_main=$(echo 'balena container ls --format '{{.ID}}' | head -n 1'| balena ssh $drone_uuid.local)
-
-	# Note how the 'balena logs' command is 'piped' to the 'balena ssh' command
-	gnome-terminal --tab -- bash -c "echo 'balena logs $drone_container_main -f; exit;' | balena ssh $drone_uuid.local"
-	#gnome-terminal --tab -- bash -c "balena logs $drone_uuid.local --service main --tail" # Note this requires the device to be in offline mode and so doesn't give logs. Not using '.local' requires internet connection
-
-	# Increment the drone count
-	drone_count=$((drone_count + 1))
-
-
-done < ../config/phys_drones_uuid.txt #Note this file needs a blank line at the end. Contains 'device_uuid' for each drone on a new line.
-
-
-# Run GCS ROS2 launch
-gnome-terminal -- bash -c "ros2 launch swarm_load_carry phys_gcs.launch.py" #; exec bash"
+# Balena SSH into loads and view the logs
+ssh_and_view_logs "loads" $NUM_LOAD 1 "../config/phys_load_uuid.txt"

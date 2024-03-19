@@ -76,7 +76,7 @@ def generate_launch_description():
     )]
     
     # Launch camera and visual measurement if set to do so
-    if drone_id_env <= int(num_cameras):       
+    if int(drone_id_env) <= int(num_cameras):       
         launch_description.append(camera)
 
         #if load_pose_type == "visual":
