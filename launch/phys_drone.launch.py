@@ -59,7 +59,7 @@ def generate_launch_description():
     
     gcs_background = ExecuteProcess(
             cmd=[[
-                f'gnome-terminal --tab -- bash -c "ros2 run swarm_load_carry gcs_background --ros-args -r __node:=gcs_background1 --params-file {config}"', 
+                f'bash -c "ros2 run swarm_load_carry gcs_background --ros-args -r __node:=gcs_background1 --params-file {config}"', #gnome-terminal --tab -- 
             ]],
             shell=True
         )
