@@ -51,7 +51,7 @@ def generate_launch_description():
         launch_arg_sim_phys,
         ExecuteProcess(
             cmd=[[
-                f'gnome-terminal --tab -- bash -c "ros2 run swarm_load_carry load --ros-args -r __node:=load{load_id} --params-file {config}"',  # -r __ns:=/load_{load_id}
+                f'bash -c "ros2 run swarm_load_carry load --ros-args -r __node:=load{load_id} --params-file {config}"',  #gnome-terminal --tab -- -r __ns:=/load_{load_id}  
             ]],
             shell=True
         )

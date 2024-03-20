@@ -212,6 +212,8 @@ class Load(Node):
             if np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD):
                 self.set_tf_init_pose(load_state_rel_world_qs)
 
+                # TODO: If in physical, ARM LOAD's PX4/start log
+
             # Publish load relative to load initial position
             load_rel_load_init = utils.transform_frames(self.load_state_rel_world, f'{self.get_name()}_init', self.tf_buffer, self.get_logger(), cs_out_type=CS_type.ENU)
 
