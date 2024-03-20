@@ -18,11 +18,12 @@ from tf2_ros import TransformBroadcaster, StaticTransformBroadcaster
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
-from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
+from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint, VehicleLocalPosition, VehicleAttitude, VehicleGlobalPosition, VehicleCommand 
 from geometry_msgs.msg import Pose, PoseArray
 
 from swarm_load_carry.state import State, CS_type
-from swarm_load_carry_interfaces.msg import Phase
+from swarm_load_carry.pose_pixhawk import PosePixhawk
+from swarm_load_carry_interfaces.msg import Phase, GlobalPose
 
 # Could make subclasses for different load types (e.g. camera etc.)
 class Load(Node):
@@ -94,8 +95,10 @@ class Load(Node):
         ## VARIABLES
         self.load_desired_state = State(f'{self.get_name()}_init', CS_type.ENU)
 
+        self.pixhawk_pose = PosePixhawk(self.get_name(), self.env, self.load_pose_type, self.evaluate, self.tf_broadcaster)
         self.load_initial_state_rel_world = State('world', CS_type.ENU)
         self.load_state_rel_world = State('world', CS_type.ENU)
+  
         self.load_state_gt = State('ground_truth', CS_type.XYZ)
 
         self.drone_phases = np.array([-1] * self.num_drones)
@@ -104,7 +107,9 @@ class Load(Node):
         self.timer = self.create_timer(self.timer_period_load, self.clbk_publoop)
 
         ## PUBLISHERS
-        
+        self.pub_vehicle_command = self.create_publisher(VehicleCommand, f'load_{self.load_id}/fmu/in/vehicle_command', qos_profile)
+        #self.pub_global_init_pose = self.create_publisher(GlobalPose, f'load_{self.load_id}/out/global_init_pose', qos_profile)
+
         ## SUBSCRIBERS
         self.sub_load_attitude_desired = self.create_subscription(
             VehicleAttitudeSetpoint,
@@ -126,13 +131,26 @@ class Load(Node):
                     f'load_{self.load_id}/out/pose_ground_truth/gz',
                     self.clbk_load_pose_gt,
                     qos_profile_gt)
-            else:
-                pass # TODO: Add subscriber for ground truth pose in physical environment
-                # self.sub_load_pose_gt = self.create_subscription(
-                #     PoseArray,
-                #     f'load_{self.load_id}/out/pose_ground_truth/gnss',
-                #     self.clbk_load_pose_gt,
-                #     qos_profile)
+            elif self.env == 'phys':
+                # Add subscriber for ground truth pose in physical environment
+                # Note that ground truth simply comes from the vehicle local position from the EKF
+                self.sub_attitude = self.create_subscription(
+                    VehicleAttitude,
+                    f'{self.ns}/fmu/out/vehicle_attitude',
+                    lambda msg: self.pixhawk_pose.clbk_vehicle_attitude(msg, self.get_clock().now().to_msg()),
+                    qos_profile)
+
+                self.sub_local_position = self.create_subscription(
+                    VehicleLocalPosition,
+                    f'{self.ns}/fmu/out/vehicle_local_position',
+                    lambda msg: self.pixhawk_pose.clbk_vehicle_local_position(msg, self.get_clock().now().to_msg()), 
+                    qos_profile)  
+                
+                self.sub_global_position = self.create_subscription(
+                    VehicleGlobalPosition,
+                    f'{self.ns}/fmu/out/vehicle_global_position',
+                    lambda msg: self.pixhawk_pose.clbk_vehicle_global_position(msg, self.phase, int(self.get_clock().now().nanoseconds/1000), self.pub_vehicle_command), 
+                    qos_profile) 
 
         # Drone current phases
         self.sub_drone_phases = [None] * self.num_drones
@@ -176,6 +194,7 @@ class Load(Node):
 
     def clbk_update_drone_phase(self, msg, drone_ind):
         self.drone_phases[drone_ind] = msg.phase
+            
 
     def clbk_load_pose_gt(self, msg):
         # Extract the load pose from the message
