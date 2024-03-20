@@ -46,7 +46,7 @@ ssh_and_view_logs() {
 }
 
 # Start QGC
-gnome-terminal --tab -- bash -c "/home/harvey/.appImage/QGroundControl.AppImage"
+bash -c "/home/harvey/.appImage/QGroundControl.AppImage" #gnome-terminal --tab -- 
 
 # Balena SSH into drones and view the logs
 ssh_and_view_logs "drones" $NUM_DRONES $START_DRONE_NUM "../config/phys_drones_uuid.txt"
