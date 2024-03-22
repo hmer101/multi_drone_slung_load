@@ -92,6 +92,15 @@ class Load(Node):
             depth=1
         )
 
+        ## TFS
+        self.tf_broadcaster = TransformBroadcaster(self)
+        self.tf_static_broadcaster_init_pose = StaticTransformBroadcaster(self)
+        self.tf_static_broadcaster_marker_rel_load = StaticTransformBroadcaster(self)
+        self.tf_static_broadcaster_marker_rel_load_gt = StaticTransformBroadcaster(self)
+
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+
         ## VARIABLES
         self.load_desired_state = State(f'{self.get_name()}_init', CS_type.ENU)
 
@@ -166,15 +175,6 @@ class Load(Node):
 
         ## SERVICES
         ## CLIENTS
-
-        ## TFS
-        self.tf_broadcaster = TransformBroadcaster(self)
-        self.tf_static_broadcaster_init_pose = StaticTransformBroadcaster(self)
-        self.tf_static_broadcaster_marker_rel_load = StaticTransformBroadcaster(self)
-        self.tf_static_broadcaster_marker_rel_load_gt = StaticTransformBroadcaster(self)
-
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
 
         self.get_logger().info('Initialization complete')
 

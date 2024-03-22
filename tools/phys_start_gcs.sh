@@ -46,10 +46,13 @@ ssh_and_view_logs() {
 }
 
 # Start QGC
-bash -c "/home/harvey/.appImage/QGroundControl.AppImage" #gnome-terminal --tab -- 
+#bash -c "/home/harvey/.appImage/QGroundControl.AppImage" #gnome-terminal --tab -- 
 
 # Balena SSH into drones and view the logs
-ssh_and_view_logs "drones" $NUM_DRONES $START_DRONE_NUM "../config/phys_drones_uuid.txt"
+#ssh_and_view_logs "drones" $NUM_DRONES $START_DRONE_NUM "../config/phys_drones_uuid.txt"
 
 # Balena SSH into loads and view the logs
 ssh_and_view_logs "loads" $NUM_LOAD 1 "../config/phys_load_uuid.txt"
+
+# Start the GCS
+#bash -c "ros2 launch swarm_load_carry phys_gcs.launch.py" #gnome-terminal --tab -- 

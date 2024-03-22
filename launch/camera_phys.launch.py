@@ -32,7 +32,7 @@ def generate_launch_description():
          package='realsense2_camera',
          executable='realsense2_camera_node',
          namespace=PythonExpression(["'/px4_' + str(", drone_id, ")"]),
-         name=PythonExpression(["'drone' + str(", drone_id, ")"]),
+         name=PythonExpression(["'camera' + str(", drone_id, ")"]),
          output='screen',
          parameters=[config]
         )
