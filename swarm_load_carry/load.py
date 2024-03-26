@@ -107,8 +107,6 @@ class Load(Node):
         self.pixhawk_pose = PosePixhawk(self.get_name(), self.env, self.load_pose_type, self.evaluate, self.get_logger(), \
                                         self.tf_broadcaster, tf_static_broadcaster_init_pose, \
                                         tf_static_broadcaster_marker_rel_load, tf_static_broadcaster_marker_rel_load_gt)
-        #self.load_initial_state_rel_world = State('world', CS_type.ENU)
-        #self.load_state_rel_world = State('world', CS_type.ENU)
   
         self.load_state_gt = State('ground_truth', CS_type.XYZ)
 
@@ -120,7 +118,6 @@ class Load(Node):
 
         ## PUBLISHERS
         self.pub_vehicle_command = None # Initialized below
-        #self.pub_global_init_pose = self.create_publisher(GlobalPose, f'load_{self.load_id}/out/global_init_pose', qos_profile)
 
         ## SUBSCRIBERS
         self.sub_load_attitude_desired = self.create_subscription(
@@ -315,28 +312,6 @@ class Load(Node):
             return load_state_rel_world_qs
         else:
             return None
-
-    # def set_tf_init_pose(self, load_initial_state_rel_world):
-    #     # Set initial pose
-    #     self.load_initial_state_rel_world.pos =  np.copy(load_initial_state_rel_world.pos)
-    #     self.load_initial_state_rel_world.att_q = load_initial_state_rel_world.att_q.copy()
-        
-    #     # Publish static transform for init pose (relative to world)
-    #     # As CS is in ENU, always aligned
-    #     utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'{self.get_name()}_init', self.load_initial_state_rel_world.pos, np.quaternion(*[1.0, 0.0, 0.0, 0.0]), self.tf_static_broadcaster_init_pose)
-
-    #     # Publish other static transforms
-    #     # Marker relative to load
-    #     q_list = ft.quaternion_from_euler(self.R_marker_rel_load[0], self.R_marker_rel_load[1], self.R_marker_rel_load[2])
-    #     r_marker_rel_load = np.quaternion(*q_list)
-    #     utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}', f'load_marker{self.load_id}', self.t_marker_rel_load, r_marker_rel_load, self.tf_static_broadcaster_marker_rel_load)
-    #     utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_gt', f'load_marker{self.load_id}_gt', self.t_marker_rel_load, r_marker_rel_load, self.tf_static_broadcaster_marker_rel_load_gt)
-
-    #     # 
-    #     self.pixhawk_pose.flag_local_init_pose_set = True
-
-    #     # Send complete message
-    #     self.get_logger().info('Initial pose TF set')
 
 
 def main():

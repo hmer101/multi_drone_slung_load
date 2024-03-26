@@ -142,16 +142,9 @@ class Drone(Node):
                                         self.tf_broadcaster, tf_static_broadcaster_init_pose,  \
                                         tf_static_broadcaster_cam_rel_drone, tf_static_broadcaster_cam_rel_drone_gt, \
                                         tf_static_broadcaster_world_rel_gt)
-        
-        #self.vehicle_initial_state_rel_world = State('world', CS_type.ENU)
 
         self.vehicle_state_gt = State('ground_truth', CS_type.XYZ)
         self.vehicle_desired_state_rel_load = State(f'{self.load_name}', CS_type.ENU)
-
-        
-        # Other vehicles
-        # self.global_origin_state = State('globe', CS_type.LLA)
-        # self.global_origin_state_prev = self.global_origin_state.copy()
 
         # Load
         self.load_desired_local_state = State(f'{self.load_name}_init', CS_type.ENU)
@@ -232,7 +225,6 @@ class Drone(Node):
             self.sub_global_origin = self.create_subscription(
                 GlobalPose,
                 f'/px4_{self.first_drone_num}/out/global_init_pose', 
-                #self.clbk_global_origin,
                 self.pixhawk_pose.clbk_global_origin, #lambda msg: self.pixhawk_pose.clbk_global_origin(msg),
                 qos_profile)
         
@@ -307,21 +299,7 @@ class Drone(Node):
 
     def clbk_load_desired_local_position(self, msg):
         self.load_desired_local_state.pos = np.array([msg.x, msg.y, msg.z])
-    
-    # def clbk_global_origin(self, msg):
-    #     self.global_origin_state.pos[0] = msg.global_pos.lat
-    #     self.global_origin_state.pos[1] = msg.global_pos.lon
-    #     self.global_origin_state.pos[2] = msg.global_pos.alt
-
-    #     self.global_origin_state.att_q.w = msg.global_att.q[0]
-    #     self.global_origin_state.att_q.x = msg.global_att.q[1]
-    #     self.global_origin_state.att_q.y = msg.global_att.q[2]
-    #     self.global_origin_state.att_q.z = msg.global_att.q[3]
-
-    #     # Global origin updated - must update local initial poses
-    #     self.pixhawk_pose.flag_local_init_pose_set = False
         
-
     def clbk_set_desired_pose_rel_load(self, request, response):
         self.vehicle_desired_state_rel_load.pos = np.array([request.transform_stamped.transform.translation.x, request.transform_stamped.transform.translation.y, request.transform_stamped.transform.translation.z])
         self.vehicle_desired_state_rel_load.att_q = np.quaternion(request.transform_stamped.transform.rotation.w, request.transform_stamped.transform.rotation.x, request.transform_stamped.transform.rotation.y, request.transform_stamped.transform.rotation.z) 
@@ -610,9 +588,6 @@ class Drone(Node):
                         self.phase = Phase.PHASE_UNASSIGNED
                         self.cnt_phase_ticks = 0
 
-                        # Ensure that flags are properly reset on next takeoff
-                        #self.flag_reset_pre_arm_complete = False
-
                         self.get_logger().info(f'LANDED AND DISARMED') 
             
             case Phase.PHASE_HOLD:
@@ -624,9 +599,6 @@ class Drone(Node):
             case Phase.PHASE_KILL:
                 offboard_ros.kill(self.pub_vehicle_command, timestamp)
                 self.cnt_phase_ticks = 0
-
-                # Ensure that flags are properly reset on next takeoff
-                #self.flag_reset_pre_arm_complete = False
 
                 pass
 
@@ -644,56 +616,6 @@ class Drone(Node):
         #self.flag_reset_pre_arm_complete = True # To ensure that this function finishes running before setup is complete
         self.get_logger().info('RESET PRE-ARM COMPLETE')
 
-
-    # def broadcast_tf_init_pose(self):
-    #     # Publish static transform for init pose (relative to world)
-    #     # As all init CS are in ENU, they are all aligned in orientation
-    #     utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'drone{self.drone_id}_init', self.vehicle_initial_state_rel_world.pos, np.quaternion(1.0, 0.0, 0.0, 0.0), self.tf_static_broadcaster_init_pose)
-
-    #     # Publish other static transforms
-    #     # Camera relative to drone
-    #     if self.num_cameras > 0:
-    #         q_list = ft.quaternion_from_euler(self.R_cam_rel_pixhawk[0], self.R_cam_rel_pixhawk[1], self.R_cam_rel_pixhawk[2])
-    #         r_cam_rel_pixhawk = np.quaternion(*q_list)
-    #         utils.broadcast_tf(self.get_clock().now().to_msg(), f'drone{self.drone_id}', f'camera{self.drone_id}', self.t_cam_rel_pixhawk, r_cam_rel_pixhawk, self.tf_static_broadcaster_cam_rel_drone)
-    #         utils.broadcast_tf(self.get_clock().now().to_msg(), f'drone{self.drone_id}_gt', f'camera{self.drone_id}_gt', self.t_cam_rel_pixhawk, r_cam_rel_pixhawk, self.tf_static_broadcaster_cam_rel_drone_gt)
-
-    #     # Send complete message
-    #     self.pixhawk_pose.flag_local_init_pose_set = True 
-    #     self.get_logger().info('Local init pose set')
-
-    # def set_local_init_pose_later_drones(self):
-    #     ## Set initial pose relative to first drone's initial pose
-    #     origin_state_lla = self.global_origin_state 
-
-    #     # Perform transformation
-    #     trans_E, trans_N, trans_U = pm.geodetic2enu(self.pixhawk_pose.initial_global_state.pos[0], self.pixhawk_pose.initial_global_state.pos[1], self.pixhawk_pose.initial_global_state.pos[2], origin_state_lla.pos[0], origin_state_lla.pos[1], origin_state_lla.pos[2]) 
-        
-    #     # Set local init pose (relative to base CS)
-    #     self.vehicle_initial_state_rel_world.pos = np.array([trans_E, trans_N, trans_U+self.height_drone_cs_rel_gnd])
-    #     self.vehicle_initial_state_rel_world.att_q = self.pixhawk_pose.initial_global_state.att_q.copy() #TODO: If required to set relative to world, need extra flag to ensure inital att is set before sending global init pose
-
-    #     # Broadcast tf
-    #     self.broadcast_tf_init_pose()
-
-    # def set_local_init_pose_first_drone(self):
-    #     # Set local initial state
-    #     self.vehicle_initial_state_rel_world.pos = np.array([0.0, 0.0, self.height_drone_cs_rel_gnd])
-    #     self.vehicle_initial_state_rel_world.att_q = self.pixhawk_pose.initial_global_state.att_q.copy()
-
-    #     # Broadcast tf
-    #     self.broadcast_tf_init_pose()
-
-    #     # If using ground truth
-    #     # Set transform from ground truth to world
-    #     if self.load_pose_type == 'ground_truth' or self.evaluate == True:
-    #         # Ground truth origin set by Gazebo in simulation
-    #         if self.env == 'sim':
-    #             utils.broadcast_tf(self.get_clock().now().to_msg(), 'ground_truth', 'world', self.vehicle_state_gt.pos, self.vehicle_state_gt.att_q, self.tf_static_broadcaster_world_rel_gt)
-    #         elif self.env == 'phys':
-    #             # Set ground truth origin at world origin in physical environment
-    #             utils.broadcast_tf(self.get_clock().now().to_msg(), 'ground_truth', 'world', np.array([0.0, 0.0, 0.0]), np.quaternion(1.0, 0.0, 0.0, 0.0), self.tf_static_broadcaster_world_rel_gt)     
-     
 
 def main():
     # Create node
