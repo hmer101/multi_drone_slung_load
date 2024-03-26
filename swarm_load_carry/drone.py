@@ -260,7 +260,6 @@ class Drone(Node):
         ## FLAGS 
         # Ensure set services are called at least once before taking off)
         self.flag_desired_pose_rel_load_set = False
-        #self.flag_reset_pre_arm_complete = False # Ensure that the above flags are actually reset before drone setup is complete
 
 
         ## Print information
