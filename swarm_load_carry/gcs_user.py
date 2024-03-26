@@ -28,13 +28,17 @@ class GCSUser(Node):
         self.get_logger().info(f'Name: {self.get_name()}')
 
         ## PARAMETERS
+        self.declare_parameter('load_id', 1)
         self.declare_parameter('num_drones', 3)
         self.declare_parameter('first_drone_num', 1)
         self.declare_parameter('auto_level', 0)
+        self.declare_parameter('phase_change_requests_through_background', True)
 
+        self.load_id = self.get_parameter('load_id').get_parameter_value().integer_value
         self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
         self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
         self.auto_level = self.get_parameter('auto_level').get_parameter_value().integer_value
+        self.phase_change_requests_through_background = self.get_parameter('phase_change_requests_through_background').get_parameter_value().bool_value
         
 
         ## PUBLISHERS
@@ -42,12 +46,20 @@ class GCSUser(Node):
         ## SERVICES
 
         ## CLIENTS
-        self.cli_phase_change = [None] * self.num_drones
+        # Send the phase change requests through the background node
+        if self.phase_change_requests_through_background:
+            self.cli_phase_change = [self.create_client(PhaseChange,f'/gcs_background_{self.load_id}/phase_change_request')]
+            
+            while not self.cli_phase_change[0].wait_for_service(timeout_sec=3.0): #1.0
+                self.get_logger().info(f'Waiting for phase change service request: gcs_1')
 
-        for i in range(self.first_drone_num, self.num_drones+self.first_drone_num):
-            self.cli_phase_change[i-self.first_drone_num] = self.create_client(PhaseChange,f'/px4_{i}/phase_change')
-            while not self.cli_phase_change[i-self.first_drone_num].wait_for_service(timeout_sec=3.0): #1.0
-                self.get_logger().info(f'Waiting for phase change service: drone {i}')
+        # Send the phase change requests directly to the drones
+        else:
+            self.cli_phase_change = [None] * self.num_drones
+            for i in range(self.first_drone_num, self.num_drones+self.first_drone_num):
+                self.cli_phase_change[i-self.first_drone_num] = self.create_client(PhaseChange,f'/px4_{i}/phase_change')
+                while not self.cli_phase_change[i-self.first_drone_num].wait_for_service(timeout_sec=3.0): #1.0
+                    self.get_logger().info(f'Waiting for phase change service: drone {i}')
 
         self.get_logger().info('Setup complete')
 
@@ -82,23 +94,23 @@ class GCSUser(Node):
 
             match(cmd):
                 case 't':
-                    utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_SETUP_DRONE)
+                    utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_SETUP_DRONE)
                 case _ if self.auto_level == 0 and cmd == 'f':
-                    utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_TAKEOFF_PRE_TENSION)
+                    utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_TAKEOFF_PRE_TENSION)
                 case _ if self.auto_level == 0 and cmd == 'e':
-                    utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_TAKEOFF_POST_TENSION)
+                    utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_TAKEOFF_POST_TENSION)
                 # case _ if self.auto_level == 0 and cmd == 'u':
                 #     utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_TAKEOFF_POST_TENSION) 
                 case 'm':
-                    utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_MISSION_START)
+                    utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_MISSION_START)
                 case 'l':
-                    utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_LAND_START)
+                    utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_LAND_START)
                 # case 'r':
                 #     self.phase_change(Phase.PHASE_RTL_START)
                 case 'h':
-                    utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_HOLD)
+                    utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_HOLD)
                 case 'k':
-                    utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_KILL)
+                    utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_KILL)
 
 
 def main(args=None):

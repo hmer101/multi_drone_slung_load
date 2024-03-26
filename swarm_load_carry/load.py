@@ -94,9 +94,9 @@ class Load(Node):
 
         ## TFS
         self.tf_broadcaster = TransformBroadcaster(self)
-        self.tf_static_broadcaster_init_pose = StaticTransformBroadcaster(self)
-        self.tf_static_broadcaster_marker_rel_load = StaticTransformBroadcaster(self)
-        self.tf_static_broadcaster_marker_rel_load_gt = StaticTransformBroadcaster(self)
+        tf_static_broadcaster_init_pose = StaticTransformBroadcaster(self)
+        tf_static_broadcaster_marker_rel_load = StaticTransformBroadcaster(self)
+        tf_static_broadcaster_marker_rel_load_gt = StaticTransformBroadcaster(self)
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -104,9 +104,11 @@ class Load(Node):
         ## VARIABLES
         self.load_desired_state = State(f'{self.get_name()}_init', CS_type.ENU)
 
-        self.pixhawk_pose = PosePixhawk(self.get_name(), self.env, self.load_pose_type, self.evaluate, self.tf_broadcaster)
-        self.load_initial_state_rel_world = State('world', CS_type.ENU)
-        self.load_state_rel_world = State('world', CS_type.ENU)
+        self.pixhawk_pose = PosePixhawk(self.get_name(), self.env, self.load_pose_type, self.evaluate, self.get_logger(), \
+                                        self.tf_broadcaster, tf_static_broadcaster_init_pose, \
+                                        tf_static_broadcaster_marker_rel_load, tf_static_broadcaster_marker_rel_load_gt)
+        #self.load_initial_state_rel_world = State('world', CS_type.ENU)
+        #self.load_state_rel_world = State('world', CS_type.ENU)
   
         self.load_state_gt = State('ground_truth', CS_type.XYZ)
 
@@ -114,9 +116,10 @@ class Load(Node):
 
         ## TIMERS
         self.timer = self.create_timer(self.timer_period_load, self.clbk_publoop)
+        self.cnt_phase_ticks = 0
 
         ## PUBLISHERS
-        self.pub_vehicle_command = self.create_publisher(VehicleCommand, f'load_{self.load_id}/fmu/in/vehicle_command', qos_profile)
+        self.pub_vehicle_command = None # Initialized below
         #self.pub_global_init_pose = self.create_publisher(GlobalPose, f'load_{self.load_id}/out/global_init_pose', qos_profile)
 
         ## SUBSCRIBERS
@@ -132,6 +135,19 @@ class Load(Node):
             self.clbk_desired_load_local_position,
             qos_profile)
         
+        # Drone current phases
+        self.sub_drone_phases = [None] * self.num_drones
+
+        for i in range(self.first_drone_num, self.num_drones+self.first_drone_num):
+            callback = lambda msg, drone_ind=(i-self.first_drone_num): self.clbk_update_drone_phase(msg, drone_ind)
+        
+            self.sub_drone_phases[i-self.first_drone_num] = self.create_subscription(
+                Phase,
+                f'/px4_{i}/out/current_phase',
+                callback,
+                qos_profile)
+
+        
         # Subscribe to ground truth load feedback if we are using ground truth, or evaluating the system
         if self.load_pose_type == 'ground_truth' or self.evaluate == True:
             if self.env == 'sim':
@@ -145,34 +161,31 @@ class Load(Node):
                 # Note that ground truth simply comes from the vehicle local position from the EKF
                 self.sub_attitude = self.create_subscription(
                     VehicleAttitude,
-                    f'{self.ns}/fmu/out/vehicle_attitude',
+                    f'load_{self.load_id}/fmu/out/vehicle_attitude',
                     lambda msg: self.pixhawk_pose.clbk_vehicle_attitude(msg, self.get_clock().now().to_msg()),
                     qos_profile)
 
                 self.sub_local_position = self.create_subscription(
                     VehicleLocalPosition,
-                    f'{self.ns}/fmu/out/vehicle_local_position',
+                    f'load_{self.load_id}/fmu/out/vehicle_local_position',
                     lambda msg: self.pixhawk_pose.clbk_vehicle_local_position(msg, self.get_clock().now().to_msg()), 
-                    qos_profile)  
-                
+                    qos_profile) 
+                 
+                self.pub_vehicle_command = self.create_publisher(VehicleCommand, f'load_{self.load_id}/fmu/in/vehicle_command', qos_profile)
                 self.sub_global_position = self.create_subscription(
                     VehicleGlobalPosition,
-                    f'{self.ns}/fmu/out/vehicle_global_position',
-                    lambda msg: self.pixhawk_pose.clbk_vehicle_global_position(msg, self.phase, int(self.get_clock().now().nanoseconds/1000), self.pub_vehicle_command), 
+                    f'load_{self.load_id}/fmu/out/vehicle_global_position',
+                    lambda msg: self.pixhawk_pose.clbk_vehicle_global_position(msg, np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD), int(self.get_clock().now().nanoseconds/1000), self.pub_vehicle_command), 
                     qos_profile) 
+                
+                # First drone's global origin - world origin for setting initial pose
+                self.sub_global_origin = self.create_subscription(
+                    GlobalPose,
+                    f'/px4_{self.first_drone_num}/out/global_init_pose', 
+                    self.clbk_global_origin,
+                    qos_profile)
 
-        # Drone current phases
-        self.sub_drone_phases = [None] * self.num_drones
-
-        for i in range(self.first_drone_num, self.num_drones+self.first_drone_num):
-            callback = lambda msg, drone_ind=(i-self.first_drone_num): self.clbk_update_drone_phase(msg, drone_ind)
         
-            self.sub_drone_phases[i-self.first_drone_num] = self.create_subscription(
-                Phase,
-                f'/px4_{i}/out/current_phase',
-                callback,
-                qos_profile)
-
         ## SERVICES
         ## CLIENTS
 
@@ -210,37 +223,60 @@ class Load(Node):
     # Loop on timer to publish actual load pose
     def clbk_publoop(self):       
         # Get quasi-static load pose estimate for setting load initial TF relative to world
-        load_state_rel_world_qs = self.calc_load_pose_quasi_static()
+        #load_state_rel_world_qs = self.calc_load_pose_quasi_static()
         
         # Publish load pose with selected method
-        if self.load_pose_type == 'quasi-static':
+        if self.load_pose_type == 'quasi-static' or self.load_pose_type == 'visual':
             # Set self.load_state_rel_world using quasi-static method
-            self.load_state_rel_world = load_state_rel_world_qs
-
+            load_state_rel_world = self.calc_load_pose_quasi_static() #load_state_rel_world_qs
+        
         elif self.load_pose_type == 'ground_truth':
             # Set self.load_state_rel_world using ground truth
-            # Convert the ground truth pose to the 'world' frame TODO: HHHHHHEEEEEEEEEEE - THIS IS CAUSING GT FB ISSUE!!!
-            self.load_state_rel_world = load_state_rel_world_qs #utils.transform_frames(self.load_state_gt, 'world', self.tf_buffer, self.get_logger())
+            if self.env == 'sim':
+                load_state_rel_world = utils.transform_frames(self.load_state_gt, 'world', self.tf_buffer, self.get_logger(), cs_out_type=CS_type.ENU)
 
-        #elif self.load_pose_type == 'visual': #TODO: Take estimation from slung_pose_estimation node
-            # Set self.load_state_rel_world using visual estimation result
+            elif self.env == 'phys':
+                # Convert the pixhawk measured pose to the 'world' frame
+                #self.load_state_rel_world = utils.transform_frames(self.pixhawk_pose.local_state, 'world', self.tf_buffer, self.get_logger(), cs_out_type=CS_type.ENU)
+                pass
+
+                # TODO: HEREEREERE!!!
+                # if self.pixhawk_pose.flag_gps_home_set 
+                # load_state_rel_world = utils.transform_frames(self.pixhawk_pose.local_state, 'world', self.tf_buffer, self.get_logger(), cs_out_type=CS_type.ENU)
+
 
         # Publish load pose if it has been set and if the initial load pose has been set
-        if load_state_rel_world_qs != None and self.load_state_rel_world != None:
-            # If all drones are in load setup phase, reset load's init pose
+        if load_state_rel_world != None:
+            # If all drones are in load setup phase, setup load
             if np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD):
-                self.set_tf_init_pose(load_state_rel_world_qs)
+                # Reset flags
+                if self.cnt_phase_ticks == 0:
+                    self.reset_pre_arm()
+
+                self.pixhawk_pose.set_local_init_pose_non_ref(self.get_clock().now().to_msg(), initial_state_rel_world=load_state_rel_world, cs_offset=np.array([0.0, 0.0, 0.0]), item2_name='load_marker', t_item2_rel_item1=self.t_marker_rel_load, R_item2_rel_item1=self.R_marker_rel_load)
 
                 # TODO: If in physical, ARM LOAD's PX4/start log
 
-            # Publish load relative to load initial position
-            load_rel_load_init = utils.transform_frames(self.load_state_rel_world, f'{self.get_name()}_init', self.tf_buffer, self.get_logger(), cs_out_type=CS_type.ENU)
+                self.cnt_phase_ticks += 1
+            else:
+                # Reset phase tick counter so load will reset on next setup
+                self.cnt_phase_ticks = 0
 
+            # Set load relative to load initial position for publishing
+            load_rel_load_init = utils.transform_frames(load_state_rel_world, f'{self.get_name()}_init', self.tf_buffer, self.get_logger(), cs_out_type=CS_type.ENU)
+
+            # Publish load relative to load initial position
             if load_rel_load_init != None:
                 utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', self.get_name(), load_rel_load_init.pos, load_rel_load_init.att_q, self.tf_broadcaster)          
 
+            
 
     ## HELPER FUNCTIONS
+    def reset_pre_arm(self):
+        self.pixhawk_pose.reset()
+
+        self.get_logger().info('RESET PRE-ARM COMPLETE')
+
     def calc_load_pose_quasi_static(self):
         load_state_rel_world_qs = State('world', CS_type.ENU)
 
@@ -280,24 +316,27 @@ class Load(Node):
         else:
             return None
 
-    def set_tf_init_pose(self, load_initial_state_rel_world):
-        # Set initial pose
-        self.load_initial_state_rel_world.pos =  np.copy(load_initial_state_rel_world.pos)
-        self.load_initial_state_rel_world.att_q = load_initial_state_rel_world.att_q.copy()
+    # def set_tf_init_pose(self, load_initial_state_rel_world):
+    #     # Set initial pose
+    #     self.load_initial_state_rel_world.pos =  np.copy(load_initial_state_rel_world.pos)
+    #     self.load_initial_state_rel_world.att_q = load_initial_state_rel_world.att_q.copy()
         
-        # Publish static transform for init pose (relative to world)
-        # As CS is in ENU, always aligned
-        utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'{self.get_name()}_init', self.load_initial_state_rel_world.pos, np.quaternion(*[1.0, 0.0, 0.0, 0.0]), self.tf_static_broadcaster_init_pose)
+    #     # Publish static transform for init pose (relative to world)
+    #     # As CS is in ENU, always aligned
+    #     utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'{self.get_name()}_init', self.load_initial_state_rel_world.pos, np.quaternion(*[1.0, 0.0, 0.0, 0.0]), self.tf_static_broadcaster_init_pose)
 
-        # Publish other static transforms
-        # Marker relative to load
-        q_list = ft.quaternion_from_euler(self.R_marker_rel_load[0], self.R_marker_rel_load[1], self.R_marker_rel_load[2])
-        r_marker_rel_load = np.quaternion(*q_list)
-        utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}', f'load_marker{self.load_id}', self.t_marker_rel_load, r_marker_rel_load, self.tf_static_broadcaster_marker_rel_load)
-        utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_gt', f'load_marker{self.load_id}_gt', self.t_marker_rel_load, r_marker_rel_load, self.tf_static_broadcaster_marker_rel_load_gt)
+    #     # Publish other static transforms
+    #     # Marker relative to load
+    #     q_list = ft.quaternion_from_euler(self.R_marker_rel_load[0], self.R_marker_rel_load[1], self.R_marker_rel_load[2])
+    #     r_marker_rel_load = np.quaternion(*q_list)
+    #     utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}', f'load_marker{self.load_id}', self.t_marker_rel_load, r_marker_rel_load, self.tf_static_broadcaster_marker_rel_load)
+    #     utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_gt', f'load_marker{self.load_id}_gt', self.t_marker_rel_load, r_marker_rel_load, self.tf_static_broadcaster_marker_rel_load_gt)
 
-        # Send complete message
-        self.get_logger().info('Initial pose TF set')
+    #     # 
+    #     self.pixhawk_pose.flag_local_init_pose_set = True
+
+    #     # Send complete message
+    #     self.get_logger().info('Initial pose TF set')
 
 
 def main():

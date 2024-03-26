@@ -32,7 +32,7 @@ def generate_launch_description():
     # GCS background so can be on physical drone network if selected (more reliable than GCS)    
     gcs_background = ExecuteProcess(
         cmd=[[
-            f'bash -c "ros2 run swarm_load_carry gcs_background --ros-args -r __node:=gcs_background1 --params-file {config}"', #gnome-terminal --tab -- 
+            f'bash -c "ros2 run swarm_load_carry gcs_background --ros-args -r __node:=gcs_background1 --params-file {config}"', #gnome-terminal --tab -- -r __ns:=/gcs_1
         ]],
         shell=True
     )

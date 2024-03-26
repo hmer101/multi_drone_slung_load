@@ -47,6 +47,7 @@ class GCSBackground(Node):
         self.declare_parameter('kp_formation_load', 0.0)
         self.declare_parameter('r_drones_max_safety', 0.1)
         self.declare_parameter('auto_level', 0)
+        self.declare_parameter('phase_change_requests_through_background', True)
 
         #self.declare_parameter('height_drone_rel_load', 1.5)
         self.declare_parameter('takeoff_height_load_max', 4.0)
@@ -76,6 +77,7 @@ class GCSBackground(Node):
         self.kp_formation_load = self.get_parameter('kp_formation_load').get_parameter_value().double_value
         self.r_drones_max_safety = self.get_parameter('r_drones_max_safety').get_parameter_value().double_value
         self.auto_level = self.get_parameter('auto_level').get_parameter_value().bool_value
+        self.phase_change_requests_through_background = self.get_parameter('phase_change_requests_through_background').get_parameter_value().bool_value
 
         #self.height_drone_rel_load = self.get_parameter('height_drone_rel_load').get_parameter_value().double_value
         self.takeoff_height_load_max = self.get_parameter('takeoff_height_load_max').get_parameter_value().double_value
@@ -146,6 +148,13 @@ class GCSBackground(Node):
         self.flag_load_init_pose_set = False
 
         ## SERVICES
+        # Intermediate service to take in a change request from the user and forward to the drones (as GCS background is on the local ethernet network)
+        if self.phase_change_requests_through_background:
+            self.srv_phase_change_request = self.create_service(
+                PhaseChange,
+                f'/gcs_background_{self.load_id}/phase_change_request',
+                self.clbk_phase_change_request)
+
         ## CLIENTS
         # Set drone poses relative to load
         self.cli_set_drone_poses_rel_load = [None] * self.num_drones
@@ -164,11 +173,19 @@ class GCSBackground(Node):
             self.cli_phase_change[i-self.first_drone_num] = self.create_client(PhaseChange,f'/px4_{i}/phase_change')
             while not self.cli_phase_change[i-self.first_drone_num].wait_for_service(timeout_sec=3.0): #1.0
                 self.get_logger().info(f'Waiting for phase change service: drone {i}')  
-
+        
         self.get_logger().info('Setup complete')
 
 
     ## CALLBACKS
+    def clbk_phase_change_request(self, request, response):
+        # Change phase of all drones
+        # Note: don't wait for response so that the GCS can continue to send commands - non-blocking (otherwise get deadlock with gcs_user calling this service)
+        utils.change_phase_all(self, self.cli_phase_change, request.phase_request.phase, wait_for_response=False)
+
+        response.success = True
+        return response
+
     def clbk_cmdloop(self):
         # Store previous load pose
         self.load_desired_local_state_prev = self.load_desired_local_state
@@ -208,7 +225,7 @@ class GCSBackground(Node):
 
         elif np.all(self.drone_phases == Phase.PHASE_TAKEOFF_END) and (self.auto_level == 2):
             # In fully auto, set drones to mission start phase once takeoff complete
-            utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_MISSION_START)
+            utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_MISSION_START)
 
             self.get_logger().info(f'In fully auto mode. Takeoff complete. Starting mission.')
 
@@ -223,7 +240,7 @@ class GCSBackground(Node):
 
             # If fully auto, transition to land phase when mission complete
             if (self.auto_level==2) and self.cnt_phase_ticks > self.cnt_threshold_fully_auto_mission:
-                utils.change_phase_all_drones(self, self.num_drones, self.cli_phase_change, Phase.PHASE_LAND_START)
+                utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_LAND_START)
                         
                 self.get_logger().info(f'In fully auto mode. Mission complete. Transitioning to land phase.')
                 self.cnt_phase_ticks = 0

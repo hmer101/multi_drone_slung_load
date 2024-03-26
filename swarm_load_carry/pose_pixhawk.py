@@ -1,4 +1,5 @@
 import numpy as np
+import pymap3d as pm
 import quaternion
 import utils
 import swarm_load_carry.drone_offboard_ros as offboard_ros
@@ -10,24 +11,39 @@ from swarm_load_carry_interfaces.msg import Phase, GlobalPose
 # Class to handle the vehicle's pose and state, both global and local.
 # This includes storing the state variables, publishing the TFs, and handling the callbacks for the vehicle's pose.
 class PosePixhawk:
-    def __init__(self, name, env, load_pose_type, evaluate, tf_broadcaster):
+    def __init__(self, name, env, load_pose_type, evaluate, logger, tf_broadcaster, tf_static_broadcaster_init_pose, tf_static_broadcaster_item2_rel_item1=None, tf_static_broadcaster_item2_rel_item1_gt=None, tf_static_broadcaster_world_rel_gt=None):
         # PARAMETERS
         self.name = name
+        self.id = int(name[-1])
         self.env = env
         self.load_pose_type = load_pose_type
         self.evaluate = evaluate
 
         # STATES
+        self.global_origin_state = State('globe', CS_type.LLA)
+        self.global_origin_state_prev = self.global_origin_state.copy()
+
         self.initial_global_state = State('globe', CS_type.LLA)
-        self.local_state = State('init', CS_type.ENU)
+        self.initial_state_rel_world = State('world', CS_type.ENU)
+        self.local_state = State(f'{self.name}_init', CS_type.ENU)
 
         ## TFS
         self.tf_broadcaster = tf_broadcaster
+
+        self.tf_static_broadcaster_init_pose = tf_static_broadcaster_init_pose
+        self.tf_static_broadcaster_world_rel_gt = tf_static_broadcaster_world_rel_gt
+        self.tf_static_broadcaster_item2_rel_item1 = tf_static_broadcaster_item2_rel_item1 
+        self.tf_static_broadcaster_item2_rel_item1_gt = tf_static_broadcaster_item2_rel_item1_gt
 
         # FLAGS
         self.flag_gps_home_set = False # GPS home set when vehicle armed
         self.flag_local_init_pose_set = False
 
+        # MISC
+        self.logger = logger
+
+
+    ## CALLBACKS
     def clbk_vehicle_attitude(self, msg, current_time):
         # Original q from FRD->NED
         # Handles FRD->NED to FLU->ENU transformation 
@@ -96,3 +112,83 @@ class PosePixhawk:
                 pub_global_init_pose.publish(msg_global_pose)
 
             self.flag_gps_home_set = True   
+
+    def clbk_global_origin(self, msg):
+        self.global_origin_state.pos[0] = msg.global_pos.lat
+        self.global_origin_state.pos[1] = msg.global_pos.lon
+        self.global_origin_state.pos[2] = msg.global_pos.alt
+
+        self.global_origin_state.att_q.w = msg.global_att.q[0]
+        self.global_origin_state.att_q.x = msg.global_att.q[1]
+        self.global_origin_state.att_q.y = msg.global_att.q[2]
+        self.global_origin_state.att_q.z = msg.global_att.q[3]
+
+        # Global origin updated - must update local initial poses
+        self.flag_local_init_pose_set = False
+
+    ## HELPER FUNCTIONS
+    def reset(self):
+        self.flag_gps_home_set = False
+        self.flag_local_init_pose_set = False
+
+
+    def broadcast_tf_init_pose(self, time, item2_name=None, t_item2_rel_item1=None, R_item2_rel_item1=None):
+        # Publish static transform for init pose (relative to world)
+        # As all init CS are in ENU, they are all aligned in orientation
+        utils.broadcast_tf(time, 'world', f'{self.name}_init', self.initial_state_rel_world.pos, np.quaternion(1.0, 0.0, 0.0, 0.0), self.tf_static_broadcaster_init_pose) #self.get_clock().now().to_msg() self.tf_static_broadcaster_init_pose
+
+        # Publish other static transforms
+        # Camera relative to drone or marker relative to load etc.
+        if item2_name is not None and t_item2_rel_item1 is not None and R_item2_rel_item1 is not None:
+            q_list = ft.quaternion_from_euler(R_item2_rel_item1[0], R_item2_rel_item1[1], R_item2_rel_item1[2])
+            r_cam_rel_pixhawk = np.quaternion(*q_list)
+            utils.broadcast_tf(time, f'{self.name}', f'{item2_name}{self.id}', t_item2_rel_item1, r_cam_rel_pixhawk, self.tf_static_broadcaster_item2_rel_item1)
+            utils.broadcast_tf(time, f'{self.name}', f'{item2_name}{self.id}_gt', t_item2_rel_item1, r_cam_rel_pixhawk, self.tf_static_broadcaster_item2_rel_item1_gt)
+
+        # Send complete message
+        self.flag_local_init_pose_set = True 
+        self.logger.info('Local init pose set') #self.get_logger().info('Local init pose set')
+
+
+    # Set initial pose relative to world and broadcasts tf
+    # t_init: initial position in ENU (np.array)
+    # q_init: initial orientation in quaternion (np.quaternion)
+    def _set_local_init_pose(self, t_init, q_init, time, item2_name=None, t_item2_rel_item1=None, R_item2_rel_item1=None):
+        # Set local initial state
+        self.initial_state_rel_world.pos = np.copy(t_init)
+        self.initial_state_rel_world.att_q = q_init.copy()
+
+        # Broadcast tf
+        self.broadcast_tf_init_pose(time, item2_name, t_item2_rel_item1, R_item2_rel_item1)
+
+    
+    # Set the local initial position of the Pixhawk used as the reference/world frame
+    def set_local_init_pose_ref(self, time, cs_offset=np.array([0.0, 0.0, 0.0]), state_gt=None, item2_name=None, t_item2_rel_item1=None, R_item2_rel_item1=None):
+        # Set local init pose (relative to base/world CS. Note that this defines the reference CS)
+        self._set_local_init_pose(cs_offset, self.initial_global_state.att_q, time, item2_name, t_item2_rel_item1, R_item2_rel_item1) #np.array([0.0, 0.0, self.height_drone_cs_rel_gnd])
+
+        # If using ground truth, set transform from ground truth to world
+        if self.load_pose_type == 'ground_truth' or self.evaluate == True:
+            # Ground truth origin set by Gazebo in simulation
+            if self.env == 'sim':
+                utils.broadcast_tf(time, 'ground_truth', 'world', state_gt.pos, state_gt.att_q, self.tf_static_broadcaster_world_rel_gt) #self.get_clock().now().to_msg() self.vehicle_state_gt.pos, self.vehicle_state_gt.att_q, self.tf_static_broadcaster_world_rel_gt)
+            elif self.env == 'phys':
+                # Set ground truth origin at world origin in physical environment
+                utils.broadcast_tf(time, 'ground_truth', 'world', np.array([0.0, 0.0, 0.0]), np.quaternion(1.0, 0.0, 0.0, 0.0), self.tf_static_broadcaster_world_rel_gt)     
+     
+    # Set the local initial position for all other Pixhawks
+    def set_local_init_pose_non_ref(self, time, initial_state_rel_world=None, cs_offset=np.array([0.0, 0.0, 0.0]), item2_name=None, t_item2_rel_item1=None, R_item2_rel_item1=None): #set_local_init_pose_later_drones(self):
+        # If we are given the initial state relative to the world, use that
+        if initial_state_rel_world is not None:
+            self._set_local_init_pose(initial_state_rel_world.pos, initial_state_rel_world.att_q, time, item2_name, t_item2_rel_item1, R_item2_rel_item1)
+        else:
+            ## Set initial pose relative to first drone's initial pose
+            origin_state_lla = self.global_origin_state 
+
+            # Perform transformation
+            trans_E, trans_N, trans_U = pm.geodetic2enu(self.initial_global_state.pos[0], self.initial_global_state.pos[1], self.initial_global_state.pos[2], origin_state_lla.pos[0], origin_state_lla.pos[1], origin_state_lla.pos[2]) 
+            
+            # Set local init pose (relative to base CS)
+            initial_t = np.array([trans_E, trans_N, trans_U]) + cs_offset
+
+            self._set_local_init_pose(initial_t, self.initial_global_state.att_q, time, t_item2_rel_item1, R_item2_rel_item1)

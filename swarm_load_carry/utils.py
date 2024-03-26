@@ -381,15 +381,19 @@ def phase_change(cli_phase_change, phase_desired):
 
     return phase_future
 
-
-def change_phase_all_drones(node, num_drones, cli_array_phase_change, phase_desired, wait_for_response=True):
+# Can be used to send a phase change request to all clients in an array
+# Often used for sending phase change requests directly to drones, or through the GCS to the drones
+def change_phase_all(node, cli_array_phase_change, phase_desired, wait_for_response=True):
+    num_clients = len(cli_array_phase_change)
+    
     # Send request
-    phase_future = [None] * num_drones
+    phase_future = [None] * num_clients
 
-    for i in range(num_drones):
+    for i in range(num_clients):
         phase_future[i] = phase_change(cli_array_phase_change[i], phase_desired)
 
     # Wait for response
     if wait_for_response:
-        for i in range(num_drones):
+        for i in range(num_clients):
             rclpy.spin_until_future_complete(node, phase_future[i])
+            
