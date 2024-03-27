@@ -224,23 +224,25 @@ class Load(Node):
         
         # Publish load pose with selected method
         if self.load_pose_type == 'quasi-static' or self.load_pose_type == 'visual': #TODO: Add visual pose estimation
-            # Set self.load_state_rel_world using quasi-static method
+            # Set load_state_rel_world using quasi-static method
             load_state_rel_world = self.calc_load_pose_quasi_static() #load_state_rel_world_qs
         
         elif self.load_pose_type == 'ground_truth':
-            # Set self.load_state_rel_world using ground truth
+            # Set load_state_rel_world using ground truth
             if self.env == 'sim':
                 load_state_rel_world = utils.transform_frames(self.load_state_gt, 'world', self.tf_buffer, self.get_logger(), cs_out_type=CS_type.ENU)
 
             elif self.env == 'phys':
-                # Convert the pixhawk measured pose to the 'world' frame
-                #self.load_state_rel_world = utils.transform_frames(self.pixhawk_pose.local_state, 'world', self.tf_buffer, self.get_logger(), cs_out_type=CS_type.ENU)
-                pass
+                # Convert the pixhawk measured pose to the 'world' frame  
+                load_state_rel_world = utils.transform_frames(self.pixhawk_pose.local_state, 'world', self.tf_buffer, self.get_logger(), cs_out_type=CS_type.ENU)
 
-                # TODO: HEREEREERE!!!
-                # if self.pixhawk_pose.flag_gps_home_set 
-                # load_state_rel_world = utils.transform_frames(self.pixhawk_pose.local_state, 'world', self.tf_buffer, self.get_logger(), cs_out_type=CS_type.ENU)
-
+                # Cannot find the transform from the load_init to the world frame - local init pose hasn't been set yet
+                # Can set it if the global origin state and the gps home have been set
+                # TODO: TO TEST
+                if load_state_rel_world is None and self.pixhawk_pose.flag_gps_home_set and self.pixhawk_pose.global_origin_state != self.pixhawk_pose.global_origin_state_prev:
+                    self.pixhawk_pose.set_local_init_pose_non_ref(self.get_clock().now().to_msg(), initial_state_rel_world=None, cs_offset=np.array([0.0, 0.0, self.height_load_cs_rel_gnd]), \
+                                                                 item2_name='load_marker', t_item2_rel_item1=self.t_marker_rel_load, R_item2_rel_item1=self.R_marker_rel_load)
+                    self.pixhawk_pose.global_origin_state_prev = self.pixhawk_pose.global_origin_state.copy()
 
         # Publish load pose if it has been set and if the initial load pose has been set
         if load_state_rel_world != None:
