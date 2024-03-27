@@ -284,7 +284,7 @@ class Drone(Node):
 
     def clbk_vehicle_pose_gt(self, msg):
         # Extract the drone pose from the message
-        drone_pose_gt = utils.extract_pose_from_pose_array_msg(msg, 2)
+        drone_pose_gt = utils.extract_pose_from_pose_array_msg(msg, 2) #2 with cameras on in gz, 1 without
 
         self.vehicle_state_gt.pos = np.array([drone_pose_gt.position.x, drone_pose_gt.position.y, drone_pose_gt.position.z])
         self.vehicle_state_gt.att_q = np.quaternion(drone_pose_gt.orientation.w, drone_pose_gt.orientation.x, drone_pose_gt.orientation.y, drone_pose_gt.orientation.z)

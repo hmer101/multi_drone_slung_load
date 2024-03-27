@@ -308,7 +308,7 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
     # Yaw
     trajectory_msg.yaw = ft.quaternion_get_yaw(q_drone_desired_px4)
 
-    # Add velocity and acceleration targets if applicabletrajectory
+    # Add velocity and acceleration targets if applicable trajectory
     if drone_prev_local_state != None:
         rate_desired_setpoints_ros2 = gen_rate_setpoints_straight(vehicle_desired_state_rel_drone_init, drone_prev_local_state, v_scalar, a_scalar, yawspeed_scalar)
         trajectory_msg = traj_msg_add_rate_setpoints(trajectory_msg, rate_desired_setpoints_ros2)

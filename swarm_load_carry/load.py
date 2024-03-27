@@ -223,7 +223,7 @@ class Load(Node):
         #load_state_rel_world_qs = self.calc_load_pose_quasi_static()
         
         # Publish load pose with selected method
-        if self.load_pose_type == 'quasi-static' or self.load_pose_type == 'visual':
+        if self.load_pose_type == 'quasi-static' or self.load_pose_type == 'visual': #TODO: Add visual pose estimation
             # Set self.load_state_rel_world using quasi-static method
             load_state_rel_world = self.calc_load_pose_quasi_static() #load_state_rel_world_qs
         

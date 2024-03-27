@@ -69,12 +69,13 @@ def generate_launch_description():
             gz_bridge_args.append(f'/px4_{i}{topic_cam_info}@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo')
 
         # Ground truth (IGN -> ROS2)
-        if evaluate:
+        # Use if evaluating or if using the load's ground truth pose so we can set ground_truth relative to world (only need first drone for this but easier with all to extract gt pose from pose array)
+        if evaluate or load_pose_type == "ground_truth": #(i == first_drone_num and load_pose_type == "ground_truth"):
             gz_bridge_args.append(f'/model/swarm/model/x500_{i}/pose_static@geometry_msgs/msg/PoseArray[gz.msgs.Pose_V')
             gz_bridge_remappings.append((f'/model/swarm/model/x500_{i}/pose_static', f'/px4_{i}/out/pose_ground_truth/gz'))
     
     # Ground truth load (IGN -> ROS2)
-    if evaluate:
+    if evaluate or load_pose_type == "ground_truth":
         gz_bridge_args.append('/model/swarm/model/load/pose_static@geometry_msgs/msg/PoseArray[gz.msgs.Pose_V')
         gz_bridge_remappings.append(('/model/swarm/model/load/pose_static', '/load_1/out/pose_ground_truth/gz'))
 

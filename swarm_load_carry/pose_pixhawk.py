@@ -143,7 +143,10 @@ class PosePixhawk:
             q_list = ft.quaternion_from_euler(R_item2_rel_item1[0], R_item2_rel_item1[1], R_item2_rel_item1[2])
             r_cam_rel_pixhawk = np.quaternion(*q_list)
             utils.broadcast_tf(time, f'{self.name}', f'{item2_name}{self.id}', t_item2_rel_item1, r_cam_rel_pixhawk, self.tf_static_broadcaster_item2_rel_item1)
-            utils.broadcast_tf(time, f'{self.name}', f'{item2_name}{self.id}_gt', t_item2_rel_item1, r_cam_rel_pixhawk, self.tf_static_broadcaster_item2_rel_item1_gt)
+            
+            # Also broadcast ground truth if evaluating or if this is the load and ground truth feedback is being used
+            if self.evaluate == True or (('load' in self.name) and self.load_pose_type == 'ground_truth'):  
+                utils.broadcast_tf(time, f'{self.name}_gt', f'{item2_name}{self.id}_gt', t_item2_rel_item1, r_cam_rel_pixhawk, self.tf_static_broadcaster_item2_rel_item1_gt)
 
         # Send complete message
         self.flag_local_init_pose_set = True 
@@ -171,7 +174,11 @@ class PosePixhawk:
         if self.load_pose_type == 'ground_truth' or self.evaluate == True:
             # Ground truth origin set by Gazebo in simulation
             if self.env == 'sim':
-                utils.broadcast_tf(time, 'ground_truth', 'world', state_gt.pos, state_gt.att_q, self.tf_static_broadcaster_world_rel_gt) #self.get_clock().now().to_msg() self.vehicle_state_gt.pos, self.vehicle_state_gt.att_q, self.tf_static_broadcaster_world_rel_gt)
+                # World frame is set cooincident with the first drone's initial pose, which is oriented in ENU. 
+                # Rotate drone 1's attitude measured in ground truth into ENU
+                q_initial_state_rel_world_inv = self.initial_state_rel_world.att_q.inverse()
+                state_gt_att_rotated = utils.transform_orientation(q_initial_state_rel_world_inv, state_gt.att_q)
+                utils.broadcast_tf(time, 'ground_truth', 'world', state_gt.pos, state_gt_att_rotated, self.tf_static_broadcaster_world_rel_gt) #self.get_clock().now().to_msg() self.vehicle_state_gt.pos, self.vehicle_state_gt.att_q, self.tf_static_broadcaster_world_rel_gt)
             elif self.env == 'phys':
                 # Set ground truth origin at world origin in physical environment
                 utils.broadcast_tf(time, 'ground_truth', 'world', np.array([0.0, 0.0, 0.0]), np.quaternion(1.0, 0.0, 0.0, 0.0), self.tf_static_broadcaster_world_rel_gt)     
