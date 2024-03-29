@@ -21,7 +21,8 @@ def generate_launch_description():
     
     evaluate = params["/**"]["ros__parameters"]["evaluate"]
     load_pose_type = params["/**"]["ros__parameters"]["load_pose_type"]
-    min_on_gcs = params["/**"]["ros__parameters"]["min_on_gcs"]
+    run_load_node_on = params["/**"]["ros__parameters"]["run_load_node_on"]
+    run_background_node_on = params["/**"]["ros__parameters"]["run_background_node_on"]
 
     ## INCLUDE LAUNCH FILES       
     load = IncludeLaunchDescription(
@@ -50,15 +51,17 @@ def generate_launch_description():
     ## BUILD LAUNCH DESCRIPTION
     launch_description = []
 
-    launch_description.append(load)
+    # Launch load node if required
+    if run_load_node_on == "load":
+        launch_description.append(load)
+    
+    # Launch GCS background node if required
+    if run_background_node_on == "load":
+        launch_description.append(gcs_background)
 
     # Only need to communicate with the Pixhawk if GPS position of the load is required (for feedback or evaluation)
     if evaluate or load_pose_type == "ground_truth":
         launch_description.append(micro_xcre_agent)
-    
-    # Only launch gcs_background if not launching on gcs, otherwise just launch load
-    if min_on_gcs:
-        launch_description.append(gcs_background)
 
 
     ## RUN LAUNCH FILES

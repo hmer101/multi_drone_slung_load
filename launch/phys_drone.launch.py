@@ -21,8 +21,8 @@ def generate_launch_description():
     
     num_cameras = params["/**"]["ros__parameters"]["num_cameras"]
     first_drone_num = params["/**"]["ros__parameters"]["first_drone_num"]
-    min_on_gcs = params["/**"]["ros__parameters"]["min_on_gcs"]
-    real_load_attached = params["/**"]["ros__parameters"]["real_load_attached"]
+    run_load_node_on = params["/**"]["ros__parameters"]["run_load_node_on"]
+    run_background_node_on = params["/**"]["ros__parameters"]["run_background_node_on"]
 
     ## INCLUDE LAUNCH FILES
     # Launch drone
@@ -82,10 +82,16 @@ def generate_launch_description():
         #if load_pose_type == "visual":
         launch_description.append(pose_measurement_visual)
 
-    # Only launch load and gcs_background on 1st drone if set to do so i.e. not running on GCS or load (drones must be networked)
-    if min_on_gcs and not real_load_attached and int(drone_id_env) == first_drone_num:
-        launch_description.append(load)
-        launch_description.append(gcs_background)
+    # Only launch load and gcs_background on 1st drone if set to do so
+    if int(drone_id_env) == first_drone_num:
+        # Launch load node if required
+        if run_load_node_on == "drone":
+            launch_description.append(load)
+        
+        # Launch GCS background node if required
+        if run_background_node_on == "drone":
+            launch_description.append(gcs_background)
+
 
     ## RUN LAUNCH FILES and start MicroDDS agent
     return LaunchDescription(launch_description)

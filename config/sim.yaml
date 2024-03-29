@@ -14,6 +14,7 @@
       auto_level: 0 # 0 = "Fully manual" - requires checks at intermediate steps, 1 = "semi-automatic" - fewer intermediate steps, 2 = "fully automatic" - turn into offboard mode for completely automatic mission
       #min_on_gcs: true # Run all nodes possible on the drone swarm rather than GCS
       #real_load_attached: true # If no load is attached, have to run load node somewhere else 
+      #run_background_node_on: 'load' # 'load', 'drone'
       phase_change_requests_through_background: true # If true, phase change requests are sent through the gcs background node rather than from the gcs user node directly to the drones
 
       ## DRONE SETTINGS
