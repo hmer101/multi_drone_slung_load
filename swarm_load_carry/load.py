@@ -219,13 +219,20 @@ class Load(Node):
 
     # Loop on timer to publish actual load pose
     def clbk_publoop(self):       
-        # Get quasi-static load pose estimate for setting load initial TF relative to world
-        #load_state_rel_world_qs = self.calc_load_pose_quasi_static()
+        # TEMP: SPOOF LOAD POSE GT so don't need working load GPS yet (need to spoof init pose for drones + load too)
+        #utils.broadcast_tf(self.get_clock().now().to_msg(), 'ground_truth', f'{self.get_name()}_gt', self.load_state_gt.pos, self.load_state_gt.att_q, self.tf_broadcaster)
         
+        # Reset flags if all drones are in load setup phase for the first time
+        if np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD):
+            if self.cnt_phase_ticks == 0:
+                self.reset_pre_arm()
+
+            self.cnt_phase_ticks += 1
+
         # Publish load pose with selected method
         if self.load_pose_type == 'quasi-static' or self.load_pose_type == 'visual': #TODO: Add visual pose estimation
             # Set load_state_rel_world using quasi-static method
-            load_state_rel_world = self.calc_load_pose_quasi_static() #load_state_rel_world_qs
+            load_state_rel_world = self.calc_load_pose_quasi_static()
         
         elif self.load_pose_type == 'ground_truth':
             # Set load_state_rel_world using ground truth
@@ -238,8 +245,11 @@ class Load(Node):
 
                 # Cannot find the transform from the load_init to the world frame - local init pose hasn't been set yet
                 # Can set it if the global origin state and the gps home have been set
-                # TODO: TO TEST
-                if load_state_rel_world is None and self.pixhawk_pose.flag_gps_home_set and self.pixhawk_pose.global_origin_state != self.pixhawk_pose.global_origin_state_prev:
+                # Only set if the system is in the setup load phase
+                # TODO: TO TEST.
+                if load_state_rel_world is None and self.pixhawk_pose.flag_gps_home_set and \
+                    self.pixhawk_pose.global_origin_state != self.pixhawk_pose.global_origin_state_prev and np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD):
+                    
                     self.pixhawk_pose.set_local_init_pose_non_ref(self.get_clock().now().to_msg(), initial_state_rel_world=None, cs_offset=np.array([0.0, 0.0, self.height_load_cs_rel_gnd]), \
                                                                  item2_name='load_marker', t_item2_rel_item1=self.t_marker_rel_load, R_item2_rel_item1=self.R_marker_rel_load)
                     self.pixhawk_pose.global_origin_state_prev = self.pixhawk_pose.global_origin_state.copy()
@@ -248,15 +258,9 @@ class Load(Node):
         if load_state_rel_world != None:
             # If all drones are in load setup phase, setup load
             if np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD):
-                # Reset flags
-                if self.cnt_phase_ticks == 0:
-                    self.reset_pre_arm()
-
                 self.pixhawk_pose.set_local_init_pose_non_ref(self.get_clock().now().to_msg(), initial_state_rel_world=load_state_rel_world, cs_offset=np.array([0.0, 0.0, 0.0]), item2_name='load_marker', t_item2_rel_item1=self.t_marker_rel_load, R_item2_rel_item1=self.R_marker_rel_load)
 
                 # TODO: If in physical, ARM LOAD's PX4/start log
-
-                self.cnt_phase_ticks += 1
             else:
                 # Reset phase tick counter so load will reset on next setup
                 self.cnt_phase_ticks = 0

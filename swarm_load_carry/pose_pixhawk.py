@@ -79,7 +79,7 @@ class PosePixhawk:
             utils.broadcast_tf(current_time, f'{self.name}_init', f'{self.name}', self.local_state.pos, self.local_state.att_q, self.tf_broadcaster)
 
             # If in the real world, and ground truth is on, use the vehicle local position to publish ground truth
-            if self.env == 'phys' and (self.load_pose_type == 'ground_truth' or self.evaluate == True) and self.flag_local_init_pose_set:
+            if self.env == 'phys' and (self.load_pose_type == 'ground_truth' or self.evaluate == True): #and self.flag_local_init_pose_set:
                 # Note how the TF tree will look different in the real world because the ground truth is published relative to the local init pose rather than directly from the ground truth.
                 # This is OK because the lookups will still work.
                 utils.broadcast_tf(current_time, f'{self.name}_init', f'{self.name}_gt', self.local_state.pos, self.local_state.att_q, self.tf_broadcaster)
