@@ -19,8 +19,10 @@ def generate_launch_description():
     with open(config, 'r') as file:
         params = yaml.safe_load(file)
     
+    evaluate = params["/**"]["ros__parameters"]["evaluate"]
+    load_pose_type = params["/**"]["ros__parameters"]["load_pose_type"]
     min_on_gcs = params["/**"]["ros__parameters"]["min_on_gcs"]
-    
+
     ## INCLUDE LAUNCH FILES       
     load = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
@@ -37,10 +39,22 @@ def generate_launch_description():
         shell=True
     )
 
+    # MicroXCREAgent - allows ROS2 communications from Pixhawk to be received if GPS is required
+    micro_xcre_agent =  ExecuteProcess(
+        cmd=[[
+            f'bash -c "MicroXRCEAgent udp4 -p 8888"', #gnome-terminal --tab -- 
+        ]],
+        shell=True
+    )
+
     ## BUILD LAUNCH DESCRIPTION
     launch_description = []
 
     launch_description.append(load)
+
+    # Only need to communicate with the Pixhawk if GPS position of the load is required (for feedback or evaluation)
+    if evaluate or load_pose_type == "ground_truth":
+        launch_description.append(micro_xcre_agent)
     
     # Only launch gcs_background if not launching on gcs, otherwise just launch load
     if min_on_gcs:
