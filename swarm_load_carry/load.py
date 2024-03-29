@@ -179,7 +179,7 @@ class Load(Node):
                 self.sub_global_origin = self.create_subscription(
                     GlobalPose,
                     f'/px4_{self.first_drone_num}/out/global_init_pose', 
-                    self.clbk_global_origin,
+                    self.pixhawk_pose.clbk_global_origin,
                     qos_profile)
 
         
