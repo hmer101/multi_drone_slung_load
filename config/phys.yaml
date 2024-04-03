@@ -31,6 +31,7 @@
       enable_depth: false
       enable_infra1: false
       enable_infra2: false
+      pointcloud.enable: false
 
       rgb_camera.enable_auto_exposure: true
       rgb_camera.profile: 640x480x15 #30
