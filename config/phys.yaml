@@ -34,7 +34,7 @@
       pointcloud.enable: false
 
       rgb_camera.enable_auto_exposure: true
-      rgb_camera.profile: 640x480x15 #30
+      rgb_camera.color_profile: 640x480x15 #30
 
       ## FORMATION CONTROL
       kp_formation_load: 0.0 #0.1
