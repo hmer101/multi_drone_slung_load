@@ -26,7 +26,7 @@
       drone_order: [1, 2, 3] #[1, 2, 3] #ACW from load's x axis
 
       ## CAMERA SETTINGS
-      initial_reset: true
+      initial_reset: false #true
       enable_color: true
       enable_depth: false
       enable_infra1: false
