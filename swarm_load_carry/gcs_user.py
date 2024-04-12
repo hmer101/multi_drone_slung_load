@@ -37,7 +37,7 @@ class GCSUser(Node):
 
         self.declare_parameter('timer_period_gcs_user', 0.1)
 
-        self.declare_parameter('rc_aux_thresholds', [65.0, 70.0, 75.0, 80.0, 85.0, 90.0, 100.0])
+        self.declare_parameter('rc_aux_thresholds', [0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.95])
         self.declare_parameter('rc_aux_buffer', 0.01)
         
 
@@ -137,7 +137,7 @@ class GCSUser(Node):
             # Update the previous value of aux1 output
             self.rc_aux_1_prev = self.rc_aux_1
 
-            self.get_logger().info(f'{self.rc_aux_1_prev}')
+            self.get_logger().info(f'New self.rc_aux_1: {self.rc_aux_1}')
 
 
     ## MISSION CONTROL

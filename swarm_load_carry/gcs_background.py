@@ -47,6 +47,7 @@ class GCSBackground(Node):
         self.declare_parameter('kp_formation_load', 0.0)
         self.declare_parameter('r_drones_max_safety', 0.1)
         self.declare_parameter('auto_level', 0)
+        self.declare_parameter('print_desired_load_pose', False)
         self.declare_parameter('phase_change_requests_through_background', True)
 
         #self.declare_parameter('height_drone_rel_load', 1.5)
@@ -77,6 +78,7 @@ class GCSBackground(Node):
         self.kp_formation_load = self.get_parameter('kp_formation_load').get_parameter_value().double_value
         self.r_drones_max_safety = self.get_parameter('r_drones_max_safety').get_parameter_value().double_value
         self.auto_level = self.get_parameter('auto_level').get_parameter_value().bool_value
+        self.print_desired_load_pose = self.get_parameter('print_desired_load_pose').get_parameter_value().bool_value
         self.phase_change_requests_through_background = self.get_parameter('phase_change_requests_through_background').get_parameter_value().bool_value
 
         #self.height_drone_rel_load = self.get_parameter('height_drone_rel_load').get_parameter_value().double_value
@@ -321,8 +323,11 @@ class GCSBackground(Node):
                         self.get_logger().info(f'Drones too close/far from each other at {utils.dist_euler_3D(drone_positions[i], drone_positions[j])} m. Stopping load movement.')
                         x_dot_load_desired = np.array([0.0, 0.0, 0.0])
                         break
+        
+        # Print the desired load velocity if desired
+        if self.print_desired_load_pose:                   
+            self.get_logger().info(f'x_dot_load_desired: {x_dot_load_desired}')
 
-        self.get_logger().info(f'x_dot_load_desired: {x_dot_load_desired}')
         x_load_desired_altered = x_load_desired_prev + x_dot_load_desired*dt
 
 
@@ -422,8 +427,9 @@ class GCSBackground(Node):
         setpoint_msg_att.q_d = [float(q_d.w), float(q_d.x), float(q_d.y), float(q_d.z)]
         self.pub_load_attitude_desired.publish(setpoint_msg_att)
 
-        # Print desired pose
-        self.get_logger().info(f'Desired load pose: {self.load_desired_local_state.pos}, {self.load_desired_local_state.att_q}')
+        # Print desired pose if desired
+        if self.print_desired_load_pose:
+            self.get_logger().info(f'Desired load pose: {self.load_desired_local_state.pos}, {self.load_desired_local_state.att_q}')
 
 
 def main(args=None):

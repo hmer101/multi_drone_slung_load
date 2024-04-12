@@ -12,8 +12,7 @@
 
       ## GCS SETTINGS
       auto_level: 0 # 0 = "Fully manual" - requires checks at intermediate steps, 1 = "semi-automatic" - fewer intermediate steps, 2 = "fully automatic" - turn into offboard mode for completely automatic mission
-      #min_on_gcs: true # Run all nodes possible on the drone swarm rather than GCS
-      #real_load_attached: true # If no load is attached, have to run load node somewhere else 
+      print_desired_load_pose: false # In the gcs background node
       run_load_node_on: 'load' # 'load', 'drone', 'gcs' We can run the load node on the gcs, a load or a drone
       run_background_node_on: 'drone' # 'load', 'drone', 'gcs' We can run the background node on the gcs, a load, or a drone
       run_user_node_on: 'drone' # 'drone', 'gcs'. Running the user node on the drone means that the RC will need to be used to send offboard transition commands, otherwise they can be sent from the gcs through WiFi
@@ -21,7 +20,7 @@
       phase_change_requests_through_background: false # If true, phase change requests are sent through the gcs background node rather than from the gcs user node directly to the drones
 
       ## RC SETTINGS
-      rc_aux_thresholds: [65.0, 70.0, 75.0, 80.0, 85.0, 90.0, 100.0] # Aux1 expected values for the different offboard phases: takeoff, formation, engage tension, mission, land, hold (all), kill (all)
+      rc_aux_thresholds: [0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.95] # Aux1 expected values for the different offboard phases: takeoff, formation, engage tension, mission, land, hold (all), kill (all)
       rc_aux_buffer: 0.01 # The +/- range from the above thresholds that are still considered acceptable
 
       ## DRONE SETTINGS
