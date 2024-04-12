@@ -36,7 +36,7 @@ def generate_launch_description():
     # GCS user and background so can be on physical drone network if selected (more reliable than GCS)    
     gcs_user = ExecuteProcess(
             cmd=[[
-                f'gnome-terminal --tab -- bash -c "ros2 run swarm_load_carry gcs_user --ros-args -r __node:=gcs_user1 --params-file {config}"', #-r __ns:=/gcs_1 
+                f'bash -c "ros2 run swarm_load_carry gcs_user --ros-args -r __node:=gcs_user1 --params-file {config}"', #-r __ns:=/gcs_1 
             ]],
             shell=True
         )
