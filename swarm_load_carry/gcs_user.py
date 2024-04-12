@@ -121,18 +121,25 @@ class GCSUser(Node):
         if self.rc_aux_1 != self.rc_aux_1_prev:
             if self.rc_aux_1 >= (self.rc_aux_thresholds[0] - self.rc_aux_buffer) and self.rc_aux_1 <= (self.rc_aux_thresholds[0] + self.rc_aux_buffer):
                 utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_SETUP_DRONE)
+                self.get_logger().info(f'CHANGE TO SETUP DRONE PHASE (which switches to takeoff)')
             elif self.auto_level == 0 and self.rc_aux_1 >= (self.rc_aux_thresholds[1] - self.rc_aux_buffer) and self.rc_aux_1 <= (self.rc_aux_thresholds[1] + self.rc_aux_buffer):
                 utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_TAKEOFF_PRE_TENSION)
+                self.get_logger().info(f'CHANGE TO FORMATION PHASE')
             elif self.auto_level == 0 and self.rc_aux_1 >= (self.rc_aux_thresholds[2] - self.rc_aux_buffer) and self.rc_aux_1 <= (self.rc_aux_thresholds[2] + self.rc_aux_buffer):
                 utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_TAKEOFF_POST_TENSION)
+                self.get_logger().info(f'CHANGE TO TAKEOFF PHASE')
             elif self.rc_aux_1 >= (self.rc_aux_thresholds[3] - self.rc_aux_buffer) and self.rc_aux_1 <= (self.rc_aux_thresholds[3] + self.rc_aux_buffer):
                 utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_MISSION_START)
+                self.get_logger().info(f'CHANGE TO MISSION START PHASE')
             elif self.rc_aux_1 >= (self.rc_aux_thresholds[4] - self.rc_aux_buffer) and self.rc_aux_1 <= (self.rc_aux_thresholds[4] + self.rc_aux_buffer):
                 utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_LAND_START)
+                self.get_logger().info(f'CHANGE TO LAND START PHASE')
             elif self.rc_aux_1 >= (self.rc_aux_thresholds[5] - self.rc_aux_buffer) and self.rc_aux_1 <= (self.rc_aux_thresholds[5] + self.rc_aux_buffer):
                 utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_HOLD)
+                self.get_logger().info(f'CHANGE TO HOLD PHASE')
             elif self.rc_aux_1 >= (self.rc_aux_thresholds[6] - self.rc_aux_buffer) and self.rc_aux_1 <= (self.rc_aux_thresholds[6] + self.rc_aux_buffer):
                 utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_KILL)
+                self.get_logger().info(f'CHANGE TO KILL PHASE')
 
             # Update the previous value of aux1 output
             self.rc_aux_1_prev = self.rc_aux_1

@@ -391,7 +391,7 @@ class Drone(Node):
             #trajectory_msg_with_speed = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.vehicle_local_state, v_scalar=self.vel_drone, yawspeed_scalar=self.yawspeed_drone)
 
             if trajectory_msg == None:
-                self.get_logger().warn(f'Load or drone initial position not found. Skipping this command loop.')
+                #self.get_logger().warn(f'Load or drone initial position not found. Skipping this command loop.') TODO: re-enable
                 return
 
 
