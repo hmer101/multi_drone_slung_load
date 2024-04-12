@@ -14,7 +14,7 @@ import utils
 
 from swarm_load_carry_interfaces.srv import PhaseChange
 from swarm_load_carry_interfaces.msg import Phase
-from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
+from px4_msgs.msg import ManualControlSetpoint
 
 
 class GCSUser(Node):
@@ -33,16 +33,53 @@ class GCSUser(Node):
         self.declare_parameter('first_drone_num', 1)
         self.declare_parameter('auto_level', 0)
         self.declare_parameter('phase_change_requests_through_background', True)
+        self.declare_parameter('user_interaction_through_rc', True)
+
+        self.declare_parameter('timer_period_gcs_user', 0.1)
+
+        self.declare_parameter('rc_aux_thresholds', [65.0, 70.0, 75.0, 80.0, 85.0, 90.0, 100.0])
+        self.declare_parameter('rc_aux_buffer', 0.01)
+        
 
         self.load_id = self.get_parameter('load_id').get_parameter_value().integer_value
         self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
         self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
         self.auto_level = self.get_parameter('auto_level').get_parameter_value().integer_value
         self.phase_change_requests_through_background = self.get_parameter('phase_change_requests_through_background').get_parameter_value().bool_value
+        self.user_interaction_through_rc = self.get_parameter('user_interaction_through_rc').get_parameter_value().bool_value
+
+        self.timer_period_gcs_user = self.get_parameter('timer_period_gcs_user').get_parameter_value().double_value
+
+        self.rc_aux_thresholds = np.array(self.get_parameter('rc_aux_thresholds').get_parameter_value().double_array_value)
+        self.rc_aux_buffer = self.get_parameter('rc_aux_buffer').get_parameter_value().double_value
         
+
+        ## VARIABLES
+        if self.user_interaction_through_rc:
+            self.rc_aux_1 = 0.0 # Stores the value of the aux1 output from the RC
+            self.rc_aux_1_prev = 0.0 # Stores the previous value of aux1 output to detect changes
+
+            # Timer for actioning any changes
+            self.timer = self.create_timer(self.timer_period_gcs_user, self.clbk_cmdloop)
+
+        ### ROS2
+        qos_profile = QoSProfile(
+            reliability=qos.ReliabilityPolicy.BEST_EFFORT,
+            durability=qos.DurabilityPolicy.TRANSIENT_LOCAL,
+            history=qos.HistoryPolicy.KEEP_LAST,
+            depth=1
+        )
 
         ## PUBLISHERS
         ## SUBSCRIBERS
+        # If the user interaction occurs through the RC, need to subscribe to the RC control inputs
+        if self.user_interaction_through_rc:
+            self.sub_local_position = self.create_subscription(
+                ManualControlSetpoint,
+                f'px4_{self.first_drone_num}/fmu/out/manual_control_setpoint',
+                self.clbk_manual_control_setpoint, 
+                qos_profile)  
+
         ## SERVICES
 
         ## CLIENTS
@@ -61,23 +98,51 @@ class GCSUser(Node):
                 while not self.cli_phase_change[i-self.first_drone_num].wait_for_service(timeout_sec=3.0): #1.0
                     self.get_logger().info(f'Waiting for phase change service: drone {i}')
 
-        self.get_logger().info('Setup complete')
+            ## Command list - select based on level of autonomy
+            match(self.auto_level):
+                case 0: # Highly manual mode
+                    self.command_list = ['t = takeoff', 'f = move into formation', 'e = engage tension', 'm = mission start', 'l = land', 'h = hold', 'k = kill', 'q= quit'] #'u = lift load up', 
+                case 1: # Semi-automatic mode
+                    self.command_list = ['t = takeoff', 'm = mission start', 'l = land', 'h = hold', 'k = kill', 'q= quit']
+                case 2: # Fully automatic mode
+                    self.command_list = []
 
-        ## Command list - select based on level of autonomy
-        match(self.auto_level):
-            case 0: # Highly manual mode
-                self.command_list = ['t = takeoff', 'f = move into formation', 'e = engage tension', 'm = mission start', 'l = land', 'h = hold', 'k = kill', 'q= quit'] #'u = lift load up', 
-            case 1: # Semi-automatic mode
-                self.command_list = ['t = takeoff', 'm = mission start', 'l = land', 'h = hold', 'k = kill', 'q= quit']
-            case 2: # Fully automatic mode
-                self.command_list = []
+
+        self.get_logger().info('Setup complete')
 
 
     ## CALLBACKS
+    def clbk_manual_control_setpoint(self, msg):
+        self.rc_aux_1 = msg.aux1
+
+    # Take in user commands through the RC
+    def clbk_cmdloop(self):
+        # Only execute if the value of the aux1 output has changed
+        if self.rc_aux_1 != self.rc_aux_1_prev:
+            if self.rc_aux_1 >= (self.rc_aux_thresholds[0] - self.rc_aux_buffer) and self.rc_aux_1 <= (self.rc_aux_thresholds[0] + self.rc_aux_buffer):
+                utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_SETUP_DRONE)
+            elif self.auto_level == 0 and self.rc_aux_1 >= (self.rc_aux_thresholds[1] - self.rc_aux_buffer) and self.rc_aux_1 <= (self.rc_aux_thresholds[1] + self.rc_aux_buffer):
+                utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_TAKEOFF_PRE_TENSION)
+            elif self.auto_level == 0 and self.rc_aux_1 >= (self.rc_aux_thresholds[2] - self.rc_aux_buffer) and self.rc_aux_1 <= (self.rc_aux_thresholds[2] + self.rc_aux_buffer):
+                utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_TAKEOFF_POST_TENSION)
+            elif self.rc_aux_1 >= (self.rc_aux_thresholds[3] - self.rc_aux_buffer) and self.rc_aux_1 <= (self.rc_aux_thresholds[3] + self.rc_aux_buffer):
+                utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_MISSION_START)
+            elif self.rc_aux_1 >= (self.rc_aux_thresholds[4] - self.rc_aux_buffer) and self.rc_aux_1 <= (self.rc_aux_thresholds[4] + self.rc_aux_buffer):
+                utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_LAND_START)
+            elif self.rc_aux_1 >= (self.rc_aux_thresholds[5] - self.rc_aux_buffer) and self.rc_aux_1 <= (self.rc_aux_thresholds[5] + self.rc_aux_buffer):
+                utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_HOLD)
+            elif self.rc_aux_1 >= (self.rc_aux_thresholds[6] - self.rc_aux_buffer) and self.rc_aux_1 <= (self.rc_aux_thresholds[6] + self.rc_aux_buffer):
+                utils.change_phase_all(self, self.cli_phase_change, Phase.PHASE_KILL)
+
+            # Update the previous value of aux1 output
+            self.rc_aux_1_prev = self.rc_aux_1
+
+            self.get_logger().info(f'{self.rc_aux_1_prev}')
+
 
     ## MISSION CONTROL
-    # Take in user commands for the drones
-    def user_commands(self):
+    # Take in user commands through the GCS
+    def commands_gcs(self):
         cmd = None
 
         # Check if command_list is not empty
@@ -118,8 +183,13 @@ def main(args=None):
     rclpy.init(args=args)
     gcs_user = GCSUser()
 
-    # Take in user commands (blocking)
-    gcs_user.user_commands()
+    if gcs_user.user_interaction_through_rc:
+        # Take in user commands through RC
+        rclpy.spin(gcs_user)
+    else:
+        # Take in user commands through GCS
+        # Done like this because 'input' function is blocking
+        gcs_user.commands_gcs()
 
     # Destroy node
     gcs_user.destroy_node()

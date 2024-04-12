@@ -25,6 +25,7 @@ def generate_launch_description():
     # real_load_attached = params["/**"]["ros__parameters"]["real_load_attached"]
     run_load_node_on = params["/**"]["ros__parameters"]["run_load_node_on"]
     run_background_node_on = params["/**"]["ros__parameters"]["run_background_node_on"]
+    run_user_node_on = params["/**"]["ros__parameters"]["run_user_node_on"]
     
     ## INCLUDE LAUNCH FILES    
     gcs = IncludeLaunchDescription(
@@ -49,6 +50,13 @@ def generate_launch_description():
             shell=True
         )
 
+    gcs_background = ExecuteProcess(
+            cmd=[[
+                f'gnome-terminal --tab -- bash -c "ros2 run swarm_load_carry gcs_background --ros-args -r __node:=gcs_background1 --params-file {config}"', #gnome-terminal --tab -- -r __ns:=/gcs_1 
+            ]],
+            shell=True
+        )
+
     ## BUILD LAUNCH DESCRIPTION
     launch_description = []
 
@@ -56,10 +64,12 @@ def generate_launch_description():
     if run_load_node_on == "gcs":
         launch_description.append(load)
 
-    # Launch GCS background node if required, user node is always run on gcs
+    # Launch GCS background and user nodes if required
+    # if run_background_node_on == "gcs" and run_user_node_on == "gcs":
+    #     launch_description.append(gcs)
     if run_background_node_on == "gcs":
-        launch_description.append(gcs)
-    else:
+        launch_description.append(gcs_background)
+    if run_user_node_on == "gcs":
         launch_description.append(gcs_user)
 
     ## RUN LAUNCH FILES

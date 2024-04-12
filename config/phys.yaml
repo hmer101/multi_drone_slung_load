@@ -16,12 +16,18 @@
       #real_load_attached: true # If no load is attached, have to run load node somewhere else 
       run_load_node_on: 'load' # 'load', 'drone', 'gcs' We can run the load node on the gcs, a load or a drone
       run_background_node_on: 'drone' # 'load', 'drone', 'gcs' We can run the background node on the gcs, a load, or a drone
-      phase_change_requests_through_background: true # If true, phase change requests are sent through the gcs background node rather than from the gcs user node directly to the drones
+      run_user_node_on: 'drone' # 'drone', 'gcs'. Running the user node on the drone means that the RC will need to be used to send offboard transition commands, otherwise they can be sent from the gcs through WiFi
+      user_interaction_through_rc: true #Send the user interaction commands from a remote controller (true) or through the ground control station (false)
+      phase_change_requests_through_background: false # If true, phase change requests are sent through the gcs background node rather than from the gcs user node directly to the drones
+
+      ## RC SETTINGS
+      rc_aux_thresholds: [65.0, 70.0, 75.0, 80.0, 85.0, 90.0, 100.0] # Aux1 expected values for the different offboard phases: takeoff, formation, engage tension, mission, land, hold (all), kill (all)
+      rc_aux_buffer: 0.01 # The +/- range from the above thresholds that are still considered acceptable
 
       ## DRONE SETTINGS
       first_drone_num: 1 #1
-      num_drones: 3
-      num_cameras: 3 # 0 if cameras are off
+      num_drones: 1 #3
+      num_cameras: 1 #3 # 0 if cameras are off
     
       drone_order: [1, 2, 3] #[1, 2, 3] #ACW from load's x axis
 
@@ -84,6 +90,7 @@
       # Timings
       # Note cnt thresholds are linked to the timer periods
       timer_period_drone: 0.1 # sec
+      timer_period_gcs_user: 0.1 # sec
       timer_period_gcs_background: 0.2 # sec
       timer_period_load: 0.1 # sec
 

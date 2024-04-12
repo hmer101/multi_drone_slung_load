@@ -316,6 +316,9 @@ class Drone(Node):
             case Phase.PHASE_SETUP_DRONE:
                 self.phase=Phase.PHASE_SETUP_DRONE
 
+            # case Phase.PHASE_TAKEOFF_START: # Minor
+            #     self.phase = Phase.PHASE_TAKEOFF_START
+
             case Phase.PHASE_TAKEOFF_PRE_TENSION: # Minor
                 self.phase=Phase.PHASE_TAKEOFF_PRE_TENSION
 
@@ -453,9 +456,12 @@ class Drone(Node):
                 # GCS sets up desired poses of drones relative to load so check if this has been set
                 if self.flag_desired_pose_rel_load_set:
                     self.cnt_phase_ticks = 0
-                    self.phase = Phase.PHASE_TAKEOFF_START
                     self.get_logger().info(f'GCS setup complete')
                     self.get_logger().info(f'SETUP COMPLETE')
+
+                    # Automatically transition to takeoff if in more autonomy than manual mode
+                    #if self.auto_level >=1:
+                    self.phase = Phase.PHASE_TAKEOFF_START
 
             # Run takeoff
             case Phase.PHASE_TAKEOFF_START:               
