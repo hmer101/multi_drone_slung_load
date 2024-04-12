@@ -23,6 +23,7 @@ def generate_launch_description():
     load_pose_type = params["/**"]["ros__parameters"]["load_pose_type"]
     run_load_node_on = params["/**"]["ros__parameters"]["run_load_node_on"]
     run_background_node_on = params["/**"]["ros__parameters"]["run_background_node_on"]
+    run_user_node_on = params["/**"]["ros__parameters"]["run_user_node_on"]
 
     ## INCLUDE LAUNCH FILES       
     load = IncludeLaunchDescription(
@@ -32,7 +33,14 @@ def generate_launch_description():
       launch_arguments={'env': 'phys'}.items()
       )
 
-    # GCS background so can be on physical drone network if selected (more reliable than GCS)    
+    # GCS user and background so can be on physical drone network if selected (more reliable than GCS)    
+    gcs_user = ExecuteProcess(
+            cmd=[[
+                f'gnome-terminal --tab -- bash -c "ros2 run swarm_load_carry gcs_user --ros-args -r __node:=gcs_user1 --params-file {config}"', #-r __ns:=/gcs_1 
+            ]],
+            shell=True
+        )
+    
     gcs_background = ExecuteProcess(
         cmd=[[
             f'bash -c "ros2 run swarm_load_carry gcs_background --ros-args -r __node:=gcs_background1 --params-file {config}"', #gnome-terminal --tab -- -r __ns:=/gcs_1
@@ -58,6 +66,10 @@ def generate_launch_description():
     # Launch GCS background node if required
     if run_background_node_on == "load":
         launch_description.append(gcs_background)
+    
+    # Launch GCS user node if required
+    if run_user_node_on == "load":
+        launch_description.append(gcs_user)
 
     # Only need to communicate with the Pixhawk if GPS position of the load is required (for feedback or evaluation)
     if evaluate or load_pose_type == "ground_truth":

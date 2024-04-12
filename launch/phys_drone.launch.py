@@ -23,6 +23,7 @@ def generate_launch_description():
     first_drone_num = params["/**"]["ros__parameters"]["first_drone_num"]
     run_load_node_on = params["/**"]["ros__parameters"]["run_load_node_on"]
     run_background_node_on = params["/**"]["ros__parameters"]["run_background_node_on"]
+    run_user_node_on = params["/**"]["ros__parameters"]["run_user_node_on"]
 
     ## INCLUDE LAUNCH FILES
     # Launch drone
@@ -49,7 +50,7 @@ def generate_launch_description():
             launch_arguments={'drone_id': str(drone_id_env), 'env': 'phys'}.items()
             )
 
-    # Load and GCS background so can be on physical drone network if selected (more reliable than GCS)
+    # Load, GCS user and GCS background so can be on physical drone network if selected (more reliable than GCS)
     load = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('swarm_load_carry'), 'launch'),
@@ -57,6 +58,13 @@ def generate_launch_description():
       launch_arguments={'env': 'phys'}.items()
       )
     
+    gcs_user = ExecuteProcess(
+            cmd=[[
+                f'gnome-terminal --tab -- bash -c "ros2 run swarm_load_carry gcs_user --ros-args -r __node:=gcs_user1 --params-file {config}"', #-r __ns:=/gcs_1 
+            ]],
+            shell=True
+        )
+
     gcs_background = ExecuteProcess(
             cmd=[[
                 f'bash -c "ros2 run swarm_load_carry gcs_background --ros-args -r __node:=gcs_background1 --params-file {config}"', #gnome-terminal --tab --  -r __ns:=/gcs_1
@@ -82,15 +90,18 @@ def generate_launch_description():
         #if load_pose_type == "visual":
         launch_description.append(pose_measurement_visual)
 
-    # Only launch load and gcs_background on 1st drone if set to do so
+    # Only launch load, gcs_background and/or gcs_user on 1st drone if set to do so
     if int(drone_id_env) == first_drone_num:
         # Launch load node if required
         if run_load_node_on == "drone":
             launch_description.append(load)
         
-        # Launch GCS background node if required
+        # Launch GCS background or user nodes are required
         if run_background_node_on == "drone":
             launch_description.append(gcs_background)
+
+        if run_user_node_on == "drone":
+            launch_description.append(gcs_user)
 
 
     ## RUN LAUNCH FILES and start MicroDDS agent
