@@ -344,275 +344,268 @@ class Drone(Node):
         return response
 
 
-    def clbk_cmdloop(self):  
-        # Publish the phase the drone is currently in #TODO: TEMP!!!! REMOVE!!!
-        # msg_current_phase = Phase()
-        # msg_current_phase.phase = self.phase
-        # self.pub_current_phase.publish(msg_current_phase)
+    def clbk_cmdloop(self):         
+        # Safety switch for switching out of offboard mode and back into offboard mode
+        if self.vehicle_status is not None: # and if self.env == 'phys':
+            # If taken out of offboard mode by RC, and not pre-setup, switch to hold phase
+            # Don't include land drones phase as intentionally switch out of offboard mode here
+            if self.vehicle_status.nav_state_user_intention != VehicleStatus.NAVIGATION_STATE_OFFBOARD \
+                and self.phase >= Phase.PHASE_TAKEOFF_START and self.phase != Phase.PHASE_HOLD and self.phase != Phase.PHASE_KILL and self.phase != Phase.PHASE_LAND_DRONES and self.phase != Phase.PHASE_LAND_END:
+                self.phase_restore = self.phase
+                self.phase = Phase.PHASE_HOLD
+                self.get_logger().info(f'Offboard mode switched off. Switching to hold phase.')
+
+            # If only just put into offboard mode by RC, and a phase to restore has been set, restore to that phase
+            elif self.vehicle_status.nav_state_user_intention == VehicleStatus.NAVIGATION_STATE_OFFBOARD and self.phase_restore != Phase.PHASE_UNASSIGNED:
+                self.phase = self.phase_restore
+                self.phase_restore = Phase.PHASE_UNASSIGNED
+                self.get_logger().info(f'Offboard mode switched on. Restoring to phase {self.phase}.')
+
+
+        # Continually publish offboard mode heartbeat (note need setpoint published too to stay in offboard mode)
+        timestamp = int(self.get_clock().now().nanoseconds/1000)
+        offboard_ros.publish_offboard_control_heartbeat_signal(self.pub_offboard_mode, 'pos', timestamp)
         
-        # # Safety switch for switching out of offboard mode and back into offboard mode
-        # if self.vehicle_status is not None: # and if self.env == 'phys':
-        #     # If taken out of offboard mode by RC, and not pre-setup, switch to hold phase
-        #     # Don't include land drones phase as intentionally switch out of offboard mode here
-        #     if self.vehicle_status.nav_state_user_intention != VehicleStatus.NAVIGATION_STATE_OFFBOARD \
-        #         and self.phase >= Phase.PHASE_TAKEOFF_START and self.phase != Phase.PHASE_HOLD and self.phase != Phase.PHASE_KILL and self.phase != Phase.PHASE_LAND_DRONES and self.phase != Phase.PHASE_LAND_END:
-        #         self.phase_restore = self.phase
-        #         self.phase = Phase.PHASE_HOLD
-        #         self.get_logger().info(f'Offboard mode switched off. Switching to hold phase.')
-
-        #     # If only just put into offboard mode by RC, and a phase to restore has been set, restore to that phase
-        #     elif self.vehicle_status.nav_state_user_intention == VehicleStatus.NAVIGATION_STATE_OFFBOARD and self.phase_restore != Phase.PHASE_UNASSIGNED:
-        #         self.phase = self.phase_restore
-        #         self.phase_restore = Phase.PHASE_UNASSIGNED
-        #         self.get_logger().info(f'Offboard mode switched on. Restoring to phase {self.phase}.')
+        # Get TF relative to world if the world position is set
+        if self.pixhawk_pose.flag_local_init_pose_set:
+            # Get actual position feedback 
+            # Start with drone position (TODO: incorporate load position feedback later)
+            tf_drone_rel_world = utils.lookup_tf('world', self.get_name(), self.tf_buffer, rclpy.time.Time(), self.get_logger())
 
 
-        # # Continually publish offboard mode heartbeat (note need setpoint published too to stay in offboard mode)
-        # timestamp = int(self.get_clock().now().nanoseconds/1000)
-        # offboard_ros.publish_offboard_control_heartbeat_signal(self.pub_offboard_mode, 'pos', timestamp)
-        
-        # # Get TF relative to world if the world position is set
-        # if self.pixhawk_pose.flag_local_init_pose_set:
-        #     # Get actual position feedback 
-        #     # Start with drone position (TODO: incorporate load position feedback later)
-        #     # TODO: RE-ENABLE!!!
-        #     #tf_drone_rel_world = utils.lookup_tf('world', self.get_name(), self.tf_buffer, rclpy.time.Time(), self.get_logger())
-        #     pass
+        # Start setup and take-off automatically if in fully-auto mode. 
+        if (self.auto_level == 2) and self.phase == Phase.PHASE_UNASSIGNED and self.vehicle_status is not None:
+            # Counter starts when attempt to put into offboard mode by RC
+            if self.vehicle_status.nav_state_user_intention == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+                if self.cnt_phase_ticks >= self.cnt_threshold_fully_auto_pre_takeoff:
+                    self.phase = Phase.PHASE_SETUP_DRONE
+                    self.cnt_phase_ticks = 0
+
+                else:
+                    self.cnt_phase_ticks += 1
+
+        # Generate trajectory message for formation used after take-off.
+        elif self.phase > Phase.PHASE_SETUP_GCS:
+            # Note speed setpoints are not included by default (include in particular phases below)
+            trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger())
+            #trajectory_msg_with_speed = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.vehicle_local_state, v_scalar=self.vel_drone, yawspeed_scalar=self.yawspeed_drone)
+
+            if trajectory_msg == None:
+                self.get_logger().warn(f'Load or drone initial position not found. Skipping this command loop.')
+                return
 
 
-        # # Start setup and take-off automatically if in fully-auto mode. 
-        # if (self.auto_level == 2) and self.phase == Phase.PHASE_UNASSIGNED and self.vehicle_status is not None:
-        #     # Counter starts when attempt to put into offboard mode by RC
-        #     if self.vehicle_status.nav_state_user_intention == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-        #         if self.cnt_phase_ticks >= self.cnt_threshold_fully_auto_pre_takeoff:
-        #             self.phase = Phase.PHASE_SETUP_DRONE
-        #             self.cnt_phase_ticks = 0
-
-        #         else:
-        #             self.cnt_phase_ticks += 1
-
-        # # Generate trajectory message for formation used after take-off.
-        # elif self.phase > Phase.PHASE_SETUP_GCS:
-        #     # Note speed setpoints are not included by default (include in particular phases below)
-        #     trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger())
-        #     #trajectory_msg_with_speed = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.vehicle_local_state, v_scalar=self.vel_drone, yawspeed_scalar=self.yawspeed_drone)
-
-        #     if trajectory_msg == None:
-        #         #self.get_logger().warn(f'Load or drone initial position not found. Skipping this command loop.') TODO: re-enable
-        #         return
-
-
-        # # Perform actions depending on what mode is requested
-        # # TODO: Add some formation feedback to all phases (especially mission)
-        # match self.phase:
-        #     # Run origin-altering setup pre-arming
-        #     case Phase.PHASE_SETUP_DRONE:               
-        #         # Reset FMU and TF home positions
-        #         if self.cnt_phase_ticks == 0:
-        #             #self.flag_reset_pre_arm_complete = False
-        #             self.reset_pre_arm()
+        # Perform actions depending on what mode is requested
+        # TODO: Add some formation feedback to all phases (especially mission)
+        match self.phase:
+            # Run origin-altering setup pre-arming
+            case Phase.PHASE_SETUP_DRONE:               
+                # Reset FMU and TF home positions
+                if self.cnt_phase_ticks == 0:
+                    #self.flag_reset_pre_arm_complete = False
+                    self.reset_pre_arm()
                 
-        #         elif self.cnt_phase_ticks > self.cnt_threshold_drone_setup: #Note: Tried flag (self.flag_reset_pre_arm_complete) but didn't work. Perhaps other processes on PX4 need time to reset (i.e. to get to reset what is published on the global pose topic)
-        #             self.get_logger().info(f'flag_gps_home_set: {self.pixhawk_pose.flag_gps_home_set}, self.pixhawk_pose.flag_local_init_pose_set: {self.pixhawk_pose.flag_local_init_pose_set}')
+                elif self.cnt_phase_ticks > self.cnt_threshold_drone_setup: #Note: Tried flag (self.flag_reset_pre_arm_complete) but didn't work. Perhaps other processes on PX4 need time to reset (i.e. to get to reset what is published on the global pose topic)
+                    self.get_logger().info(f'flag_gps_home_set: {self.pixhawk_pose.flag_gps_home_set}, self.pixhawk_pose.flag_local_init_pose_set: {self.pixhawk_pose.flag_local_init_pose_set}')
                     
-        #             # Set initial poses when ready
-        #             if self.pixhawk_pose.flag_gps_home_set and not self.pixhawk_pose.flag_local_init_pose_set:                    
-        #                 # Rest of setup differs for first drone and others
-        #                 if self.drone_id == self.first_drone_num:
-        #                     #self.set_local_init_pose_first_drone()
-        #                     self.pixhawk_pose.set_local_init_pose_ref(self.get_clock().now().to_msg(), cs_offset=np.array([0.0, 0.0, self.height_drone_cs_rel_gnd]), \
-        #                                                               state_gt=self.vehicle_state_gt, item2_name='camera', t_item2_rel_item1=self.t_cam_rel_pixhawk, R_item2_rel_item1=self.R_cam_rel_pixhawk)
+                    # Set initial poses when ready
+                    if self.pixhawk_pose.flag_gps_home_set and not self.pixhawk_pose.flag_local_init_pose_set:                    
+                        # Rest of setup differs for first drone and others
+                        if self.drone_id == self.first_drone_num:
+                            #self.set_local_init_pose_first_drone()
+                            self.pixhawk_pose.set_local_init_pose_ref(self.get_clock().now().to_msg(), cs_offset=np.array([0.0, 0.0, self.height_drone_cs_rel_gnd]), \
+                                                                      state_gt=self.vehicle_state_gt, item2_name='camera', t_item2_rel_item1=self.t_cam_rel_pixhawk, R_item2_rel_item1=self.R_cam_rel_pixhawk)
 
-        #                 else:
-        #                     # Set init poses once the first drone's initial position has been received
-        #                     if self.pixhawk_pose.global_origin_state != self.pixhawk_pose.global_origin_state_prev:
-        #                         self.pixhawk_pose.set_local_init_pose_non_ref(self.get_clock().now().to_msg(), initial_state_rel_world=None, cs_offset=np.array([0.0, 0.0, self.height_drone_cs_rel_gnd]), \
-        #                                                          item2_name='camera', t_item2_rel_item1=self.t_cam_rel_pixhawk, R_item2_rel_item1=self.R_cam_rel_pixhawk)
-        #                         #self.set_local_init_pose_later_drones()
-        #                         self.pixhawk_pose.global_origin_state_prev = self.pixhawk_pose.global_origin_state.copy()
+                        else:
+                            # Set init poses once the first drone's initial position has been received
+                            if self.pixhawk_pose.global_origin_state != self.pixhawk_pose.global_origin_state_prev:
+                                self.pixhawk_pose.set_local_init_pose_non_ref(self.get_clock().now().to_msg(), initial_state_rel_world=None, cs_offset=np.array([0.0, 0.0, self.height_drone_cs_rel_gnd]), \
+                                                                 item2_name='camera', t_item2_rel_item1=self.t_cam_rel_pixhawk, R_item2_rel_item1=self.R_cam_rel_pixhawk)
+                                #self.set_local_init_pose_later_drones()
+                                self.pixhawk_pose.global_origin_state_prev = self.pixhawk_pose.global_origin_state.copy()
                     
-        #             # Exit setup only once drone's GPS home and initial positions have been set, 
-        #             # the drone's desired pose relative to the load has been set and the load's initial pose has been set
-        #             elif self.pixhawk_pose.flag_gps_home_set and self.pixhawk_pose.flag_local_init_pose_set: #and self.flag_desired_pose_rel_load_set: # and (tf_load_init_rel_world != None):
-        #                 self.cnt_phase_ticks = 0
-        #                 self.phase = Phase.PHASE_SETUP_LOAD
-        #                 self.get_logger().info(f'Drone setup complete')
+                    # Exit setup only once drone's GPS home and initial positions have been set, 
+                    # the drone's desired pose relative to the load has been set and the load's initial pose has been set
+                    elif self.pixhawk_pose.flag_gps_home_set and self.pixhawk_pose.flag_local_init_pose_set: #and self.flag_desired_pose_rel_load_set: # and (tf_load_init_rel_world != None):
+                        self.cnt_phase_ticks = 0
+                        self.phase = Phase.PHASE_SETUP_LOAD
+                        self.get_logger().info(f'Drone setup complete')
 
-        #                 return
+                        return
                         
-        #         self.cnt_phase_ticks += 1
+                self.cnt_phase_ticks += 1
 
-        #     # Wait for load to be set up (load set up requires drones to be properly set up). Have an extra phase to ensure drones are properly set up before
-        #     # load pulls the transforms to set up, otherwise can inadvertently pull old transforms
-        #     case Phase.PHASE_SETUP_LOAD:
-        #         # Check if load's setup is complete
-        #         tf_load_init_rel_world = utils.lookup_tf('world', f'{self.load_name}_init', self.tf_buffer, rclpy.time.Time(), self.get_logger())
+            # Wait for load to be set up (load set up requires drones to be properly set up). Have an extra phase to ensure drones are properly set up before
+            # load pulls the transforms to set up, otherwise can inadvertently pull old transforms
+            case Phase.PHASE_SETUP_LOAD:
+                # Check if load's setup is complete
+                tf_load_init_rel_world = utils.lookup_tf('world', f'{self.load_name}_init', self.tf_buffer, rclpy.time.Time(), self.get_logger())
 
-        #         # Exit setup only once load's initial pose has been set
-        #         if tf_load_init_rel_world != None and self.cnt_phase_ticks > self.cnt_threshold_drone_setup:
-        #             self.cnt_phase_ticks = 0
-        #             self.phase = Phase.PHASE_SETUP_GCS
-        #             self.get_logger().info(f'Load setup complete')
+                # Exit setup only once load's initial pose has been set
+                if tf_load_init_rel_world != None and self.cnt_phase_ticks > self.cnt_threshold_drone_setup:
+                    self.cnt_phase_ticks = 0
+                    self.phase = Phase.PHASE_SETUP_GCS
+                    self.get_logger().info(f'Load setup complete')
 
-        #             return
+                    return
 
-        #         self.cnt_phase_ticks += 1
+                self.cnt_phase_ticks += 1
 
-        #     # Wait for GCS to be set up
-        #     case Phase.PHASE_SETUP_GCS:               
-        #         # GCS sets up desired poses of drones relative to load so check if this has been set
-        #         if self.flag_desired_pose_rel_load_set:
-        #             self.cnt_phase_ticks = 0
-        #             self.get_logger().info(f'GCS setup complete')
-        #             self.get_logger().info(f'SETUP COMPLETE')
+            # Wait for GCS to be set up
+            case Phase.PHASE_SETUP_GCS:               
+                # GCS sets up desired poses of drones relative to load so check if this has been set
+                if self.flag_desired_pose_rel_load_set:
+                    self.cnt_phase_ticks = 0
+                    self.get_logger().info(f'GCS setup complete')
+                    self.get_logger().info(f'SETUP COMPLETE')
 
-        #             # Automatically transition to takeoff if in more autonomy than manual mode
-        #             #if self.auto_level >=1:
-        #             self.phase = Phase.PHASE_TAKEOFF_START
+                    # Automatically transition to takeoff if in more autonomy than manual mode
+                    #if self.auto_level >=1:
+                    self.phase = Phase.PHASE_TAKEOFF_START
 
-        #     # Run takeoff
-        #     case Phase.PHASE_TAKEOFF_START:               
-        #         # Override trajectory msg for straight-up takeoff in first phase
-        #         trajectory_msg = utils.gen_traj_msg_straight_up(self.height_load_pre_tension+self.height_drone_rel_load, self.pixhawk_pose.local_state.att_q, timestamp)
+            # Run takeoff
+            case Phase.PHASE_TAKEOFF_START:               
+                # Override trajectory msg for straight-up takeoff in first phase
+                trajectory_msg = utils.gen_traj_msg_straight_up(self.height_load_pre_tension+self.height_drone_rel_load, self.pixhawk_pose.local_state.att_q, timestamp)
 
-        #         # Send takeoff setpoint
-        #         self.pub_trajectory.publish(trajectory_msg)
+                # Send takeoff setpoint
+                self.pub_trajectory.publish(trajectory_msg)
 
-        #         # Update counter for arm phase
-        #         if self.cnt_phase_ticks <=self.cnt_threshold_takeoff_start:                   
-        #             self.cnt_phase_ticks += 1
+                # Update counter for arm phase
+                if self.cnt_phase_ticks <=self.cnt_threshold_takeoff_start:                   
+                    self.cnt_phase_ticks += 1
 
-        #         # Continue to send setpoint whilst taking off
-        #         if self.vehicle_status.arming_state==VehicleStatus.ARMING_STATE_ARMED and self.vehicle_status.nav_state==VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-        #             # Takeoff to pre-tension level. Only transition once pre-tension level reached and pose rel load set. Only transition if not in lowest autonomy level
-        #             if tf_drone_rel_world.transform.translation.z>=(self.height_load_pre_tension+self.height_drone_rel_load-self.pos_threshold) and self.auto_level >=1: 
-        #                 self.phase = Phase.PHASE_TAKEOFF_PRE_TENSION
-        #                 self.cnt_phase_ticks = 0  
-        #                 self.get_logger().info(f'Pre-tension level reached')        
+                # Continue to send setpoint whilst taking off
+                if self.vehicle_status.arming_state==VehicleStatus.ARMING_STATE_ARMED and self.vehicle_status.nav_state==VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+                    # Takeoff to pre-tension level. Only transition once pre-tension level reached and pose rel load set. Only transition if not in lowest autonomy level
+                    if tf_drone_rel_world.transform.translation.z>=(self.height_load_pre_tension+self.height_drone_rel_load-self.pos_threshold) and self.auto_level >=1: 
+                        self.phase = Phase.PHASE_TAKEOFF_PRE_TENSION
+                        self.cnt_phase_ticks = 0  
+                        self.get_logger().info(f'Pre-tension level reached')        
 
-        #         # Arm vehicle (and switch to offboard mode) when offboard message has been published for long enough, and if not already armed or in offboard mode
-        #         elif self.cnt_phase_ticks >= self.cnt_threshold_takeoff_start:                   
-        #             # Set in offboard mode
-        #             # if self.vehicle_status.nav_state!=VehicleStatus.NAVIGATION_STATE_OFFBOARD:
-        #             #     offboard_ros.engage_offboard_mode(self.pub_vehicle_command, timestamp)
+                # Arm vehicle (and switch to offboard mode) when offboard message has been published for long enough, and if not already armed or in offboard mode
+                elif self.cnt_phase_ticks >= self.cnt_threshold_takeoff_start:                   
+                    # Set in offboard mode
+                    # if self.vehicle_status.nav_state!=VehicleStatus.NAVIGATION_STATE_OFFBOARD:
+                    #     offboard_ros.engage_offboard_mode(self.pub_vehicle_command, timestamp)
 
-        #             # Arm (once in offboard mode)
-        #             if self.vehicle_status.arming_state!=VehicleStatus.ARMING_STATE_ARMED: #elif
-        #                 offboard_ros.arm(self.pub_vehicle_command, timestamp)
+                    # Arm (once in offboard mode)
+                    if self.vehicle_status.arming_state!=VehicleStatus.ARMING_STATE_ARMED: #elif
+                        offboard_ros.arm(self.pub_vehicle_command, timestamp)
 
 
-        #     case Phase.PHASE_TAKEOFF_PRE_TENSION:
-        #         # Send pre-tension setpoint: in formation but slightly below height
-        #         desired_state_rel_load_lower_z = self.vehicle_desired_state_rel_load.copy()
-        #         desired_state_rel_load_lower_z.pos[2] += self.height_load_pre_tension
+            case Phase.PHASE_TAKEOFF_PRE_TENSION:
+                # Send pre-tension setpoint: in formation but slightly below height
+                desired_state_rel_load_lower_z = self.vehicle_desired_state_rel_load.copy()
+                desired_state_rel_load_lower_z.pos[2] += self.height_load_pre_tension
 
-        #         # Wait before attempt to pick up load as get into formation
-        #         # Travel at set yawspeed and direction for this, then at no speed setpoint afterwards
-        #         if self.cnt_phase_ticks < self.cnt_threshold_takeoff_pre_tension:
-        #             self.cnt_phase_ticks += 1
-        #             trajectory_msg = utils.gen_traj_msg_circle_load(desired_state_rel_load_lower_z, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.pixhawk_pose.local_state, yawspeed_scalar=self.yawspeed_drone)
-        #         else:                   
-        #             if self.auto_level >=1: # Only automatically transition if not in lowest autonomy mode
-        #                 # TODO: Slowly rise to engage tension
-        #                 self.phase = Phase.PHASE_TAKEOFF_POST_TENSION
-        #                 self.cnt_phase_ticks = 0
-        #                 self.get_logger().info(f'Takeoff pre-tension complete') 
+                # Wait before attempt to pick up load as get into formation
+                # Travel at set yawspeed and direction for this, then at no speed setpoint afterwards
+                if self.cnt_phase_ticks < self.cnt_threshold_takeoff_pre_tension:
+                    self.cnt_phase_ticks += 1
+                    trajectory_msg = utils.gen_traj_msg_circle_load(desired_state_rel_load_lower_z, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.pixhawk_pose.local_state, yawspeed_scalar=self.yawspeed_drone)
+                else:                   
+                    if self.auto_level >=1: # Only automatically transition if not in lowest autonomy mode
+                        # TODO: Slowly rise to engage tension
+                        self.phase = Phase.PHASE_TAKEOFF_POST_TENSION
+                        self.cnt_phase_ticks = 0
+                        self.get_logger().info(f'Takeoff pre-tension complete') 
 
-        #         self.pub_trajectory.publish(trajectory_msg)
+                self.pub_trajectory.publish(trajectory_msg)
                      
 
-        #     case Phase.PHASE_TAKEOFF_POST_TENSION:
-        #         #Takeoff complete
-        #         if tf_drone_rel_world.transform.translation.z>=(self.takeoff_height_load+self.height_drone_rel_load-self.pos_threshold):
-        #             self.phase = Phase.PHASE_TAKEOFF_END 
+            case Phase.PHASE_TAKEOFF_POST_TENSION:
+                #Takeoff complete
+                if tf_drone_rel_world.transform.translation.z>=(self.takeoff_height_load+self.height_drone_rel_load-self.pos_threshold):
+                    self.phase = Phase.PHASE_TAKEOFF_END 
                     
-        #             self.get_logger().info(f'TAKEOFF COMPLETE')
+                    self.get_logger().info(f'TAKEOFF COMPLETE')
 
-        #         # Send takeoff setpoint
-        #         self.pub_trajectory.publish(trajectory_msg)
+                # Send takeoff setpoint
+                self.pub_trajectory.publish(trajectory_msg)
 
-        #     # Takeoff complete - hover at takeoff end location
-        #     case Phase.PHASE_TAKEOFF_END:
-        #         self.pub_trajectory.publish(trajectory_msg)
-        #         self.cnt_phase_ticks = 0
+            # Takeoff complete - hover at takeoff end location
+            case Phase.PHASE_TAKEOFF_END:
+                self.pub_trajectory.publish(trajectory_msg)
+                self.cnt_phase_ticks = 0
 
 
-        #     # Run main offboard mission
-        #     case Phase.PHASE_MISSION_START:
-        #         self.pub_trajectory.publish(trajectory_msg)
+            # Run main offboard mission
+            case Phase.PHASE_MISSION_START:
+                self.pub_trajectory.publish(trajectory_msg)
                     
 
-        #     # Run land 
-        #     case Phase.PHASE_LAND_START:
-        #         if self.cnt_phase_ticks < self.cnt_threshold_land_pre_descent:
-        #             self.cnt_phase_ticks += 1
-        #         else:
-        #             self.phase = Phase.PHASE_LAND_DESCENT
-        #             self.cnt_phase_ticks = 0
-        #             self.get_logger().info(f'Land descent beginning') 
+            # Run land 
+            case Phase.PHASE_LAND_START:
+                if self.cnt_phase_ticks < self.cnt_threshold_land_pre_descent:
+                    self.cnt_phase_ticks += 1
+                else:
+                    self.phase = Phase.PHASE_LAND_DESCENT
+                    self.cnt_phase_ticks = 0
+                    self.get_logger().info(f'Land descent beginning') 
 
-        #         # Send hold setpoint
-        #         self.pub_trajectory.publish(trajectory_msg)
+                # Send hold setpoint
+                self.pub_trajectory.publish(trajectory_msg)
             
-        #     case Phase.PHASE_LAND_DESCENT:
-        #         if tf_drone_rel_world.transform.translation.z<=(self.height_load_pre_tension+self.height_drone_rel_load-self.pos_threshold):
-        #             self.phase = Phase.PHASE_LAND_POST_LOAD_DOWN
-        #             self.get_logger().info(f'Load placed on ground') 
+            case Phase.PHASE_LAND_DESCENT:
+                if tf_drone_rel_world.transform.translation.z<=(self.height_load_pre_tension+self.height_drone_rel_load-self.pos_threshold):
+                    self.phase = Phase.PHASE_LAND_POST_LOAD_DOWN
+                    self.get_logger().info(f'Load placed on ground') 
 
-        #         # Send descending setpoint
-        #         self.pub_trajectory.publish(trajectory_msg)
-
-
-        #     case Phase.PHASE_LAND_POST_LOAD_DOWN:
-        #         if self.cnt_phase_ticks <self.cnt_threshold_land_post_load_down:
-        #             self.cnt_phase_ticks += 1
-        #         else: 
-        #             self.phase = Phase.PHASE_LAND_DRONES
-        #             self.cnt_phase_ticks = 0
-        #             self.get_logger().info(f'Ready to set drones down') 
-
-        #         # Send spread out setpoint
-        #         self.pub_trajectory.publish(trajectory_msg)
+                # Send descending setpoint
+                self.pub_trajectory.publish(trajectory_msg)
 
 
-        #     case Phase.PHASE_LAND_DRONES:
-        #         if self.cnt_phase_ticks <self.cnt_threshold_land_drones:
-        #             self.cnt_phase_ticks += 1
-        #         else: 
-        #             self.phase = Phase.PHASE_LAND_END
-        #             self.cnt_phase_ticks = 0
-        #             self.get_logger().info(f'Ready to disarm') 
+            case Phase.PHASE_LAND_POST_LOAD_DOWN:
+                if self.cnt_phase_ticks <self.cnt_threshold_land_post_load_down:
+                    self.cnt_phase_ticks += 1
+                else: 
+                    self.phase = Phase.PHASE_LAND_DRONES
+                    self.cnt_phase_ticks = 0
+                    self.get_logger().info(f'Ready to set drones down') 
 
-        #             #offboard_ros.land(self.pub_vehicle_command, timestamp) 
-
-        #         # Send landing setpoint
-        #         self.pub_trajectory.publish(trajectory_msg)
+                # Send spread out setpoint
+                self.pub_trajectory.publish(trajectory_msg)
 
 
-        #     case Phase.PHASE_LAND_END:
-        #         # Disarm when landed
-        #         if tf_drone_rel_world.transform.translation.z<=0.05:
-        #             if self.cnt_phase_ticks <self.cnt_threshold_land_pre_disarm:
-        #                 self.cnt_phase_ticks += 1
-        #             else:
-        #                 #offboard_ros.disengage_offboard_mode(self.pub_vehicle_command, timestamp)
-        #                 #offboard_ros.disarm(self.pub_vehicle_command, timestamp)
-        #                 self.phase = Phase.PHASE_UNASSIGNED
-        #                 self.cnt_phase_ticks = 0
+            case Phase.PHASE_LAND_DRONES:
+                if self.cnt_phase_ticks <self.cnt_threshold_land_drones:
+                    self.cnt_phase_ticks += 1
+                else: 
+                    self.phase = Phase.PHASE_LAND_END
+                    self.cnt_phase_ticks = 0
+                    self.get_logger().info(f'Ready to disarm') 
 
-        #                 self.get_logger().info(f'LANDED AND DISARMED') 
+                    #offboard_ros.land(self.pub_vehicle_command, timestamp) 
+
+                # Send landing setpoint
+                self.pub_trajectory.publish(trajectory_msg)
+
+
+            case Phase.PHASE_LAND_END:
+                # Disarm when landed
+                if tf_drone_rel_world.transform.translation.z<=0.05:
+                    if self.cnt_phase_ticks <self.cnt_threshold_land_pre_disarm:
+                        self.cnt_phase_ticks += 1
+                    else:
+                        #offboard_ros.disengage_offboard_mode(self.pub_vehicle_command, timestamp)
+                        #offboard_ros.disarm(self.pub_vehicle_command, timestamp)
+                        self.phase = Phase.PHASE_UNASSIGNED
+                        self.cnt_phase_ticks = 0
+
+                        self.get_logger().info(f'LANDED AND DISARMED') 
             
-        #     case Phase.PHASE_HOLD:
-        #         # Send setpoint as current position
-        #         self.pub_trajectory.publish(trajectory_msg)
-        #         pass
+            case Phase.PHASE_HOLD:
+                # Send setpoint as current position
+                self.pub_trajectory.publish(trajectory_msg)
+                pass
 
-        #     # Kill
-        #     case Phase.PHASE_KILL:
-        #         offboard_ros.kill(self.pub_vehicle_command, timestamp)
-        #         self.cnt_phase_ticks = 0
+            # Kill
+            case Phase.PHASE_KILL:
+                offboard_ros.kill(self.pub_vehicle_command, timestamp)
+                self.cnt_phase_ticks = 0
 
-        #         pass
+                pass
 
         # Publish the phase the drone is currently in 
         msg_current_phase = Phase()

@@ -289,7 +289,7 @@ class GCSBackground(Node):
         self.mission_theta = self.mission_theta + yaw_change_desired_altered*dt
         
         #load_desired_local_state, yaw_change_desired_altered = self.formation_control_load(x_load_d, self.load_desired_local_state_prev.pos, 0.0, 0.0, dt)
-        #self.mission_theta = self.mission_theta + omega*dt #TODO: CHANGE BACK TO yaw_change_desired_altered*dt
+        #self.mission_theta = self.mission_theta + omega*dt
 
         return load_desired_local_state
 
