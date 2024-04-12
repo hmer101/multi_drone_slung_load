@@ -345,6 +345,11 @@ class Drone(Node):
 
 
     def clbk_cmdloop(self):  
+        # Publish the phase the drone is currently in #TODO: TEMP!!!! REMOVE!!!
+        msg_current_phase = Phase()
+        msg_current_phase.phase = self.phase
+        self.pub_current_phase.publish(msg_current_phase)
+        
         # Safety switch for switching out of offboard mode and back into offboard mode
         if self.vehicle_status is not None: # and if self.env == 'phys':
             # If taken out of offboard mode by RC, and not pre-setup, switch to hold phase
@@ -370,7 +375,9 @@ class Drone(Node):
         if self.pixhawk_pose.flag_local_init_pose_set:
             # Get actual position feedback 
             # Start with drone position (TODO: incorporate load position feedback later)
-            tf_drone_rel_world = utils.lookup_tf('world', self.get_name(), self.tf_buffer, rclpy.time.Time(), self.get_logger())
+            # TODO: RE-ENABLE!!!
+            #tf_drone_rel_world = utils.lookup_tf('world', self.get_name(), self.tf_buffer, rclpy.time.Time(), self.get_logger())
+            pass
 
 
         # Start setup and take-off automatically if in fully-auto mode. 
