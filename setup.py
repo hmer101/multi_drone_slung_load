@@ -32,6 +32,7 @@ setup(
             'gcs_background = swarm_load_carry.gcs_background:main',
             'gcs_user = swarm_load_carry.gcs_user:main',
             'load = swarm_load_carry.load:main',
+            'logging_test = swarm_load_carry.logging_test:main',
         ],
     },
 )
