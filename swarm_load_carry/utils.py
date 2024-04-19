@@ -161,11 +161,11 @@ def transform_orientation(q_BA, q_CB):
 
 
 # Create a new state object that represents an input state transformed into frame2 
-def transform_frames(state, frame2_name, tf_buffer, logger, cs_out_type=CS_type.XYZ):
+def transform_frames(state, frame2_name, tf_buffer, logger, cs_out_type=CS_type.XYZ, print_warn=True):
     state2 = State(f'{frame2_name}', cs_out_type)
 
     # Find the transform
-    tf_f1_rel_f2 = lookup_tf(frame2_name, state.frame, tf_buffer, rclpy.time.Time(), logger)
+    tf_f1_rel_f2 = lookup_tf(frame2_name, state.frame, tf_buffer, rclpy.time.Time(), logger, print_warn)
 
     # Make the transform if the frames exist, otherwise return None
     if tf_f1_rel_f2 == None:
@@ -190,7 +190,7 @@ def transform_frames(state, frame2_name, tf_buffer, logger, cs_out_type=CS_type.
 
 
 ## FEEDBACK
-def get_drone_poses(num_drones, first_drone_num, tf_buffer, logger):
+def get_drone_poses(num_drones, first_drone_num, tf_buffer, logger, print_warn=True):
     drone_positions = np.zeros((num_drones, 3))
     drone_orientations = np.array([np.quaternion(*q) for q in np.zeros((num_drones, 4))])
 
@@ -201,7 +201,7 @@ def get_drone_poses(num_drones, first_drone_num, tf_buffer, logger):
         target_frame = 'world'
         source_frame = f'drone{i+first_drone_num}'
         
-        t = lookup_tf(target_frame, source_frame, tf_buffer, rclpy.time.Time(), logger)
+        t = lookup_tf(target_frame, source_frame, tf_buffer, rclpy.time.Time(), logger, print_warn)
 
         if t != None:
             drone_positions[i, :] = [t.transform.translation.x, t.transform.translation.y, t.transform.translation.z]
