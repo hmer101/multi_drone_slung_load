@@ -233,6 +233,8 @@ class Load(Node):
         if self.load_pose_type == 'quasi-static' or self.load_pose_type == 'visual': #TODO: Add visual pose estimation
             # Set load_state_rel_world using quasi-static method
             load_state_rel_world = self.calc_load_pose_quasi_static()
+
+            self.get_logger().info(f'load_state_rel_world QS: {load_state_rel_world.pos}')
         
         elif self.load_pose_type == 'ground_truth':
             # Set load_state_rel_world using ground truth
@@ -256,10 +258,13 @@ class Load(Node):
 
         # Publish load pose if it has been set and if the initial load pose has been set
         if load_state_rel_world != None:
+            self.get_logger().info(f'load_state_rel_world not NONE!')
+            
             # If all drones are in load setup phase, setup load
             if np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD):
                 self.pixhawk_pose.set_local_init_pose_non_ref(self.get_clock().now().to_msg(), initial_state_rel_world=load_state_rel_world, cs_offset=np.array([0.0, 0.0, 0.0]), item2_name='load_marker', t_item2_rel_item1=self.t_marker_rel_load, R_item2_rel_item1=self.R_marker_rel_load)
 
+                self.get_logger().info(f'SETUP LOAD INIT POSE DONE')
                 # TODO: If in physical, ARM LOAD's PX4/start log
             else:
                 # Reset phase tick counter so load will reset on next setup
@@ -268,10 +273,12 @@ class Load(Node):
             # Set load relative to load initial position for publishing
             load_rel_load_init = utils.transform_frames(load_state_rel_world, f'{self.get_name()}_init', self.tf_buffer, self.get_logger(), cs_out_type=CS_type.ENU)
 
+            self.get_logger().info(f'load_rel_load_init: {load_rel_load_init.pos} {load_rel_load_init.att_q}')
+
             # Publish load relative to load initial position
             if load_rel_load_init != None:
                 utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', self.get_name(), load_rel_load_init.pos, load_rel_load_init.att_q, self.tf_broadcaster)          
-
+                self.get_logger().info(f'Published load local pose!')
             
 
     ## HELPER FUNCTIONS
