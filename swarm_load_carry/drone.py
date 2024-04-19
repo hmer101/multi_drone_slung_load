@@ -411,6 +411,7 @@ class Drone(Node):
                     self.reset_pre_arm()
                 
                 elif self.cnt_phase_ticks > self.cnt_threshold_drone_setup: #Note: Tried flag (self.flag_reset_pre_arm_complete) but didn't work. Perhaps other processes on PX4 need time to reset (i.e. to get to reset what is published on the global pose topic)
+                    #if self.print_debug_msgs:
                     self.get_logger().info(f'flag_gps_home_set: {self.pixhawk_pose.flag_gps_home_set}, self.pixhawk_pose.flag_local_init_pose_set: {self.pixhawk_pose.flag_local_init_pose_set}')
                     
                     # Set initial poses when ready
@@ -508,7 +509,7 @@ class Drone(Node):
                 # Travel at set yawspeed and direction for this, then at no speed setpoint afterwards
                 if self.cnt_phase_ticks < self.cnt_threshold_takeoff_pre_tension:
                     self.cnt_phase_ticks += 1
-                    trajectory_msg = utils.gen_traj_msg_circle_load(desired_state_rel_load_lower_z, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.pixhawk_pose.local_state, yawspeed_scalar=self.yawspeed_drone)
+                    trajectory_msg = utils.gen_traj_msg_circle_load(desired_state_rel_load_lower_z, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.pixhawk_pose.local_state, yawspeed_scalar=self.yawspeed_drone, print_warn=self.print_debug_msgs)
                 else:                   
                     if self.auto_level >=1: # Only automatically transition if not in lowest autonomy mode
                         # TODO: Slowly rise to engage tension

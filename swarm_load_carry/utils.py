@@ -269,14 +269,14 @@ def traj_msg_add_rate_setpoints(traj_msg, rate_desired_setpoints_ros2):
 
 
 # Make drone follow desired load position, at the desired location relative to the load
-def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_state, drone_name, tf_buffer, timestamp, logger, drone_prev_local_state=None, v_scalar=None, a_scalar=None, yawspeed_scalar=None):
+def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_state, drone_name, tf_buffer, timestamp, logger, drone_prev_local_state=None, v_scalar=None, a_scalar=None, yawspeed_scalar=None, print_warn=True):
     # Generate trajectory message
     trajectory_msg = TrajectorySetpoint()
     trajectory_msg.timestamp = timestamp
     
     ## GET LOAD DESIRED STATE
     # Convert load desired state into world frame
-    load_desired_state_rel_world = transform_frames(load_desired_local_state, 'world', tf_buffer, logger, cs_out_type=CS_type.ENU)
+    load_desired_state_rel_world = transform_frames(load_desired_local_state, 'world', tf_buffer, logger, cs_out_type=CS_type.ENU, print_warn=print_warn)
     
     if load_desired_state_rel_world == None:
         return None
@@ -289,7 +289,7 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
     vehicle_desired_state_rel_world.att_q = transform_orientation(vehicle_desired_state_rel_load.att_q, load_desired_state_rel_world.att_q)                             #load_desired_state_rel_world.att_q, vehicle_desired_state_rel_load.att_q)
 
     # Transform relative to drone_init
-    vehicle_desired_state_rel_drone_init = transform_frames(vehicle_desired_state_rel_world, f'{drone_name}_init', tf_buffer, logger, cs_out_type=CS_type.ENU)
+    vehicle_desired_state_rel_drone_init = transform_frames(vehicle_desired_state_rel_world, f'{drone_name}_init', tf_buffer, logger, cs_out_type=CS_type.ENU, print_warn=print_warn)
     
 
     ## CONVERT TO TRAJECTORY MSG
