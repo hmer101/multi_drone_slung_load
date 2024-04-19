@@ -3,6 +3,10 @@
       env: 'sim'
       use_sim_time: false #true
       
+      ## DEBUG SETTINGS
+      print_desired_load_pose: false # In the gcs background node
+      print_debug_msgs: false # In the drone node
+
       ## LOAD SETTINGS
       load_id: 1
       load_pose_type: 'ground_truth' # quasi-static, visual, ground_truth
@@ -12,7 +16,6 @@
 
       ## GCS SETTINGS
       auto_level: 0 # 0 = "Fully manual" - requires checks at intermediate steps, 1 = "semi-automatic" - fewer intermediate steps, 2 = "fully automatic" - turn into offboard mode for completely automatic mission
-      print_desired_load_pose: false # In the gcs background node
       #run_load_node_on: 'load' # 'load', 'drone', 'gcs' We can run the load node on the gcs, a load or a drone
       #run_background_node_on: 'load' # 'load', 'drone'
       #run_user_node_on: 'drone' # 'drone', 'gcs'. Running the user node on the drone means that the RC will be used to send offboard transition commands, otherwise they will be sent from the gcs through WiFi

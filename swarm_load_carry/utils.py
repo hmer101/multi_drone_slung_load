@@ -128,7 +128,7 @@ def broadcast_tf(time, frame_parent, frame_child, pos, att, broadcaster):
     broadcaster.sendTransform(t)
 
 # Looks up a co-ordinate frame transform 
-def lookup_tf(target_frame, source_frame, tf_buffer, time, logger):
+def lookup_tf(target_frame, source_frame, tf_buffer, time, logger, print_warn=True):
     t = None
     
     try:
@@ -137,7 +137,8 @@ def lookup_tf(target_frame, source_frame, tf_buffer, time, logger):
             source_frame,
             time)
     except TransformException as ex:
-        logger.warn(f'Could not find frame transform: {target_frame} to {source_frame}: {ex}')
+        if print_warn:
+            logger.warn(f'Could not find frame transform: {target_frame} to {source_frame}: {ex}')
         pass
     
     return t

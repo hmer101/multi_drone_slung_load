@@ -136,6 +136,7 @@ class GCSUser(Node):
 
             # Update the previous value of aux1 output
             self.rc_aux_1_prev = self.rc_aux_1
+            #self.get_logger().info(f'RC Aux1 changed to: {self.rc_aux_1}')
 
 
     ## MISSION CONTROL

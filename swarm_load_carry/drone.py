@@ -39,6 +39,8 @@ class Drone(Node):
 
         ## PARAMETERS
         self.declare_parameter('env', 'phys')
+        
+        self.declare_parameter('print_debug_msgs', True)
 
         self.declare_parameter('load_id', 1)
         self.declare_parameter('load_pose_type', 'quasi-static')
@@ -79,6 +81,8 @@ class Drone(Node):
 
 
         self.env = self.get_parameter('env').get_parameter_value().string_value
+
+        self.print_debug_msgs = self.get_parameter('print_debug_msgs').get_parameter_value().bool_value
 
         self.load_id = self.get_parameter('load_id').get_parameter_value().integer_value
         self.load_name = f'load{self.load_id}'
@@ -370,7 +374,7 @@ class Drone(Node):
         if self.pixhawk_pose.flag_local_init_pose_set:
             # Get actual position feedback 
             # Start with drone position (TODO: incorporate load position feedback later)
-            tf_drone_rel_world = utils.lookup_tf('world', self.get_name(), self.tf_buffer, rclpy.time.Time(), self.get_logger())
+            tf_drone_rel_world = utils.lookup_tf('world', self.get_name(), self.tf_buffer, rclpy.time.Time(), self.get_logger(), print_warn=self.print_debug_msgs)
 
 
         # Start setup and take-off automatically if in fully-auto mode. 
@@ -390,7 +394,7 @@ class Drone(Node):
             trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger())
             #trajectory_msg_with_speed = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.vehicle_local_state, v_scalar=self.vel_drone, yawspeed_scalar=self.yawspeed_drone)
 
-            if trajectory_msg == None:
+            if trajectory_msg == None and self.print_debug_msgs:
                 self.get_logger().warn(f'Load or drone initial position not found. Skipping this command loop.')
                 return
 
@@ -439,7 +443,7 @@ class Drone(Node):
             # load pulls the transforms to set up, otherwise can inadvertently pull old transforms
             case Phase.PHASE_SETUP_LOAD:
                 # Check if load's setup is complete
-                tf_load_init_rel_world = utils.lookup_tf('world', f'{self.load_name}_init', self.tf_buffer, rclpy.time.Time(), self.get_logger())
+                tf_load_init_rel_world = utils.lookup_tf('world', f'{self.load_name}_init', self.tf_buffer, rclpy.time.Time(), self.get_logger(), print_warn=self.print_debug_msgs)
 
                 # Exit setup only once load's initial pose has been set
                 if tf_load_init_rel_world != None and self.cnt_phase_ticks > self.cnt_threshold_drone_setup:
