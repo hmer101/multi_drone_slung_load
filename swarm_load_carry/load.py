@@ -234,7 +234,8 @@ class Load(Node):
             # Set load_state_rel_world using quasi-static method
             load_state_rel_world = self.calc_load_pose_quasi_static()
 
-            self.get_logger().info(f'load_state_rel_world QS: {load_state_rel_world.pos}')
+            self.get_logger().info(f'load_state_rel_world QS calced!')
+            
         
         elif self.load_pose_type == 'ground_truth':
             # Set load_state_rel_world using ground truth
@@ -258,7 +259,7 @@ class Load(Node):
 
         # Publish load pose if it has been set and if the initial load pose has been set
         if load_state_rel_world != None:
-            self.get_logger().info(f'load_state_rel_world not NONE!')
+            self.get_logger().info(f'load_state_rel_world QS: {load_state_rel_world.pos}')
             
             # If all drones are in load setup phase, setup load
             if np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD):
@@ -273,10 +274,9 @@ class Load(Node):
             # Set load relative to load initial position for publishing
             load_rel_load_init = utils.transform_frames(load_state_rel_world, f'{self.get_name()}_init', self.tf_buffer, self.get_logger(), cs_out_type=CS_type.ENU)
 
-            self.get_logger().info(f'load_rel_load_init: {load_rel_load_init.pos} {load_rel_load_init.att_q}')
-
             # Publish load relative to load initial position
             if load_rel_load_init != None:
+                self.get_logger().info(f'load_rel_load_init: {load_rel_load_init.pos} {load_rel_load_init.att_q}')
                 utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', self.get_name(), load_rel_load_init.pos, load_rel_load_init.att_q, self.tf_broadcaster)          
                 self.get_logger().info(f'Published load local pose!')
             
