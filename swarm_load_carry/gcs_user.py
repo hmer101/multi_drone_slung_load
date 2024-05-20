@@ -55,8 +55,19 @@ class GCSUser(Node):
         
 
         ## VARIABLES
+        # Command list - select based on level of autonomy
+        self.command_list = None # List of commands available to the user
+        
+        match(self.auto_level):
+            case 0: # Highly manual mode
+                self.command_list = ['t = takeoff', 'f = move into formation', 'e = engage tension', 'm = mission start', 'l = land', 'h = hold', 'k = kill'] #, 'q= quit'] #'u = lift load up', 
+            case 1: # Semi-automatic mode
+                self.command_list = ['t = takeoff', 'm = mission start', 'l = land', 'h = hold', 'k = kill'] #, 'q= quit']
+            # case 2: # Fully automatic mode
+            #     self.command_list = None
+
         if self.user_interaction_through_rc:
-            self.rc_aux_1 = 0.0 # Stores the value of the aux1 output from the RC
+            self.rc_aux_1 = 0.0 # Stores the value of the aux1 output from the # Command list - select based on level of autonomyRC
             self.rc_aux_1_prev = 0.0 # Stores the previous value of aux1 output to detect changes
 
             # Timer for actioning any changes
@@ -98,15 +109,7 @@ class GCSUser(Node):
                 while not self.cli_phase_change[i-self.first_drone_num].wait_for_service(timeout_sec=3.0): #1.0
                     self.get_logger().info(f'Waiting for phase change service: drone {i}')
 
-            ## Command list - select based on level of autonomy
-            match(self.auto_level):
-                case 0: # Highly manual mode
-                    self.command_list = ['t = takeoff', 'f = move into formation', 'e = engage tension', 'm = mission start', 'l = land', 'h = hold', 'k = kill', 'q= quit'] #'u = lift load up', 
-                case 1: # Semi-automatic mode
-                    self.command_list = ['t = takeoff', 'm = mission start', 'l = land', 'h = hold', 'k = kill', 'q= quit']
-                case 2: # Fully automatic mode
-                    self.command_list = []
-
+        
 
         self.get_logger().info('Setup complete')
 
@@ -145,7 +148,7 @@ class GCSUser(Node):
         cmd = None
 
         # Check if command_list is not empty
-        if self.command_list:
+        if self.command_list is not None:
             # Convert the command list into a formatted string for the prompt
             command_prompt = ', '.join(self.command_list) + ':'
         else:

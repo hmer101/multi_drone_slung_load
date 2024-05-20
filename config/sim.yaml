@@ -11,7 +11,7 @@
       load_id: 1
       load_pose_type: 'ground_truth' # quasi-static, visual, ground_truth
       evaluate: true # If you want to evaluate the tracking performance of the load
-      show_markers: 2 # Show the detected markers 0 = No, 1 = Yes all, 2 = Drone 1 only # TODO: Replace with ENUM?
+      show_markers: 0 # Show the detected markers 0 = No, 1 = Yes all, 2 = Drone 1 only # TODO: Replace with ENUM?
       marker_edge_length: 0.08 # m
 
       ## GCS SETTINGS
@@ -29,7 +29,7 @@
       ## DRONE SETTINGS
       first_drone_num: 1 #1
       num_drones: 3
-      num_cameras: 2 # 0 if cameras are off
+      num_cameras: 0 # 0 if cameras are off
     
       drone_order: [1, 2, 3] #[1, 2, 3] #ACW from load's x axis
 
@@ -54,7 +54,7 @@
       # Formation dimensions
       height_drone_cs_rel_gnd: 0.0 #0.24 # m
       height_load_cs_rel_gnd: 0.0 #0.1 # m
-      height_load_pre_tension: -0.4 # m
+      height_load_pre_tension: -1.0 #-0.4 # m
 
       takeoff_height_load: 1.0 #m
       takeoff_height_load_max: 3.0 #m # Safety feature - maximum height load will be commanded to take off
@@ -87,7 +87,7 @@
 
       cnt_threshold_drone_setup: 50 #5/timer_period_drone # Tried 3, sometimes issues (weird circling issue of drone 2)
       cnt_threshold_takeoff_start: 30 #3/timer_period_drone # INCREASE IF NEEDED
-      cnt_threshold_takeoff_pre_tension: 50
+      cnt_threshold_takeoff_pre_tension: 100 #50
       cnt_threshold_fully_auto_pre_takeoff: 50
       cnt_threshold_fully_auto_mission: 50
       cnt_threshold_land_pre_descent: 50

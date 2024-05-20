@@ -27,7 +27,7 @@ class State():
         self.frame = frame
         self.cs_type = cs_type
 
-        self.pos = np.copy(pos)      # Position relative to frame in given co-ordinate system type
+        self.pos = np.copy(pos)     # Position relative to frame in given co-ordinate system type
         
         self.att_q = att.copy()     # Attitude relative to frame as a quaternion [w, x, y, z] (note quaternionic and PX4 default have w first. ROS quaternion msg doesn't have a vector - must specify .x,.y,.z,.w components)
         self.vel = np.copy(vel)     # Velocity relative to frame in given co-ordinate system type

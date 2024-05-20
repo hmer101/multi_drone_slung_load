@@ -278,7 +278,7 @@ class Load(Node):
             if load_rel_load_init != None:
                 self.get_logger().info(f'load_rel_load_init: {load_rel_load_init.pos} {load_rel_load_init.att_q}')
                 utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', self.get_name(), load_rel_load_init.pos, load_rel_load_init.att_q, self.tf_broadcaster)          
-                self.get_logger().info(f'Published load local pose!')
+                #self.get_logger().info(f'Published load local pose!')
             
 
     ## HELPER FUNCTIONS

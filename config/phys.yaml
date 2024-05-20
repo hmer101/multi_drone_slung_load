@@ -65,7 +65,7 @@
       # Formation dimensions
       height_drone_cs_rel_gnd: 0.0 #0.24 # m
       height_load_cs_rel_gnd: 0.0 #0.1 # m
-      height_load_pre_tension: -0.4 # m
+      height_load_pre_tension: -1.0 # m
 
       takeoff_height_load: 1.0 #m
       takeoff_height_load_max: 3.0 #m # Safety feature - maximum height load will be commanded to take off
@@ -98,7 +98,7 @@
 
       cnt_threshold_drone_setup: 50 #5/timer_period_drone # Tried 3, sometimes issues (weird circling issue of drone 2)
       cnt_threshold_takeoff_start: 30 #3/timer_period_drone # INCREASE IF NEEDED
-      cnt_threshold_takeoff_pre_tension: 50
+      cnt_threshold_takeoff_pre_tension: 100 #50
       cnt_threshold_fully_auto_pre_takeoff: 50
       cnt_threshold_fully_auto_mission: 50
       cnt_threshold_land_pre_descent: 50
