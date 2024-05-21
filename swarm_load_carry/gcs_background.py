@@ -209,7 +209,7 @@ class GCSBackground(Node):
             for i in range(self.num_drones):
                 if self.futures_set_drone_poses_rel_load[i] != None:
                     if not self.futures_set_drone_poses_rel_load[i].done():
-                        self.get_logger().info(f'Waiting for drone {i}\'s pose rel load to be set')
+                        self.get_logger().info(f'Waiting for drone {i+1}\'s pose rel load to be set')
                         return
         
         # PHASES

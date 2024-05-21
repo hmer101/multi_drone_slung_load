@@ -39,6 +39,7 @@ class Load(Node):
 
         ## PARAMETERS
         self.declare_parameter('env', 'phys')
+        self.declare_parameter('print_debug_msgs', True)
         self.declare_parameter('load_pose_type', 'quasi-static')
         self.declare_parameter('num_drones', 1)
         self.declare_parameter('first_drone_num', 1)
@@ -56,6 +57,7 @@ class Load(Node):
 
         self.declare_parameter('timer_period_load', 0.2)
 
+        self.print_debug_msgs = self.get_parameter('print_debug_msgs').get_parameter_value().bool_value
         self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
         self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
         self.env = self.get_parameter('env').get_parameter_value().string_value
@@ -234,7 +236,7 @@ class Load(Node):
             # Set load_state_rel_world using quasi-static method
             load_state_rel_world = self.calc_load_pose_quasi_static()
 
-            self.get_logger().info(f'load_state_rel_world QS calced!')
+            #self.get_logger().info(f'load_state_rel_world QS calced!')
             
         
         elif self.load_pose_type == 'ground_truth':
@@ -259,7 +261,7 @@ class Load(Node):
 
         # Publish load pose if it has been set and if the initial load pose has been set
         if load_state_rel_world != None:
-            self.get_logger().info(f'load_state_rel_world QS: {load_state_rel_world.pos}')
+            #self.get_logger().info(f'load_state_rel_world QS: {load_state_rel_world.pos}')
             
             # If all drones are in load setup phase, setup load
             if np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD):
@@ -276,7 +278,9 @@ class Load(Node):
 
             # Publish load relative to load initial position
             if load_rel_load_init != None:
-                self.get_logger().info(f'load_rel_load_init: {load_rel_load_init.pos} {load_rel_load_init.att_q}')
+                if(self.print_debug_msgs):
+                    self.get_logger().info(f'load_rel_load_init: {load_rel_load_init.pos} {load_rel_load_init.att_q}')
+                
                 utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', self.get_name(), load_rel_load_init.pos, load_rel_load_init.att_q, self.tf_broadcaster)          
                 #self.get_logger().info(f'Published load local pose!')
             
