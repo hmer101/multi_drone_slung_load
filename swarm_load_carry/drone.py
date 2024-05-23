@@ -229,7 +229,7 @@ class Drone(Node):
             self.sub_global_origin = self.create_subscription(
                 GlobalPose,
                 f'/px4_{self.first_drone_num}/out/global_init_pose', 
-                self.pixhawk_pose.clbk_global_origin, #lambda msg: self.pixhawk_pose.clbk_global_origin(msg),
+                lambda msg: self.pixhawk_pose.clbk_global_origin(msg), #self.pixhawk_pose.clbk_global_origin, #
                 qos_profile)
         
         # Ground truth
@@ -418,22 +418,22 @@ class Drone(Node):
                 
                 elif self.cnt_phase_ticks > self.cnt_threshold_drone_setup: #Note: Tried flag (self.flag_reset_pre_arm_complete) but didn't work. Perhaps other processes on PX4 need time to reset (i.e. to get to reset what is published on the global pose topic)
                     #if self.print_debug_msgs:
+                    # Note that the vehicle needs to be armed for the flag_gps_home_set to be true
                     self.get_logger().info(f'flag_gps_home_set: {self.pixhawk_pose.flag_gps_home_set}, self.pixhawk_pose.flag_local_init_pose_set: {self.pixhawk_pose.flag_local_init_pose_set}')
                     
                     # Set initial poses when ready
                     if self.pixhawk_pose.flag_gps_home_set and not self.pixhawk_pose.flag_local_init_pose_set:                    
                         # Rest of setup differs for first drone and others
                         if self.drone_id == self.first_drone_num:
-                            #self.set_local_init_pose_first_drone()
                             self.pixhawk_pose.set_local_init_pose_ref(self.get_clock().now().to_msg(), cs_offset=np.array([0.0, 0.0, self.height_drone_cs_rel_gnd]), \
                                                                       state_gt=self.vehicle_state_gt, item2_name='camera', t_item2_rel_item1=self.t_cam_rel_pixhawk, R_item2_rel_item1=self.R_cam_rel_pixhawk)
 
                         else:
                             # Set init poses once the first drone's initial position has been received
-                            if self.pixhawk_pose.global_origin_state != self.pixhawk_pose.global_origin_state_prev:
+                            #default_state = State('globe', CS_type.LLA)
+                            if self.pixhawk_pose.global_origin_state != self.pixhawk_pose.global_origin_state_prev: #self.pixhawk_pose.global_origin_state != default_state: #
                                 self.pixhawk_pose.set_local_init_pose_non_ref(self.get_clock().now().to_msg(), initial_state_rel_world=None, cs_offset=np.array([0.0, 0.0, self.height_drone_cs_rel_gnd]), \
                                                                  item2_name='camera', t_item2_rel_item1=self.t_cam_rel_pixhawk, R_item2_rel_item1=self.R_cam_rel_pixhawk)
-                                #self.set_local_init_pose_later_drones()
                                 self.pixhawk_pose.global_origin_state_prev = self.pixhawk_pose.global_origin_state.copy()
                     
                     # Exit setup only once drone's GPS home and initial positions have been set, 
