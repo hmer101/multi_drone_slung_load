@@ -18,7 +18,7 @@ ssh_and_view_logs() {
     local count=0  # Initialize a counter for launched devices
     local line_num=0  # Initialize a line counter
 
-    while IFS= read -r line; do
+    while IFS=' ' read -r uuid ip_addr; do #line
         # Start at start_num and end at num_devices
         line_num=$((line_num + 1))
 
@@ -32,13 +32,14 @@ ssh_and_view_logs() {
         fi
 
         # Extract info from txt file to ssh into devices
-        device_uuid=${line}
+        device_uuid=${uuid} #${line}
+        device_ip=${ip_addr}
 
         # Get container info from balena
-        device_container_main=$(echo 'balena container ls --format "{{.ID}}" | head -n 1' | balena ssh $device_uuid.local)
+        device_container_main=$(echo 'balena container ls --format "{{.ID}}" | head -n 1' | balena ssh $device_ip) #$device_uuid.local)
 
         # Open gnome-terminal tab to view logs
-        gnome-terminal --tab -- bash -c "echo 'balena logs $device_container_main -f; exit;' | balena ssh $device_uuid.local"
+        gnome-terminal --tab -- bash -c "echo 'balena logs $device_container_main -f; exit;' | balena ssh $device_ip" #$device_uuid.local"
 
         # Increment the device count
         count=$((count + 1))
