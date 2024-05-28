@@ -133,7 +133,11 @@ class Drone(Node):
         tf_static_broadcaster_init_pose = StaticTransformBroadcaster(self) #self.
         tf_static_broadcaster_cam_rel_drone = StaticTransformBroadcaster(self)
         tf_static_broadcaster_cam_rel_drone_gt = StaticTransformBroadcaster(self)
-        tf_static_broadcaster_world_rel_gt = StaticTransformBroadcaster(self)
+        tf_static_broadcaster_world_rel_gt = None
+        
+        # Only first drone broadcasts world to ground truth
+        if self.drone_id == self.first_drone_num:
+            tf_static_broadcaster_world_rel_gt = StaticTransformBroadcaster(self)
         
 
         ## VARIABLES
@@ -347,7 +351,7 @@ class Drone(Node):
             case Phase.PHASE_KILL:
                 self.phase=Phase.PHASE_KILL
 
-
+        self.cnt_phase_ticks = 0 # Reset phase counter
         response.success = True
         self.get_logger().info(f'Requested change to phase: {self.phase}')
 
@@ -539,6 +543,7 @@ class Drone(Node):
                 #Takeoff complete
                 if tf_drone_rel_world.transform.translation.z>=(self.takeoff_height_load+self.height_drone_rel_load-self.pos_threshold):
                     self.phase = Phase.PHASE_TAKEOFF_END 
+                    self.cnt_phase_ticks = 0
                     
                     self.get_logger().info(f'TAKEOFF COMPLETE')
 
@@ -548,12 +553,13 @@ class Drone(Node):
             # Takeoff complete - hover at takeoff end location
             case Phase.PHASE_TAKEOFF_END:
                 self.pub_trajectory.publish(trajectory_msg)
-                self.cnt_phase_ticks = 0
+                #self.cnt_phase_ticks = 0
 
 
             # Run main offboard mission
             case Phase.PHASE_MISSION_START:
                 self.pub_trajectory.publish(trajectory_msg)
+                #self.cnt_phase_ticks = 0
                     
 
             # Run land 
@@ -571,6 +577,7 @@ class Drone(Node):
             case Phase.PHASE_LAND_DESCENT:
                 if tf_drone_rel_world.transform.translation.z<=(self.height_load_pre_tension+self.height_drone_rel_load-self.pos_threshold):
                     self.phase = Phase.PHASE_LAND_POST_LOAD_DOWN
+                    self.cnt_phase_ticks = 0
                     self.get_logger().info(f'Load placed on ground') 
 
                 # Send descending setpoint
