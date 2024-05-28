@@ -139,21 +139,24 @@ class PosePixhawk:
 
         # Publish other static transforms
         # Camera relative to drone or marker relative to load etc.
-        #if item2_name is not None and t_item2_rel_item1 is not None and R_item2_rel_item1 is not None:
-        self.logger.info(f'item2_name: {item2_name}, t_item2_rel_item1: {t_item2_rel_item1}, R_item2_rel_item1: {R_item2_rel_item1}') # TODO: Remove
+        
+        self.logger.info(f'item2_name: {item2_name}')
+        self.logger.info(f't_item2_rel_item1: {t_item2_rel_item1}')
+        self.logger.info(f'R_item2_rel_item1: {R_item2_rel_item1}') # TODO: Remove
         self.logger.info('PUB ITEM 2 REL ITEM 1 TF -  START') # TODO: Remove
 
-        q_list = ft.quaternion_from_euler(R_item2_rel_item1[0], R_item2_rel_item1[1], R_item2_rel_item1[2])
-        r_cam_rel_pixhawk = np.quaternion(*q_list)
-        utils.broadcast_tf(time, f'{self.name}', f'{item2_name}{self.id}', t_item2_rel_item1, r_cam_rel_pixhawk, self.tf_static_broadcaster_item2_rel_item1)
-        
-        # Also broadcast ground truth if evaluating or if this is the load and ground truth feedback is being used
-        if self.evaluate == True or (('load' in self.name) and self.load_pose_type == 'ground_truth'):  
-            utils.broadcast_tf(time, f'{self.name}_gt', f'{item2_name}{self.id}_gt', t_item2_rel_item1, r_cam_rel_pixhawk, self.tf_static_broadcaster_item2_rel_item1_gt)
+        if item2_name is not None and t_item2_rel_item1 is not None and R_item2_rel_item1 is not None:
+            q_list = ft.quaternion_from_euler(R_item2_rel_item1[0], R_item2_rel_item1[1], R_item2_rel_item1[2])
+            r_cam_rel_pixhawk = np.quaternion(*q_list)
+            utils.broadcast_tf(time, f'{self.name}', f'{item2_name}{self.id}', t_item2_rel_item1, r_cam_rel_pixhawk, self.tf_static_broadcaster_item2_rel_item1)
+            
+            # Also broadcast ground truth if evaluating or if this is the load and ground truth feedback is being used
+            if self.evaluate == True or (('load' in self.name) and self.load_pose_type == 'ground_truth'):  
+                utils.broadcast_tf(time, f'{self.name}_gt', f'{item2_name}{self.id}_gt', t_item2_rel_item1, r_cam_rel_pixhawk, self.tf_static_broadcaster_item2_rel_item1_gt)
 
-            self.logger.info('PUB ITEM 2 REL ITEM 1 TF -  GT') # TODO: Remove
+                self.logger.info('PUB ITEM 2 REL ITEM 1 TF -  GT') # TODO: Remove
 
-        self.logger.info('PUB ITEM 2 REL ITEM 1 TF -  END') # TODO: Remove
+            self.logger.info('PUB ITEM 2 REL ITEM 1 TF -  END') # TODO: Remove
 
         # Send complete message
         self.flag_local_init_pose_set = True 
@@ -205,4 +208,4 @@ class PosePixhawk:
             # Set local init pose (relative to base CS)
             initial_t = np.array([trans_E, trans_N, trans_U]) + cs_offset
 
-            self._set_local_init_pose(initial_t, self.initial_global_state.att_q, time, t_item2_rel_item1, R_item2_rel_item1)
+            self._set_local_init_pose(initial_t, self.initial_global_state.att_q, time, item2_name, t_item2_rel_item1, R_item2_rel_item1)
