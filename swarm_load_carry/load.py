@@ -273,7 +273,7 @@ class Load(Node):
                 # Reset phase tick counter so load will reset on next setup
                 self.cnt_phase_ticks = 0
 
-            # Set load relative to load initial position for publishing
+            # Set load relative to load initial position for publishing. Note: this is same as self.pixhawk_pose.local_state for phys 
             load_rel_load_init = utils.transform_frames(load_state_rel_world, f'{self.get_name()}_init', self.tf_buffer, self.get_logger(), cs_out_type=CS_type.ENU)
 
             # Publish load relative to load initial position
