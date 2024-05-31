@@ -437,14 +437,13 @@ class Drone(Node):
 
                         else:
                             # Set init poses once the first drone's initial position has been received
-                            #default_state = State('globe', CS_type.LLA)
                             if self.pixhawk_pose.global_origin_state != self.pixhawk_pose.global_origin_state_prev: #self.pixhawk_pose.global_origin_state != default_state: #
                                 self.pixhawk_pose.set_local_init_pose_non_ref(self.get_clock().now().to_msg(), initial_state_rel_world=None, cs_offset=np.array([0.0, 0.0, self.height_drone_cs_rel_gnd]), \
                                                                  item2_name='camera', t_item2_rel_item1=self.t_cam_rel_pixhawk, R_item2_rel_item1=self.R_cam_rel_pixhawk)
                                 self.pixhawk_pose.global_origin_state_prev = self.pixhawk_pose.global_origin_state.copy()
                     
                     # Exit setup only once drone's GPS home and initial positions have been set
-                    elif tf_drone_init_rel_world != None: # Move on when TF lookup works #self.pixhawk_pose.flag_gps_home_set and self.pixhawk_pose.flag_local_init_pose_set: #and self.flag_desired_pose_rel_load_set: # and (tf_load_init_rel_world != None):
+                    elif tf_drone_init_rel_world != None: # Move on when TF lookup works 
                         self.cnt_phase_ticks = 0
                         self.phase = Phase.PHASE_SETUP_LOAD
                         self.get_logger().info(f'Drone setup complete')
