@@ -514,19 +514,22 @@ class Drone(Node):
             case Phase.PHASE_TAKEOFF_PRE_TENSION:
                 # Send pre-tension setpoint: in formation but slightly below height
                 desired_state_rel_load_lower_z = self.vehicle_desired_state_rel_load.copy()
+                desired_yawspeed = None
 
                 # Wait before attempt to pick up load as get into formation
                 # Travel at set yawspeed and direction for this, then at no speed setpoint afterwards
                 if self.cnt_phase_ticks < self.cnt_threshold_takeoff_pre_tension:
-                    self.cnt_phase_ticks += 1
                     # Wait at lower height
                     desired_state_rel_load_lower_z.pos[2] += self.height_load_pre_tension
+                    desired_yawspeed = self.yawspeed_drone
+
+                    self.cnt_phase_ticks += 1
                     #trajectory_msg = utils.gen_traj_msg_circle_load(desired_state_rel_load_lower_z, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.pixhawk_pose.local_state, yawspeed_scalar=self.yawspeed_drone, print_warn=self.print_debug_msgs)
                 
                 # Slowly rise to close to engage tension level
                 elif tf_drone_rel_world.transform.translation.z<=(self.vehicle_desired_state_rel_load.pos[2]-self.pos_threshold): # TODO: Account for load height
-                    #desired_state_rel_load_lower_z.pos[2] += self.height_load_pre_tension
                     desired_state_rel_load_lower_z.pos[2] = desired_state_rel_load_lower_z.pos[2]+self.height_load_pre_tension+self.vel_load_vertical_slow*self.timer_period_drone*(self.cnt_phase_ticks-self.cnt_threshold_takeoff_pre_tension) #min(self.vehicle_desired_state_rel_load.pos[2], )  # Reduce the amount below the pre-tension height
+
                     self.cnt_phase_ticks += 1
 
                 elif self.auto_level >=1:
@@ -536,7 +539,7 @@ class Drone(Node):
                     self.get_logger().info(f'Takeoff pre-tension complete') 
 
                 # Send lower trajectory msg while in this mode
-                trajectory_msg = utils.gen_traj_msg_circle_load(desired_state_rel_load_lower_z, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.pixhawk_pose.local_state, yawspeed_scalar=self.yawspeed_drone, print_warn=self.print_debug_msgs)
+                trajectory_msg = utils.gen_traj_msg_circle_load(desired_state_rel_load_lower_z, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.pixhawk_pose.local_state, yawspeed_scalar=desired_yawspeed, print_warn=self.print_debug_msgs)
                 self.pub_trajectory.publish(trajectory_msg)
                      
 
