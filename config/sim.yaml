@@ -3,9 +3,13 @@
       env: 'sim'
       use_sim_time: false #true
       
+      ## DIRECTORIES 
+      dir_rosbag: data/
+
       ## DEBUG SETTINGS
       print_desired_load_pose: false # In the gcs background node
       print_debug_msgs: false # In the drone node
+      logging_rosbag: false # If true, rosbags will be saved to the dir_rosbag directory
 
       ## LOAD SETTINGS
       load_id: 1
@@ -71,10 +75,7 @@
       cable_length: 2.2 #m
       load_connection_point_r: 0.08 #m
 
-      # Camera and markers
-      t_cam_rel_pixhawk: [0.1, 0.03, -0.025] # Camera translation relative to PX4 (i.e. drone body)
-      R_cam_rel_pixhawk: [-2.61799, 0.0, -1.570796327] #[-2.0944, 0.0, -1.570796327] # Camera rotation relative to PX4 (i.e. drone body)
-
+      # Camera and markers/
       t_marker_rel_load: [0.0, 0.0, 0.1] # Marker translation relative to load
       R_marker_rel_load: [0.0, 0.0, 1.570796327] # Marker rotation relative to load
 
@@ -98,4 +99,3 @@
       ## TOPIC NAMES
       topic_img_rgb: /out/camera
       topic_cam_info_color: /out/camera_info
-      

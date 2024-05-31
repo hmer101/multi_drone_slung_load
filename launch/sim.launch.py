@@ -21,6 +21,7 @@ def generate_launch_description():
     num_drones = params["/**"]["ros__parameters"]["num_drones"]
     first_drone_num = params["/**"]["ros__parameters"]["first_drone_num"]
     num_cameras = params["/**"]["ros__parameters"]["num_cameras"]
+    logging_rosbag = params["/**"]["ros__parameters"]["logging_rosbag"]
     
 
     ## INCLUDE ALL POSSIBLE LAUNCH TASKS
@@ -43,6 +44,11 @@ def generate_launch_description():
          get_package_share_directory('swarm_load_carry'), 'launch'),
          '/gz_bridge.launch.py'])
       )  
+    
+    log_rosbag = ExecuteProcess(
+            cmd=['ros2', 'launch', 'swarm_load_carry', 'logging.launch.py', 'env:=sim'],
+            output='screen'
+        )
 
     ## COMPILE LAUNCH DESCRIPTION FROM SELECTED COMPONENTS (alter sim.yaml to change which components are included)
     launch_description = []
@@ -73,6 +79,10 @@ def generate_launch_description():
 
     # Gazebo parameter and image bridges
     launch_description.append(gz_bridge)
+
+    # Logging
+    if logging_rosbag:
+        launch_description.append(log_rosbag)
 
 
     ## RUN LAUNCH FILES

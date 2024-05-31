@@ -24,12 +24,20 @@ def generate_launch_description():
     run_load_node_on = params["/**"]["ros__parameters"]["run_load_node_on"]
     run_background_node_on = params["/**"]["ros__parameters"]["run_background_node_on"]
     run_user_node_on = params["/**"]["ros__parameters"]["run_user_node_on"]
+    run_logging_on = params["/**"]["ros__parameters"]["run_logging_on"]
 
     ## INCLUDE LAUNCH FILES       
     load = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('swarm_load_carry'), 'launch'),
          '/load.launch.py']),
+      launch_arguments={'env': 'phys'}.items()
+      )
+    
+    logging = IncludeLaunchDescription(
+      PythonLaunchDescriptionSource([os.path.join(
+         get_package_share_directory('swarm_load_carry'), 'launch'),
+         '/logging.launch.py']),
       launch_arguments={'env': 'phys'}.items()
       )
 
@@ -75,6 +83,9 @@ def generate_launch_description():
     if evaluate or load_pose_type == "ground_truth":
         launch_description.append(micro_xcre_agent)
 
+    # Launch logging node if required
+    if run_logging_on == "load":
+        launch_description.append(logging)
 
     ## RUN LAUNCH FILES
     return LaunchDescription(launch_description)

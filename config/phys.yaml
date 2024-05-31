@@ -3,9 +3,13 @@
       env: 'phys'
       #use_sim_time: false #true
 
+      ## DIRECTORIES 
+      dir_rosbag: data/
+
       ## DEBUG SETTINGS
       print_desired_load_pose: false # In the gcs background node
       print_debug_msgs: false # In the drone node (can add to other nodes too). TODO: Could properly use ROS logging levels: https://docs.ros.org/en/humble/Tutorials/Demos/Logging-and-logger-configuration.html
+      run_logging_on: 'load' # If not empty, rosbags will be saved to the dir_rosbag directory on the selected device
 
       ## LOAD SETTINGS
       load_id: 1
