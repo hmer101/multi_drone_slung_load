@@ -47,7 +47,7 @@
       vel_load_vertical_fast: 0.3 # m/s
       #yawspeed_load: 0.393
 
-      vel_drone: 0.1 # m/s
+      vel_drone: 0.3 #0.1 # m/s
       yawspeed_drone: 0.393 # rad/s    
 
       # Heights/distances/dimensions

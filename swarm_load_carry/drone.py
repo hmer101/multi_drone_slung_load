@@ -425,6 +425,9 @@ class Drone(Node):
                     # Note that the vehicle needs to be armed for the flag_gps_home_set to be true
                     self.get_logger().info(f'flag_gps_home_set: {self.pixhawk_pose.flag_gps_home_set}, self.pixhawk_pose.flag_local_init_pose_set: {self.pixhawk_pose.flag_local_init_pose_set}')
                     
+                    # Check if initial poses have been set
+                    tf_drone_init_rel_world = utils.lookup_tf('world', f'drone{self.drone_id}_init', self.tf_buffer, rclpy.time.Time(), self.get_logger(), print_warn=self.print_debug_msgs)
+
                     # Set initial poses when ready
                     if self.pixhawk_pose.flag_gps_home_set and not self.pixhawk_pose.flag_local_init_pose_set:                    
                         # Rest of setup differs for first drone and others
@@ -440,9 +443,8 @@ class Drone(Node):
                                                                  item2_name='camera', t_item2_rel_item1=self.t_cam_rel_pixhawk, R_item2_rel_item1=self.R_cam_rel_pixhawk)
                                 self.pixhawk_pose.global_origin_state_prev = self.pixhawk_pose.global_origin_state.copy()
                     
-                    # Exit setup only once drone's GPS home and initial positions have been set, 
-                    # the drone's desired pose relative to the load has been set and the load's initial pose has been set
-                    elif self.pixhawk_pose.flag_gps_home_set and self.pixhawk_pose.flag_local_init_pose_set: #and self.flag_desired_pose_rel_load_set: # and (tf_load_init_rel_world != None):
+                    # Exit setup only once drone's GPS home and initial positions have been set
+                    elif tf_drone_init_rel_world != None: # Move on when TF lookup works #self.pixhawk_pose.flag_gps_home_set and self.pixhawk_pose.flag_local_init_pose_set: #and self.flag_desired_pose_rel_load_set: # and (tf_load_init_rel_world != None):
                         self.cnt_phase_ticks = 0
                         self.phase = Phase.PHASE_SETUP_LOAD
                         self.get_logger().info(f'Drone setup complete')

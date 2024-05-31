@@ -230,6 +230,9 @@ class Load(Node):
                 self.reset_pre_arm()
 
             self.cnt_phase_ticks += 1
+        else:
+            # Reset phase tick counter so load will reset on next setup
+            self.cnt_phase_ticks = 0
 
         # Publish load pose with selected method
         if self.load_pose_type == 'quasi-static' or self.load_pose_type == 'visual': #TODO: Add visual pose estimation
@@ -251,7 +254,6 @@ class Load(Node):
                 # Cannot find the transform from the load_init to the world frame - local init pose hasn't been set yet
                 # Can set it if the global origin state and the gps home have been set
                 # Only set if the system is in the setup load phase
-                # TODO: TO TEST.
                 if load_state_rel_world is None and self.pixhawk_pose.flag_gps_home_set and \
                     self.pixhawk_pose.global_origin_state != self.pixhawk_pose.global_origin_state_prev and np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD):
                     
@@ -264,14 +266,14 @@ class Load(Node):
             #self.get_logger().info(f'load_state_rel_world QS: {load_state_rel_world.pos}')
             
             # If all drones are in load setup phase, setup load
-            if np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD):
+            if np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD) and not self.pixhawk_pose.flag_local_init_pose_set: #and self.pixhawk_pose.flag_gps_home_set 
                 self.pixhawk_pose.set_local_init_pose_non_ref(self.get_clock().now().to_msg(), initial_state_rel_world=load_state_rel_world, cs_offset=np.array([0.0, 0.0, 0.0]), item2_name='load_marker', t_item2_rel_item1=self.t_marker_rel_load, R_item2_rel_item1=self.R_marker_rel_load)
 
-                self.get_logger().info(f'SETUP LOAD INIT POSE DONE')
+                self.get_logger().info(f'Set load init pose')
                 # TODO: If in physical, ARM LOAD's PX4/start log
-            else:
-                # Reset phase tick counter so load will reset on next setup
-                self.cnt_phase_ticks = 0
+            # else:
+            #     # Reset phase tick counter so load will reset on next setup
+            #     self.cnt_phase_ticks = 0
 
             # Set load relative to load initial position for publishing. Note: this is same as self.pixhawk_pose.local_state for phys 
             load_rel_load_init = utils.transform_frames(load_state_rel_world, f'{self.get_name()}_init', self.tf_buffer, self.get_logger(), cs_out_type=CS_type.ENU)
