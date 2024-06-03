@@ -1,7 +1,7 @@
 /**:
     ros__parameters:
       env: 'sim'
-      use_sim_time: false #true
+      use_sim_time: false # doesn't seem to make a difference?
       
       ## DIRECTORIES 
       dir_rosbag: data/
@@ -15,7 +15,7 @@
       load_id: 1
       load_pose_type: 'ground_truth' # quasi-static, visual, ground_truth
       evaluate: true # If you want to evaluate the tracking performance of the load
-      show_markers: 0 # Show the detected markers 0 = No, 1 = Yes all, 2 = Drone 1 only # TODO: Replace with ENUM?
+      show_markers: 1 # Show the detected markers 0 = No, 1 = Yes all, 2 = Drone 1 only # TODO: Replace with ENUM?
       marker_edge_length: 0.08 # m
 
       ## GCS SETTINGS
@@ -33,7 +33,7 @@
       ## DRONE SETTINGS
       first_drone_num: 1 #1
       num_drones: 3
-      num_cameras: 0 # 0 if cameras are off
+      num_cameras: 1 # 0 if cameras are off
     
       drone_order: [1, 2, 3] #[1, 2, 3] #ACW from load's x axis
 
@@ -44,7 +44,7 @@
       ## PHASE SETTINGS      
       # Mission settings
       mission_circle_r: 2.0 # m
-      mission_circle_v: 0.75 # m/s 
+      mission_circle_v: 1.0 #0.75 # m/s 
 
       # Drone rate settings
       vel_load_vertical_slow: 0.05 # m/s

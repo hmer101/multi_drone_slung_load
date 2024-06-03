@@ -484,6 +484,7 @@ class Drone(Node):
             case Phase.PHASE_TAKEOFF_START:               
                 # Override trajectory msg for straight-up takeoff in first phase
                 trajectory_msg = utils.gen_traj_msg_straight_up(self.height_load_pre_tension+self.height_drone_rel_load, self.pixhawk_pose.local_state.att_q, timestamp)
+                #trajectory_msg = utils.gen_traj_msg_straight_up(self.height_load_pre_tension+self.height_drone_rel_load, self.pixhawk_pose.local_state.att_q, timestamp, 0, 0, self.pixhawk_pose.local_state, 5.0, 5.0)
 
                 # Send takeoff setpoint
                 self.pub_trajectory.publish(trajectory_msg)

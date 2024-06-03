@@ -332,7 +332,7 @@ def gen_traj_msg_straight_up(takeoff_height, takeoff_q, timestamp, takeoff_N=0.0
     trajectory_msg.yaw = ft.quaternion_get_yaw(q_px4)
 
     # Add rate targets if applicable
-    if drone_prev_local_state != None:
+    if drone_prev_local_state is not None:
         # Construct desired state (position as orientation is unchanged for straight up)
         vehicle_desired_local_state = State(f'droneX_init', CS_type.ENU)
         vehicle_desired_local_state.pos = np.array([takeoff_E, takeoff_N, takeoff_height])
