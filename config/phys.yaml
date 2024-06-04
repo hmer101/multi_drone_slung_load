@@ -90,7 +90,7 @@
       t_cam_rel_pixhawk: [0.1, 0.03, -0.025] # Camera translation relative to PX4 (i.e. drone body)
       R_cam_rel_pixhawk: [-2.61799, 0.0, -1.570796327] # Camera rotation relative to PX4 (i.e. drone body)
 
-      t_marker_rel_load: [0.0, 0.0, 0.035] # Marker translation relative to load
+      t_marker_rel_load: [0.0, 0.0, 0.0] #0.035 # Marker translation relative to load
       R_marker_rel_load: [0.0, 0.0, 1.570796327] # Marker rotation relative to load
 
       # Timings
