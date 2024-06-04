@@ -4,7 +4,7 @@
       #use_sim_time: false #true
 
       ## DIRECTORIES 
-      dir_rosbag: data/
+      dir_rosbag: ws_ros2/data/
 
       ## DEBUG SETTINGS
       print_desired_load_pose: false # In the gcs background node
@@ -67,8 +67,8 @@
 
       # Heights/distances/dimensions
       # Formation dimensions
-      height_drone_cs_rel_gnd: 0.0 #0.24 # m
-      height_load_cs_rel_gnd: 0.0 #0.1 # m
+      height_drone_cs_rel_gnd: 0.25 #0.24 # m
+      height_load_cs_rel_gnd: 0.07 #0.1 # m
       height_load_pre_tension: -1.0 # m
 
       takeoff_height_load: 1.0 #m
@@ -87,10 +87,10 @@
       load_connection_point_r: 0.095 #m
 
       # Camera and markers
-      t_cam_rel_pixhawk: [0.1, 0.03, -0.025] # Camera translation relative to PX4 (i.e. drone body)
-      R_cam_rel_pixhawk: [-2.61799, 0.0, -1.570796327] # Camera rotation relative to PX4 (i.e. drone body)
+      t_cam_rel_pixhawk: [0.09, 0.03, -0.09] #[0.1, 0.03, -0.025] # Camera translation relative to PX4 (i.e. drone body)
+      R_cam_rel_pixhawk: [-2.61799387799, 0.0, -1.570796327] # Camera rotation relative to PX4 (i.e. drone body)
 
-      t_marker_rel_load: [0.0, 0.0, 0.0] #0.035 # Marker translation relative to load
+      t_marker_rel_load: [-0.03, 0.07, 0.0] # Marker translation relative to load (load TF measured from pixhawk)
       R_marker_rel_load: [0.0, 0.0, 1.570796327] # Marker rotation relative to load
 
       # Timings
