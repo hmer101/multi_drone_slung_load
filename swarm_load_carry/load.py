@@ -9,7 +9,7 @@ import quaternion
 import utils
 import rclpy
 import rclpy.qos as qos
-from rclpy.qos import QoSProfile
+from rclpy.qos import QoSProfile, qos_profile_sensor_data
 from rclpy.node import Node
 
 import frame_transforms as ft
@@ -80,12 +80,8 @@ class Load(Node):
         self.height_drone_rel_load = utils.drone_height_rel_load(self.cable_length, self.r_drones_rel_load, self.load_connection_point_r)
 
         # QoS profiles
-        qos_profile = QoSProfile(
-            reliability=qos.ReliabilityPolicy.BEST_EFFORT,
-            durability=qos.DurabilityPolicy.TRANSIENT_LOCAL,
-            history=qos.HistoryPolicy.KEEP_LAST,
-            depth=1
-        )
+        qos_profile_fmu = qos_profile_sensor_data
+        qos_profile_drone_system = qos_profile_sensor_data
 
         qos_profile_gt = QoSProfile(
             reliability=qos.ReliabilityPolicy.RELIABLE,
@@ -93,6 +89,13 @@ class Load(Node):
             history=qos.HistoryPolicy.KEEP_LAST,
             depth=1
         )
+
+        # qos_profile = QoSProfile(
+        #     reliability=qos.ReliabilityPolicy.BEST_EFFORT,
+        #     durability=qos.DurabilityPolicy.TRANSIENT_LOCAL,
+        #     history=qos.HistoryPolicy.KEEP_LAST,
+        #     depth=1
+        # )
 
         ## TFS
         self.tf_broadcaster = TransformBroadcaster(self)
@@ -126,13 +129,13 @@ class Load(Node):
             VehicleAttitudeSetpoint,
             f'load_{self.load_id}/in/desired_attitude',
             self.clbk_desired_load_attitude,
-            qos_profile)
+            qos_profile_drone_system)
 
         self.sub_load_position_desired = self.create_subscription(
             VehicleLocalPositionSetpoint,
             f'load_{self.load_id}/in/desired_local_position',
             self.clbk_desired_load_local_position,
-            qos_profile)
+            qos_profile_drone_system)
         
         # Drone current phases
         self.sub_drone_phases = [None] * self.num_drones
@@ -144,7 +147,7 @@ class Load(Node):
                 Phase,
                 f'/px4_{i}/out/current_phase',
                 callback,
-                qos_profile)
+                qos_profile_drone_system)
 
         
         # Subscribe to ground truth load feedback if we are using ground truth, or evaluating the system
@@ -162,27 +165,27 @@ class Load(Node):
                     VehicleAttitude,
                     f'load_{self.load_id}/fmu/out/vehicle_attitude',
                     lambda msg: self.pixhawk_pose.clbk_vehicle_attitude(msg, self.get_clock().now().to_msg()),
-                    qos_profile)
+                    qos_profile_fmu)
 
                 self.sub_local_position = self.create_subscription(
                     VehicleLocalPosition,
                     f'load_{self.load_id}/fmu/out/vehicle_local_position',
                     lambda msg: self.pixhawk_pose.clbk_vehicle_local_position(msg, self.get_clock().now().to_msg()), 
-                    qos_profile) 
+                    qos_profile_fmu) 
                  
-                self.pub_vehicle_command = self.create_publisher(VehicleCommand, f'load_{self.load_id}/fmu/in/vehicle_command', qos_profile)
+                self.pub_vehicle_command = self.create_publisher(VehicleCommand, f'load_{self.load_id}/fmu/in/vehicle_command', qos_profile_fmu)
                 self.sub_global_position = self.create_subscription(
                     VehicleGlobalPosition,
                     f'load_{self.load_id}/fmu/out/vehicle_global_position',
                     lambda msg: self.pixhawk_pose.clbk_vehicle_global_position(msg, np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD), int(self.get_clock().now().nanoseconds/1000), self.pub_vehicle_command), 
-                    qos_profile) 
+                    qos_profile_fmu) 
                 
                 # First drone's global origin - world origin for setting initial pose
                 self.sub_global_origin = self.create_subscription(
                     GlobalPose,
                     f'/px4_{self.first_drone_num}/out/global_init_pose', 
                     self.pixhawk_pose.clbk_global_origin,
-                    qos_profile)
+                    qos_profile_fmu)
 
         
         ## SERVICES
@@ -256,8 +259,9 @@ class Load(Node):
                                                                  item2_name='load_marker', t_item2_rel_item1=self.t_marker_rel_load, R_item2_rel_item1=self.R_marker_rel_load)
                     self.pixhawk_pose.global_origin_state_prev = self.pixhawk_pose.global_origin_state.copy()
 
+        # For simulation only (physical load pose handled in pixhawk_pose callback)
         # Publish load pose if it has been set and if the initial load pose has been set
-        if load_state_rel_world != None:            
+        if load_state_rel_world != None and self.env == 'sim':            
             # If all drones are in load setup phase, setup load
             if np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD) and not self.pixhawk_pose.flag_local_init_pose_set: #and self.pixhawk_pose.flag_gps_home_set 
                 self.pixhawk_pose.set_local_init_pose_non_ref(self.get_clock().now().to_msg(), initial_state_rel_world=load_state_rel_world, cs_offset=np.array([0.0, 0.0, 0.0]), item2_name='load_marker', t_item2_rel_item1=self.t_marker_rel_load, R_item2_rel_item1=self.R_marker_rel_load)
@@ -265,10 +269,11 @@ class Load(Node):
                 self.get_logger().info(f'Set load init pose')
                 # TODO: If in physical, ARM LOAD's PX4/start log
 
+            # Publish load relative to load initial position if in simulation
+            #if self.env == 'sim': 
             # Set load relative to load initial position for publishing. Note: this is same as self.pixhawk_pose.local_state for phys 
             load_rel_load_init = utils.transform_frames(load_state_rel_world, f'{self.get_name()}_init', self.tf_buffer, self.get_logger(), cs_out_type=CS_type.ENU)
-
-            # Publish load relative to load initial position
+            
             if load_rel_load_init != None:
                 if(self.print_debug_msgs):
                     self.get_logger().info(f'load_rel_load_init: {load_rel_load_init.pos} {load_rel_load_init.att_q}')

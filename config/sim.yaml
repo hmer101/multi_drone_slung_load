@@ -9,7 +9,7 @@
       ## DEBUG SETTINGS
       print_desired_load_pose: false # In the gcs background node
       print_debug_msgs: false # In the drone node
-      logging_rosbag: true # If true, rosbags will be saved to the dir_rosbag directory
+      logging_rosbag: true #true # If true, rosbags will be saved to the dir_rosbag directory
 
       ## LOAD SETTINGS
       load_id: 1
@@ -82,22 +82,25 @@
       t_marker_rel_load: [0.0, 0.0, 0.1] # Marker translation relative to load
       R_marker_rel_load: [0.0, 0.0, 1.570796327] # Marker rotation relative to load
 
-      # Timings
-      # Note cnt thresholds are linked to the timer periods
-      timer_period_drone: 0.1 # sec
+      ## Timings
+      # Note cnt thresholds are linked to the timer periods (drone, gcs_background)
+      timer_period_drone: 0.2 #0.1 # sec
       timer_period_gcs_user: 0.1 # sec
       timer_period_gcs_background: 0.2 # sec
-      timer_period_load: 0.1 # sec
+      timer_period_load: 0.02 #0.1 # sec
 
-      cnt_threshold_drone_setup: 50 #5/timer_period_drone # Tried 3, sometimes issues (weird circling issue of drone 2)
-      cnt_threshold_takeoff_start: 30 #3/timer_period_drone # INCREASE IF NEEDED
-      cnt_threshold_takeoff_pre_tension: 100 #50
-      cnt_threshold_fully_auto_pre_takeoff: 50
+      # Drone
+      cnt_threshold_drone_setup: 25 #50 # Tried 3, sometimes issues (weird circling issue of drone 2)
+      cnt_threshold_takeoff_start: 15 #30 # INCREASE IF NEEDED
+      cnt_threshold_takeoff_pre_tension: 50 #100
+      cnt_threshold_fully_auto_pre_takeoff: 25 #50
+      cnt_threshold_land_pre_descent: 25 #50
+      cnt_threshold_land_post_load_down: 25 #50
+      cnt_threshold_land_drones: 50 #100
+      cnt_threshold_land_pre_disarm: 15 #30
+
+      # GCS background
       cnt_threshold_fully_auto_mission: 50
-      cnt_threshold_land_pre_descent: 50
-      cnt_threshold_land_post_load_down: 50
-      cnt_threshold_land_drones: 100
-      cnt_threshold_land_pre_disarm: 30
 
       ## TOPIC NAMES
       topic_img_rgb: /out/camera

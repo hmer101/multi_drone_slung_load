@@ -15,7 +15,7 @@ from swarm_load_carry.state import State, CS_type
 from swarm_load_carry.pose_pixhawk import PosePixhawk
 
 import rclpy.qos as qos
-from rclpy.qos import QoSProfile
+from rclpy.qos import QoSProfile, qos_profile_sensor_data
 from rclpy.node import Node
 
 from tf2_ros import TransformBroadcaster, StaticTransformBroadcaster
@@ -163,8 +163,11 @@ class Drone(Node):
         self.cnt_phase_ticks = 0
 
         ### ROS2
-        qos_profile = QoSProfile(
-            reliability=qos.ReliabilityPolicy.BEST_EFFORT,
+        qos_profile_fmu = qos_profile_sensor_data
+        qos_profile_drone_system = qos_profile_sensor_data
+
+        qos_profile_latched = QoSProfile(
+            reliability=qos.ReliabilityPolicy.RELIABLE,
             durability=qos.DurabilityPolicy.TRANSIENT_LOCAL,
             history=qos.HistoryPolicy.KEEP_LAST,
             depth=1
@@ -177,16 +180,24 @@ class Drone(Node):
             depth=1
         )
 
+        # qos_profile = QoSProfile(
+        #     reliability=qos.ReliabilityPolicy.BEST_EFFORT,
+        #     durability=qos.DurabilityPolicy.TRANSIENT_LOCAL,
+        #     history=qos.HistoryPolicy.KEEP_LAST,
+        #     depth=1
+        # )
+
+
         
         ## PUBLISHERS
         # Local FMU inputs
-        self.pub_offboard_mode = self.create_publisher(OffboardControlMode, f'{self.ns}/fmu/in/offboard_control_mode', qos_profile)
-        self.pub_trajectory = self.create_publisher(TrajectorySetpoint, f'{self.ns}/fmu/in/trajectory_setpoint', qos_profile)
-        self.pub_vehicle_command = self.create_publisher(VehicleCommand, f'{self.ns}/fmu/in/vehicle_command', qos_profile)
+        self.pub_offboard_mode = self.create_publisher(OffboardControlMode, f'{self.ns}/fmu/in/offboard_control_mode', qos_profile_fmu)
+        self.pub_trajectory = self.create_publisher(TrajectorySetpoint, f'{self.ns}/fmu/in/trajectory_setpoint', qos_profile_fmu)
+        self.pub_vehicle_command = self.create_publisher(VehicleCommand, f'{self.ns}/fmu/in/vehicle_command', qos_profile_fmu)
 
         # To drone system
-        self.pub_current_phase = self.create_publisher(Phase, f'{self.ns}/out/current_phase', qos_profile)
-        self.pub_global_init_pose = self.create_publisher(GlobalPose, f'{self.ns}/out/global_init_pose', qos_profile)
+        self.pub_current_phase = self.create_publisher(Phase, f'{self.ns}/out/current_phase', qos_profile_drone_system)
+        self.pub_global_init_pose = self.create_publisher(GlobalPose, f'{self.ns}/out/global_init_pose', qos_profile_latched)
 
         ## SUBSCRIBERS
         # Local FMU outputs
@@ -195,38 +206,38 @@ class Drone(Node):
             VehicleStatus,
             f'{self.ns}/fmu/out/vehicle_status',
             self.clbk_vehicle_status,
-            qos_profile)
+            qos_profile_fmu)
 
         self.sub_attitude = self.create_subscription(
             VehicleAttitude,
             f'{self.ns}/fmu/out/vehicle_attitude',
             lambda msg: self.pixhawk_pose.clbk_vehicle_attitude(msg, self.get_clock().now().to_msg()),
-            qos_profile)
+            qos_profile_fmu)
 
         self.sub_local_position = self.create_subscription(
             VehicleLocalPosition,
             f'{self.ns}/fmu/out/vehicle_local_position',
             lambda msg: self.pixhawk_pose.clbk_vehicle_local_position(msg, self.get_clock().now().to_msg()), 
-            qos_profile)  
+            qos_profile_fmu)  
         
         self.sub_global_position = self.create_subscription(
             VehicleGlobalPosition,
             f'{self.ns}/fmu/out/vehicle_global_position',
             lambda msg: self.pixhawk_pose.clbk_vehicle_global_position(msg, self.phase == Phase.PHASE_SETUP_DRONE, int(self.get_clock().now().nanoseconds/1000), self.pub_vehicle_command, self.pub_global_init_pose),
-            qos_profile) 
+            qos_profile_fmu) 
 
         # Payload 
         self.sub_payload_attitude_desired = self.create_subscription(
             VehicleAttitudeSetpoint,
             f'/load_{self.load_id}/in/desired_attitude',
             self.clbk_load_desired_attitude,
-            qos_profile)
+            qos_profile_drone_system)
         
         self.sub_payload_position_desired = self.create_subscription(
             VehicleLocalPositionSetpoint,
             f'/load_{self.load_id}/in/desired_local_position',
             self.clbk_load_desired_local_position,
-            qos_profile)
+            qos_profile_drone_system)
 
         # Other drones
         if not self.drone_id == self.first_drone_num:
@@ -234,7 +245,7 @@ class Drone(Node):
                 GlobalPose,
                 f'/px4_{self.first_drone_num}/out/global_init_pose', 
                 lambda msg: self.pixhawk_pose.clbk_global_origin(msg), #self.pixhawk_pose.clbk_global_origin, #
-                qos_profile)
+                qos_profile_latched)
         
         # Ground truth
         self.sub_vehicle_pose_gt = None

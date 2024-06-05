@@ -6,7 +6,7 @@
 
 import rclpy
 import rclpy.qos as qos
-from rclpy.qos import QoSProfile
+from rclpy.qos import QoSProfile, qos_profile_sensor_data
 from rclpy.node import Node
 
 import numpy as np
@@ -33,13 +33,6 @@ class GCSBackground(Node):
         super().__init__('gcs_background')
 
         ## PARAMETERS
-        qos_profile = QoSProfile(
-            reliability=qos.ReliabilityPolicy.BEST_EFFORT,
-            durability=qos.DurabilityPolicy.TRANSIENT_LOCAL,
-            history=qos.HistoryPolicy.KEEP_LAST,
-            depth=1
-        )
-
         self.declare_parameter('num_drones', 3)
         self.declare_parameter('first_drone_num', 1)
         self.declare_parameter('load_id', 1)
@@ -125,9 +118,19 @@ class GCSBackground(Node):
         self.timer = self.create_timer(self.timer_period_gcs_background, self.clbk_cmdloop)
         self.cnt_phase_ticks = 0
 
+        ## ROS2
+        qos_profile_drone_system = qos_profile_sensor_data
+
+        # qos_profile = QoSProfile(
+        #     reliability=qos.ReliabilityPolicy.BEST_EFFORT,
+        #     durability=qos.DurabilityPolicy.TRANSIENT_LOCAL,
+        #     history=qos.HistoryPolicy.KEEP_LAST,
+        #     depth=1
+        # )
+
         ## PUBLISHERS
-        self.pub_load_attitude_desired = self.create_publisher(VehicleAttitudeSetpoint, f'load_{self.load_id}/in/desired_attitude', qos_profile)
-        self.pub_load_position_desired = self.create_publisher(VehicleLocalPositionSetpoint, f'load_{self.load_id}/in/desired_local_position', qos_profile)
+        self.pub_load_attitude_desired = self.create_publisher(VehicleAttitudeSetpoint, f'load_{self.load_id}/in/desired_attitude', qos_profile_drone_system)
+        self.pub_load_position_desired = self.create_publisher(VehicleLocalPositionSetpoint, f'load_{self.load_id}/in/desired_local_position', qos_profile_drone_system)
 
         ## SUBSCRIBERS
         # Drone current phases
@@ -140,7 +143,7 @@ class GCSBackground(Node):
                 Phase,
                 f'/px4_{i}/out/current_phase',
                 callback,
-                qos_profile)                 
+                qos_profile_drone_system)                 
 
         ## TFs
         self.tf_buffer = Buffer()

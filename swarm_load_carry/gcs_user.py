@@ -5,7 +5,7 @@
 
 import rclpy
 import rclpy.qos as qos
-from rclpy.qos import QoSProfile
+from rclpy.qos import QoSProfile, qos_profile_sensor_data
 
 import numpy as np
 from rclpy.node import Node
@@ -74,12 +74,14 @@ class GCSUser(Node):
             self.timer = self.create_timer(self.timer_period_gcs_user, self.clbk_cmdloop)
 
         ### ROS2
-        qos_profile = QoSProfile(
-            reliability=qos.ReliabilityPolicy.BEST_EFFORT,
-            durability=qos.DurabilityPolicy.TRANSIENT_LOCAL,
-            history=qos.HistoryPolicy.KEEP_LAST,
-            depth=1
-        )
+        qos_profile_fmu = qos_profile_sensor_data
+
+        # qos_profile = QoSProfile(
+        #     reliability=qos.ReliabilityPolicy.BEST_EFFORT,
+        #     durability=qos.DurabilityPolicy.TRANSIENT_LOCAL,
+        #     history=qos.HistoryPolicy.KEEP_LAST,
+        #     depth=1
+        # )
 
         ## PUBLISHERS
         ## SUBSCRIBERS
@@ -89,7 +91,7 @@ class GCSUser(Node):
                 ManualControlSetpoint,
                 f'px4_{self.first_drone_num}/fmu/out/manual_control_setpoint',
                 self.clbk_manual_control_setpoint, 
-                qos_profile)  
+                qos_profile_fmu)  
 
         ## SERVICES
 
