@@ -87,7 +87,7 @@
       timer_period_drone: 0.2 #0.1 # sec
       timer_period_gcs_user: 0.1 # sec
       timer_period_gcs_background: 0.2 # sec
-      timer_period_load: 0.02 #0.1 # sec
+      timer_period_load: 0.02 #0.1 # sec. Note faster than phys because simulated FT pose is published on loop, whereas real world GT pose is published on callback
 
       # Drone
       cnt_threshold_drone_setup: 25 #50 # Tried 3, sometimes issues (weird circling issue of drone 2)

@@ -396,7 +396,7 @@ class Drone(Node):
             # Get actual position feedback 
             # Start with drone position (TODO: incorporate load position feedback later)
             tf_drone_rel_world = utils.lookup_tf('world', self.get_name(), self.tf_buffer, rclpy.time.Time(), self.get_logger(), print_warn=self.print_debug_msgs)
-
+            
 
         # Start setup and take-off automatically if in fully-auto mode. 
         if (self.auto_level == 2) and self.phase == Phase.PHASE_UNASSIGNED and self.vehicle_status is not None:
