@@ -34,13 +34,13 @@ def generate_launch_description():
 
     if env=="sim":
       config = os.path.join(
-        get_package_share_directory('swarm_load_carry'),
+        get_package_share_directory('multi_drone_slung_load'),
         'config',
         'sim.yaml'
         )
     elif env=="phys":
        config = os.path.join(
-        get_package_share_directory('swarm_load_carry'),
+        get_package_share_directory('multi_drone_slung_load'),
         'config',
         'phys.yaml'
         )
@@ -51,7 +51,7 @@ def generate_launch_description():
         launch_arg_sim_phys,
         ExecuteProcess(
             cmd=[[
-                f'bash -c "ros2 run swarm_load_carry load --ros-args -r __node:=load{load_id} --params-file {config}"',  #gnome-terminal --tab -- -r __ns:=/load_{load_id}  
+                f'bash -c "ros2 run multi_drone_slung_load load --ros-args -r __node:=load{load_id} --params-file {config}"',  #gnome-terminal --tab -- -r __ns:=/load_{load_id}  
             ]],
             shell=True
         )

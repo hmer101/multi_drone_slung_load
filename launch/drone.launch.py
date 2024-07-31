@@ -33,13 +33,13 @@ def generate_launch_description():
 
     if env=="sim":
       config = os.path.join(
-        get_package_share_directory('swarm_load_carry'),
+        get_package_share_directory('multi_drone_slung_load'),
         'config',
         'sim.yaml'
         )
     elif env=="phys":
        config = os.path.join(
-        get_package_share_directory('swarm_load_carry'),
+        get_package_share_directory('multi_drone_slung_load'),
         'config',
         'phys.yaml'
         ) 
@@ -49,7 +49,7 @@ def generate_launch_description():
         launch_arg_drone_id,
         launch_arg_sim_phys,
         Node(
-         package='swarm_load_carry',
+         package='multi_drone_slung_load',
          executable='drone',
          namespace=PythonExpression(["'/px4_' + str(", drone_id, ")"]),
          name=PythonExpression(["'drone' + str(", drone_id, ")"]),

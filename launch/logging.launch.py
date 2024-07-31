@@ -27,7 +27,7 @@ def generate_launch_description():
 
     if env=="sim":
         config = os.path.join(
-            get_package_share_directory('swarm_load_carry'),
+            get_package_share_directory('multi_drone_slung_load'),
             'config',
             'sim.yaml'
             )
@@ -35,7 +35,7 @@ def generate_launch_description():
         filename_rosbag = datetime.datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
     elif env=="phys":
         config = os.path.join(
-            get_package_share_directory('swarm_load_carry'),
+            get_package_share_directory('multi_drone_slung_load'),
             'config',
             'phys.yaml'
             ) 

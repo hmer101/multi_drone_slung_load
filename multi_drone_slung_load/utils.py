@@ -1,19 +1,18 @@
 import math
 #import quaternionic as quaternion
+import numpy as np
 import quaternion 
 import rclpy
 
-import numpy as np
 #from numpy.typing 
-
 import frame_transforms as ft
 
 from geometry_msgs.msg import TransformStamped
 from px4_msgs.msg import TrajectorySetpoint
 from tf2_ros import TransformException
 
-from swarm_load_carry.state import State, CS_type
-from swarm_load_carry_interfaces.srv import PhaseChange
+from multi_drone_slung_load.state import State, CS_type
+from multi_drone_slung_load_interfaces.srv import PhaseChange
 
 ## STRING HANDLING 
 
@@ -146,7 +145,8 @@ def lookup_tf(target_frame, source_frame, tf_buffer, time, logger, print_warn=Tr
 
 # Transform a position of an item (A) from one frame (B) into another (C) given the position of the item in frame B (p_BA), position of B rel C (p_CB)
 # and the orientation of B rel C (q_CB)
-def transform_position(p_BA: np.ndarray[(3,), float], p_CB: np.ndarray[(3,), float], q_CB, logger):
+#def transform_position(p_BA: np.ndarray[(3,), float], p_CB: np.ndarray[(3,), float], q_CB, logger):
+def transform_position(p_BA, p_CB, q_CB, logger):
     # Perform translation between frames that are both rotated and translated 
     p_BA_rotated = q_CB*(np.quaternion(0, *p_BA))*q_CB.inverse()
     p_CA = np.array([p_BA_rotated.x, p_BA_rotated.y, p_BA_rotated.z]) + p_CB

@@ -13,7 +13,7 @@ def generate_launch_description():
     drone_id_env = os.environ.get('DRONE_ID', 1) # Note must first set environment variable with export DRONE_ID=1
 
     config = os.path.join(
-      get_package_share_directory('swarm_load_carry'),
+      get_package_share_directory('multi_drone_slung_load'),
       'config',
       'phys.yaml'
       )
@@ -30,14 +30,14 @@ def generate_launch_description():
     ## INCLUDE LAUNCH FILES    
     gcs = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
-         get_package_share_directory('swarm_load_carry'), 'launch'),
+         get_package_share_directory('multi_drone_slung_load'), 'launch'),
          '/gcs.launch.py']),
       launch_arguments={'env': 'phys'}.items()
       )
     
     load = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
-         get_package_share_directory('swarm_load_carry'), 'launch'),
+         get_package_share_directory('multi_drone_slung_load'), 'launch'),
          '/load.launch.py']),
       launch_arguments={'env': 'phys'}.items()
       )
@@ -45,14 +45,14 @@ def generate_launch_description():
     # Load and GCS background so can be on physical drone network if selected (more reliable than GCS)    
     gcs_user = ExecuteProcess(
             cmd=[[
-                f'gnome-terminal --tab -- bash -c "ros2 run swarm_load_carry gcs_user --ros-args -r __node:=gcs_user1 --params-file {config}"', #-r __ns:=/gcs_1 
+                f'gnome-terminal --tab -- bash -c "ros2 run multi_drone_slung_load gcs_user --ros-args -r __node:=gcs_user1 --params-file {config}"', #-r __ns:=/gcs_1 
             ]],
             shell=True
         )
 
     gcs_background = ExecuteProcess(
             cmd=[[
-                f'gnome-terminal --tab -- bash -c "ros2 run swarm_load_carry gcs_background --ros-args -r __node:=gcs_background1 --params-file {config}"', #gnome-terminal --tab -- -r __ns:=/gcs_1 
+                f'gnome-terminal --tab -- bash -c "ros2 run multi_drone_slung_load gcs_background --ros-args -r __node:=gcs_background1 --params-file {config}"', #gnome-terminal --tab -- -r __ns:=/gcs_1 
             ]],
             shell=True
         )

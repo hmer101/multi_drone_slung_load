@@ -2,7 +2,7 @@ import os
 from setuptools import setup
 from glob import glob
 
-package_name = 'swarm_load_carry'
+package_name = 'multi_drone_slung_load'
 
 setup(
     name=package_name,
@@ -28,11 +28,11 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'drone = swarm_load_carry.drone:main',
-            'gcs_background = swarm_load_carry.gcs_background:main',
-            'gcs_user = swarm_load_carry.gcs_user:main',
-            'load = swarm_load_carry.load:main',
-            'logging_test = swarm_load_carry.logging_test:main',
+            'drone = multi_drone_slung_load.drone:main',
+            'gcs_background = multi_drone_slung_load.gcs_background:main',
+            'gcs_user = multi_drone_slung_load.gcs_user:main',
+            'load = multi_drone_slung_load.load:main',
+            'logging_test = multi_drone_slung_load.logging_test:main',
         ],
     },
 )

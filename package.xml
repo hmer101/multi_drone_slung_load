@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>swarm_load_carry</name>
+  <name>multi_drone_slung_load</name>
   <version>0.0.0</version>
   <description>Control multiple PX4 drones for collaborative load carrying</description>
   <maintainer email="hmer101@mit.edu">harvey</maintainer>
@@ -10,7 +10,7 @@
   <exec_depend>rclpy</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>px4_msgs</exec_depend>
-  <exec_depend>swarm_load_carry_interfaces</exec_depend>
+  <exec_depend>multi_drone_slung_load_interfaces</exec_depend>
   <exec_depend>ros2launch</exec_depend>
   <exec_depend>slung_pose_estimation</exec_depend>
 

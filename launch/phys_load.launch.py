@@ -11,7 +11,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 def generate_launch_description():
     ## GET PARAMETERS
     config = os.path.join(
-      get_package_share_directory('swarm_load_carry'),
+      get_package_share_directory('multi_drone_slung_load'),
       'config',
       'phys.yaml'
       )
@@ -29,14 +29,14 @@ def generate_launch_description():
     ## INCLUDE LAUNCH FILES       
     load = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
-         get_package_share_directory('swarm_load_carry'), 'launch'),
+         get_package_share_directory('multi_drone_slung_load'), 'launch'),
          '/load.launch.py']),
       launch_arguments={'env': 'phys'}.items()
       )
     
     logging = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
-         get_package_share_directory('swarm_load_carry'), 'launch'),
+         get_package_share_directory('multi_drone_slung_load'), 'launch'),
          '/logging.launch.py']),
       launch_arguments={'env': 'phys'}.items()
       )
@@ -44,14 +44,14 @@ def generate_launch_description():
     # GCS user and background so can be on physical drone network if selected (more reliable than GCS)    
     gcs_user = ExecuteProcess(
             cmd=[[
-                f'bash -c "ros2 run swarm_load_carry gcs_user --ros-args -r __node:=gcs_user1 --params-file {config}"', #-r __ns:=/gcs_1 
+                f'bash -c "ros2 run multi_drone_slung_load gcs_user --ros-args -r __node:=gcs_user1 --params-file {config}"', #-r __ns:=/gcs_1 
             ]],
             shell=True
         )
     
     gcs_background = ExecuteProcess(
         cmd=[[
-            f'bash -c "ros2 run swarm_load_carry gcs_background --ros-args -r __node:=gcs_background1 --params-file {config}"', #gnome-terminal --tab -- -r __ns:=/gcs_1
+            f'bash -c "ros2 run multi_drone_slung_load gcs_background --ros-args -r __node:=gcs_background1 --params-file {config}"', #gnome-terminal --tab -- -r __ns:=/gcs_1
         ]],
         shell=True
     )

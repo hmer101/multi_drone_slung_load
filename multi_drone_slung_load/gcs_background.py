@@ -20,10 +20,10 @@ import frame_transforms as ft
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
-from swarm_load_carry.state import State, CS_type
+from multi_drone_slung_load.state import State, CS_type
 
-from swarm_load_carry_interfaces.srv import SetLocalPose, GetGlobalInitPose, PhaseChange
-from swarm_load_carry_interfaces.msg import Phase
+from multi_drone_slung_load_interfaces.srv import SetLocalPose, GetGlobalInitPose, PhaseChange
+from multi_drone_slung_load_interfaces.msg import Phase
 
 from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint
 

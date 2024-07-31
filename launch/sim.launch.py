@@ -10,7 +10,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 def generate_launch_description():
      ## GET PARAMETERS
     config = os.path.join(
-      get_package_share_directory('swarm_load_carry'),
+      get_package_share_directory('multi_drone_slung_load'),
       'config',
       'sim.yaml'
       )
@@ -27,26 +27,26 @@ def generate_launch_description():
     ## INCLUDE ALL POSSIBLE LAUNCH TASKS
     load = ExecuteProcess(
             cmd=[[
-                f'gnome-terminal --tab -- bash -c "ros2 launch swarm_load_carry load.launch.py load_id:={1} env:=sim"',
+                f'gnome-terminal --tab -- bash -c "ros2 launch multi_drone_slung_load load.launch.py load_id:={1} env:=sim"',
             ]],
             shell=True
         )
     
     gcs = ExecuteProcess(
             cmd=[[
-                f'gnome-terminal --tab -- bash -c "ros2 launch swarm_load_carry gcs.launch.py env:=sim"',
+                f'gnome-terminal --tab -- bash -c "ros2 launch multi_drone_slung_load gcs.launch.py env:=sim"',
             ]],
             shell=True
         )
     
     gz_bridge = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
-         get_package_share_directory('swarm_load_carry'), 'launch'),
+         get_package_share_directory('multi_drone_slung_load'), 'launch'),
          '/gz_bridge.launch.py'])
       )  
     
     log_rosbag = ExecuteProcess(
-            cmd=['ros2', 'launch', 'swarm_load_carry', 'logging.launch.py', 'env:=sim'],
+            cmd=['ros2', 'launch', 'multi_drone_slung_load', 'logging.launch.py', 'env:=sim'],
             output='screen'
         )
 
@@ -58,7 +58,7 @@ def generate_launch_description():
     for i in range(first_drone_num, num_drones+first_drone_num):
         launch_description.append(ExecuteProcess(
             cmd=[[
-                f'gnome-terminal --tab -- bash -c "ros2 launch swarm_load_carry drone.launch.py drone_id:={i} env:=sim"',
+                f'gnome-terminal --tab -- bash -c "ros2 launch multi_drone_slung_load drone.launch.py drone_id:={i} env:=sim"',
             ]],
             shell=True
         ))

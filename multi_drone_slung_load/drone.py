@@ -4,15 +4,15 @@
 # Date: 01/06/2023
 
 import asyncio, rclpy, utils # Note import utils needs additions to setup.py. See here: https://stackoverflow.com/questions/57426715/import-modules-in-package-in-ros2
-import swarm_load_carry.drone_offboard_ros as offboard_ros
+import multi_drone_slung_load.drone_offboard_ros as offboard_ros
 import numpy as np
 # import pymap3d as pm
 import quaternion
 
 import frame_transforms as ft
 
-from swarm_load_carry.state import State, CS_type
-from swarm_load_carry.pose_pixhawk import PosePixhawk
+from multi_drone_slung_load.state import State, CS_type
+from multi_drone_slung_load.pose_pixhawk import PosePixhawk
 
 import rclpy.qos as qos
 from rclpy.qos import QoSProfile, qos_profile_sensor_data
@@ -24,8 +24,8 @@ from tf2_ros.transform_listener import TransformListener
 
 from geometry_msgs.msg import Pose, PoseArray
 from px4_msgs.msg import VehicleAttitude, VehicleLocalPosition, OffboardControlMode, VehicleControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint, VehicleGlobalPosition
-from swarm_load_carry_interfaces.srv import PhaseChange, SetLocalPose # Note must build workspace and restart IDE before custom packages are found by python
-from swarm_load_carry_interfaces.msg import Phase, GlobalPose
+from multi_drone_slung_load_interfaces.srv import PhaseChange, SetLocalPose # Note must build workspace and restart IDE before custom packages are found by python
+from multi_drone_slung_load_interfaces.msg import Phase, GlobalPose
 
 # Node to encapsulate drone information and actions
 class Drone(Node):

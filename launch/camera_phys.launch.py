@@ -20,7 +20,7 @@ def generate_launch_description():
 
     ## GET PARAMETERS
     config = os.path.join(
-        get_package_share_directory('swarm_load_carry'),
+        get_package_share_directory('multi_drone_slung_load'),
         'config',
         'phys.yaml'
         ) 

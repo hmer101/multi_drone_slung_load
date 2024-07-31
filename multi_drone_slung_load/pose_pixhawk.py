@@ -2,11 +2,11 @@ import numpy as np
 import pymap3d as pm
 import quaternion
 import utils
-import swarm_load_carry.drone_offboard_ros as offboard_ros
-from swarm_load_carry.state import State, CS_type
+import multi_drone_slung_load.drone_offboard_ros as offboard_ros
+from multi_drone_slung_load.state import State, CS_type
 import frame_transforms as ft
 from px4_msgs.msg import VehicleAttitude, VehicleLocalPosition, VehicleGlobalPosition
-from swarm_load_carry_interfaces.msg import Phase, GlobalPose
+from multi_drone_slung_load_interfaces.msg import Phase, GlobalPose
 
 # Class to handle the vehicle's pose and state, both global and local.
 # This includes storing the state variables, publishing the TFs, and handling the callbacks for the vehicle's pose.

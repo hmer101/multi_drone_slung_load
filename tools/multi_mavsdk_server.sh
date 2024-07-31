@@ -13,7 +13,7 @@
 # or 
 #    tail -f /proc/PID/fd/2 for errors
 
-cd ~/px4_ros_com_ros2/src/swarm_load_carry/tools
+cd ~/px4_ros_com_ros2/src/multi_drone_slung_load/tools
 MAVSDK_SERVER_EXEC="./mavsdk_server"
 MAVSDK_SERVER_PROCESS_NAME="mavsdk_server"
 

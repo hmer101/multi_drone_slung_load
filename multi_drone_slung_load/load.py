@@ -21,9 +21,9 @@ from tf2_ros.transform_listener import TransformListener
 from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint, VehicleLocalPosition, VehicleAttitude, VehicleGlobalPosition, VehicleCommand 
 from geometry_msgs.msg import Pose, PoseArray
 
-from swarm_load_carry.state import State, CS_type
-from swarm_load_carry.pose_pixhawk import PosePixhawk
-from swarm_load_carry_interfaces.msg import Phase, GlobalPose
+from multi_drone_slung_load.state import State, CS_type
+from multi_drone_slung_load.pose_pixhawk import PosePixhawk
+from multi_drone_slung_load_interfaces.msg import Phase, GlobalPose
 
 # Could make subclasses for different load types (e.g. camera etc.)
 class Load(Node):

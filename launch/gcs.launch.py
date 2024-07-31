@@ -25,13 +25,13 @@ def generate_launch_description():
 
     if env=="sim":
       config = os.path.join(
-        get_package_share_directory('swarm_load_carry'),
+        get_package_share_directory('multi_drone_slung_load'),
         'config',
         'sim.yaml'
         )
     elif env=="phys":
        config = os.path.join(
-        get_package_share_directory('swarm_load_carry'),
+        get_package_share_directory('multi_drone_slung_load'),
         'config',
         'phys.yaml'
         ) 
@@ -42,13 +42,13 @@ def generate_launch_description():
         launch_arg_sim_phys,
         ExecuteProcess(
             cmd=[[
-                f'bash -c "ros2 run swarm_load_carry gcs_background --ros-args -r __node:=gcs_background1 --params-file {config}"', #gnome-terminal --tab -- -r __ns:=/gcs_1 
+                f'bash -c "ros2 run multi_drone_slung_load gcs_background --ros-args -r __node:=gcs_background1 --params-file {config}"', #gnome-terminal --tab -- -r __ns:=/gcs_1 
             ]],
             shell=True
         ),
         ExecuteProcess(
             cmd=[[
-                f'gnome-terminal --tab -- bash -c "ros2 run swarm_load_carry gcs_user --ros-args -r __node:=gcs_user1 --params-file {config}"', #-r __ns:=/gcs_1
+                f'gnome-terminal --tab -- bash -c "ros2 run multi_drone_slung_load gcs_user --ros-args -r __node:=gcs_user1 --params-file {config}"', #-r __ns:=/gcs_1
             ]],
             shell=True
         )
