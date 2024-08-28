@@ -253,14 +253,14 @@ class GCSBackground(Node):
         
         elif np.all(self.drone_phases == Phase.PHASE_LAND_DESCENT):
             # Lower slowly - tension will disengage
-            self.load_desired_local_state.pos = np.array([self.load_desired_local_state.pos[0], self.load_desired_local_state.pos[1], self.load_desired_local_state.pos[2] - self.vel_load_vertical_fast*self.timer_period_gcs_background]) #- 0.1
+            self.load_desired_local_state.pos = np.array([self.load_desired_local_state.pos[0], self.load_desired_local_state.pos[1], self.load_desired_local_state.pos[2] - self.vel_load_vertical_slow*self.timer_period_gcs_background]) #- 0.1
 
             # Reset phase ticks
             self.cnt_phase_ticks = 0
 
         elif np.all(self.drone_phases == Phase.PHASE_LAND_POST_LOAD_DOWN):
-            # Spread drones out
-            self.set_drone_arrangement(self.r_drones_rel_load + 0.3, np.array([self.height_drone_rel_load-0.1, self.height_drone_rel_load-0.1, self.height_drone_rel_load-0.1]), np.array(self.drone_yaws_rel_load)) #[0, np.pi*(2/self.num_drones), -np.pi*(2/self.num_drones)]
+            # Spread drones out #self.r_drones_rel_load + 0.1
+            self.set_drone_arrangement(self.r_drones_rel_load, np.array([self.height_drone_rel_load-0.1, self.height_drone_rel_load-0.1, self.height_drone_rel_load-0.1]), np.array(self.drone_yaws_rel_load)) #[0, np.pi*(2/self.num_drones), -np.pi*(2/self.num_drones)]
 
             # Reset phase ticks
             self.cnt_phase_ticks = 0
