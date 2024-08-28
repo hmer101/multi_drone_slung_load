@@ -389,6 +389,7 @@ class Drone(Node):
 
         # Continually publish offboard mode heartbeat (note need setpoint published too to stay in offboard mode)
         timestamp = int(self.get_clock().now().nanoseconds/1000)
+        timestamp_msg = self.get_clock().now().to_msg()
         offboard_ros.publish_offboard_control_heartbeat_signal(self.pub_offboard_mode, 'pos', timestamp)
         
         # Get TF relative to world if the world position is set
@@ -412,7 +413,7 @@ class Drone(Node):
         # Generate trajectory message for formation used after take-off.
         elif self.phase > Phase.PHASE_SETUP_GCS:
             # Note speed setpoints are not included by default (include in particular phases below)
-            trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), print_warn=self.print_debug_msgs)
+            trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), timestamp_msg=timestamp_msg, print_warn=self.print_debug_msgs, tf_broadcaster=self.tf_broadcaster)
             #trajectory_msg_with_speed = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.vehicle_local_state, v_scalar=self.vel_drone, yawspeed_scalar=self.yawspeed_drone)
 
             if trajectory_msg == None: 
@@ -550,7 +551,7 @@ class Drone(Node):
                     self.get_logger().info(f'Takeoff pre-tension complete') 
 
                 # Send lower trajectory msg while in this mode
-                trajectory_msg = utils.gen_traj_msg_circle_load(desired_state_rel_load_lower_z, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.pixhawk_pose.local_state, yawspeed_scalar=desired_yawspeed, print_warn=self.print_debug_msgs)
+                trajectory_msg = utils.gen_traj_msg_circle_load(desired_state_rel_load_lower_z, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.pixhawk_pose.local_state, yawspeed_scalar=desired_yawspeed, timestamp_msg=timestamp_msg, print_warn=self.print_debug_msgs, tf_broadcaster=self.tf_broadcaster)
                 self.pub_trajectory.publish(trajectory_msg)
                      
 

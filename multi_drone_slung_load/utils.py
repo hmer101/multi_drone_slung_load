@@ -269,7 +269,7 @@ def traj_msg_add_rate_setpoints(traj_msg, rate_desired_setpoints_ros2):
 
 
 # Make drone follow desired load position, at the desired location relative to the load
-def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_state, drone_name, tf_buffer, timestamp, logger, drone_prev_local_state=None, v_scalar=None, a_scalar=None, yawspeed_scalar=None, print_warn=True):
+def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_state, drone_name, tf_buffer, timestamp, logger, timestamp_msg=None, drone_prev_local_state=None, v_scalar=None, a_scalar=None, yawspeed_scalar=None, print_warn=True, tf_broadcaster=None):
     # Generate trajectory message
     trajectory_msg = TrajectorySetpoint()
     trajectory_msg.timestamp = timestamp
@@ -287,6 +287,9 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
     
     vehicle_desired_state_rel_world.pos = transform_position(vehicle_desired_state_rel_load.pos, load_desired_state_rel_world.pos, load_desired_state_rel_world.att_q, logger) #transform_position(load_desired_state_rel_world.pos, vehicle_desired_pos_rel_load_rot, )
     vehicle_desired_state_rel_world.att_q = transform_orientation(vehicle_desired_state_rel_load.att_q, load_desired_state_rel_world.att_q)                             #load_desired_state_rel_world.att_q, vehicle_desired_state_rel_load.att_q)
+
+    if tf_broadcaster is not None:    
+        broadcast_tf(timestamp_msg, vehicle_desired_state_rel_world.frame, f'{drone_name}_d', vehicle_desired_state_rel_world.pos, vehicle_desired_state_rel_world.att_q, tf_broadcaster)
 
     # Transform relative to drone_init
     vehicle_desired_state_rel_drone_init = transform_frames(vehicle_desired_state_rel_world, f'{drone_name}_init', tf_buffer, logger, cs_out_type=CS_type.ENU, print_warn=print_warn)
@@ -318,7 +321,7 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
 
 
 # Generate trajectory message that gives setpoint at a specific height and orientation
-def gen_traj_msg_straight_up(takeoff_height, takeoff_q, timestamp, takeoff_N=0.0, takeoff_E=0.0, drone_prev_local_state=None, v_scalar=None, a_scalar=None):
+def gen_traj_msg_straight_up(takeoff_height, takeoff_q, timestamp, takeoff_N=0.0, takeoff_E=0.0, drone_name = None, drone_prev_local_state=None, v_scalar=None, a_scalar=None, timestamp_msg = None, print_warn = True, logger = None, tf_buffer = None, tf_broadcaster=None):
     trajectory_msg = TrajectorySetpoint()
     trajectory_msg.timestamp = timestamp
 
@@ -331,14 +334,21 @@ def gen_traj_msg_straight_up(takeoff_height, takeoff_q, timestamp, takeoff_N=0.0
     q_px4 = ft.ros_to_px4_orientation(q_to_normalized_np(takeoff_q))
     trajectory_msg.yaw = ft.quaternion_get_yaw(q_px4)
 
+    # Construct desired state (position as orientation is unchanged for straight up)
+    vehicle_desired_local_state = State(f'droneX_init', CS_type.ENU)
+    vehicle_desired_local_state.pos = np.array([takeoff_E, takeoff_N, takeoff_height])
+    vehicle_desired_local_state.att_q = takeoff_q
+    
     # Add rate targets if applicable
     if drone_prev_local_state is not None:
-        # Construct desired state (position as orientation is unchanged for straight up)
-        vehicle_desired_local_state = State(f'droneX_init', CS_type.ENU)
-        vehicle_desired_local_state.pos = np.array([takeoff_E, takeoff_N, takeoff_height])
-
         rate_desired_setpoints_ros2 = gen_rate_setpoints_straight(vehicle_desired_local_state, drone_prev_local_state, v_scalar, a_scalar, None)
         trajectory_msg = traj_msg_add_rate_setpoints(trajectory_msg, rate_desired_setpoints_ros2)
+
+    if tf_broadcaster is not None:    
+        vehicle_desired_state_rel_world = transform_frames(vehicle_desired_local_state, 'world', tf_buffer, logger, cs_out_type=CS_type.ENU, print_warn=print_warn)
+        
+        if vehicle_desired_state_rel_world != None:
+            broadcast_tf(timestamp_msg, vehicle_desired_state_rel_world.frame, f'{drone_name}_d', vehicle_desired_state_rel_world.pos, vehicle_desired_state_rel_world.att_q, tf_broadcaster)
 
     return trajectory_msg
 

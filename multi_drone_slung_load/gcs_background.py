@@ -19,6 +19,7 @@ import utils
 import frame_transforms as ft
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
+from tf2_ros import TransformBroadcaster
 
 from multi_drone_slung_load.state import State, CS_type
 
@@ -33,6 +34,8 @@ class GCSBackground(Node):
         super().__init__('gcs_background')
 
         ## PARAMETERS
+        self.declare_parameter('print_debug_msgs', True)
+
         self.declare_parameter('num_drones', 3)
         self.declare_parameter('first_drone_num', 1)
         self.declare_parameter('load_id', 1)
@@ -64,6 +67,8 @@ class GCSBackground(Node):
 
         self.declare_parameter('cnt_threshold_fully_auto_mission', 50)
         
+        self.print_debug_msgs = self.get_parameter('print_debug_msgs').get_parameter_value().bool_value
+
         self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
         self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
         self.load_id = self.get_parameter('load_id').get_parameter_value().integer_value
@@ -129,6 +134,7 @@ class GCSBackground(Node):
         # )
 
         ## PUBLISHERS
+        # TODO: Put these entirely in TF tree?
         self.pub_load_attitude_desired = self.create_publisher(VehicleAttitudeSetpoint, f'load_{self.load_id}/in/desired_attitude', qos_profile_drone_system)
         self.pub_load_position_desired = self.create_publisher(VehicleLocalPositionSetpoint, f'load_{self.load_id}/in/desired_local_position', qos_profile_drone_system)
 
@@ -146,6 +152,8 @@ class GCSBackground(Node):
                 qos_profile_drone_system)                 
 
         ## TFs
+        self.tf_broadcaster = TransformBroadcaster(self)
+
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
@@ -415,7 +423,6 @@ class GCSBackground(Node):
             self.futures_set_drone_poses_rel_load[i] = next_cli_set_drone_pose.call_async(pos_req)
 
 
-
     def send_desired_pose(self):
         # Send position setpoint
         setpoint_msg_pos = VehicleLocalPositionSetpoint()
@@ -429,6 +436,12 @@ class GCSBackground(Node):
         setpoint_msg_att = VehicleAttitudeSetpoint()
         setpoint_msg_att.q_d = [float(q_d.w), float(q_d.x), float(q_d.y), float(q_d.z)]
         self.pub_load_attitude_desired.publish(setpoint_msg_att)
+
+        # Add desired pose to TF tree   
+        load_desired_state_rel_world = utils.transform_frames(self.load_desired_local_state, 'world', self.tf_buffer, self.get_logger(), cs_out_type=CS_type.ENU, print_warn=self.print_debug_msgs)
+        
+        if load_desired_state_rel_world != None:
+            utils.broadcast_tf(self.get_clock().now().to_msg(), load_desired_state_rel_world.frame, f'load{self.load_id}_d', load_desired_state_rel_world.pos, load_desired_state_rel_world.att_q, self.tf_broadcaster)
 
         # Print desired pose if desired
         if self.print_desired_load_pose:

@@ -8,7 +8,7 @@
 
       ## DEBUG SETTINGS
       print_desired_load_pose: false # In the gcs background node
-      print_debug_msgs: false # In the drone node
+      print_debug_msgs: false # In the drone and load nodes
       logging_rosbag: false #true # If true, rosbags will be saved to the dir_rosbag directory
 
       ## LOAD SETTINGS
