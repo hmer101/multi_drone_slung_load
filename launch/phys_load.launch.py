@@ -10,6 +10,8 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description():
     ## GET PARAMETERS
+    load_id_env = os.environ.get('LOAD_ID', 1) # Note must first set environment variable with export DRONE_ID=1
+    
     config = os.path.join(
       get_package_share_directory('multi_drone_slung_load'),
       'config',
@@ -25,6 +27,7 @@ def generate_launch_description():
     run_background_node_on = params["/**"]["ros__parameters"]["run_background_node_on"]
     run_user_node_on = params["/**"]["ros__parameters"]["run_user_node_on"]
     run_logging_on = params["/**"]["ros__parameters"]["run_logging_on"]
+    run_logger_on = params["/**"]["ros__parameters"]["run_logger_on"]
 
     ## INCLUDE LAUNCH FILES       
     load = IncludeLaunchDescription(
@@ -34,6 +37,13 @@ def generate_launch_description():
       launch_arguments={'env': 'phys'}.items()
       )
     
+    logger = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([os.path.join(
+            get_package_share_directory('slung_pose_estimation'), 'launch'),
+            '/logger.launch.py']),
+        launch_arguments={'log_id': str(load_id_env), 'env': 'phys'}.items()
+        )
+
     logging = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('multi_drone_slung_load'), 'launch'),
@@ -83,7 +93,11 @@ def generate_launch_description():
     if evaluate or load_pose_type == "ground_truth":
         launch_description.append(micro_xcre_agent)
 
-    # Launch logging node if required
+    # Launch logger node if required
+    if run_logger_on == "load":
+        launch_description.append(logger)
+    
+    # Launch logging node (rosbag) if required
     if run_logging_on == "load":
         launch_description.append(logging)
 

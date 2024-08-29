@@ -21,6 +21,7 @@ def generate_launch_description():
     num_drones = params["/**"]["ros__parameters"]["num_drones"]
     first_drone_num = params["/**"]["ros__parameters"]["first_drone_num"]
     num_cameras = params["/**"]["ros__parameters"]["num_cameras"]
+    run_logger = params["/**"]["ros__parameters"]["run_logger"]
     logging_rosbag = params["/**"]["ros__parameters"]["logging_rosbag"]
     
 
@@ -49,6 +50,12 @@ def generate_launch_description():
             cmd=['ros2', 'launch', 'multi_drone_slung_load', 'logging.launch.py', 'env:=sim'],
             output='screen'
         )
+
+    logger = ExecuteProcess(
+            cmd=['ros2', 'launch', 'slung_pose_estimation', 'logger.launch.py', 'env:=sim'],
+            output='screen'
+        )
+
 
     ## COMPILE LAUNCH DESCRIPTION FROM SELECTED COMPONENTS (alter sim.yaml to change which components are included)
     launch_description = []
@@ -81,6 +88,9 @@ def generate_launch_description():
     launch_description.append(gz_bridge)
 
     # Logging
+    if run_logger:
+        launch_description.append(logger)
+
     if logging_rosbag:
         launch_description.append(log_rosbag)
 
