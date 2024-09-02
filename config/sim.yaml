@@ -15,7 +15,8 @@
       ## LOAD SETTINGS
       load_id: 1
       load_pose_type: 'ground_truth' # quasi-static, visual, ground_truth
-      evaluate: true # If you want to evaluate the tracking performance of the load
+      load_pub_quasi_static_tf: true # Publish the quasi-static load pose TF regardless of what load pose type is selected (useful baseline for evaluation)
+      evaluate: true # If you want to evaluate the tracking performance of the load.
       show_markers: 2 # Show the detected markers 0 = No, 1 = Yes all, 2 = Drone 1 only # TODO: Replace with ENUM?
       marker_edge_length: 0.120 #0.08 # m. Simulated marker is 80/200 = 0.4 of box face size defined in aruco_box model.sdf
 

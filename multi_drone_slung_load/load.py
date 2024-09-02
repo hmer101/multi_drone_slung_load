@@ -43,6 +43,7 @@ class Load(Node):
         self.declare_parameter('load_pose_type', 'quasi-static')
         self.declare_parameter('num_drones', 1)
         self.declare_parameter('first_drone_num', 1)
+        self.declare_parameter('load_pub_quasi_static_tf', False)
         self.declare_parameter('evaluate', False)
 
         self.declare_parameter('t_marker_rel_load', [0.0, 0.0, 0.1])
@@ -65,6 +66,7 @@ class Load(Node):
         self.env = self.get_parameter('env').get_parameter_value().string_value
         self.load_pose_type = self.get_parameter('load_pose_type').get_parameter_value().string_value
         self.evaluate = self.get_parameter('evaluate').get_parameter_value().bool_value
+        self.load_pub_quasi_static_tf = self.get_parameter('load_pub_quasi_static_tf').get_parameter_value().bool_value
 
         self.t_marker_rel_load = np.array(self.get_parameter('t_marker_rel_load').get_parameter_value().double_array_value)
         self.R_marker_rel_load = np.array(self.get_parameter('R_marker_rel_load').get_parameter_value().double_array_value)
@@ -283,7 +285,13 @@ class Load(Node):
                     self.get_logger().info(f'load_rel_load_init: {load_rel_load_init.pos} {load_rel_load_init.att_q}')
                 
                 utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_init', self.get_name(), load_rel_load_init.pos, load_rel_load_init.att_q, self.tf_broadcaster)          
-            
+
+        # Publish quasi-static load pose for reference
+        if self.load_pub_quasi_static_tf: 
+            # Set load_state_rel_world using quasi-static method
+            load_state_rel_world_qs = self.calc_load_pose_quasi_static()   
+
+            utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'{self.get_name()}_qs', load_state_rel_world_qs.pos, load_state_rel_world_qs.att_q, self.tf_broadcaster)      
 
     ## HELPER FUNCTIONS
     def reset_pre_arm(self):
