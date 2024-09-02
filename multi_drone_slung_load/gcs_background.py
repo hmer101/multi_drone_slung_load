@@ -47,6 +47,8 @@ class GCSBackground(Node):
         self.declare_parameter('phase_change_requests_through_background', True)
 
         #self.declare_parameter('height_drone_rel_load', 1.5)
+        self.declare_parameter('height_cable_attach_drone_rel_cs', 0.0)
+        self.declare_parameter('height_cable_attach_load_rel_cs', 0.0)
         self.declare_parameter('takeoff_height_load_max', 4.0)
         self.declare_parameter('r_drones_rel_load', 1.0)
         self.declare_parameter('d_drones_rel_min', 1.0)
@@ -78,8 +80,11 @@ class GCSBackground(Node):
         self.auto_level = self.get_parameter('auto_level').get_parameter_value().bool_value
         self.print_desired_load_pose = self.get_parameter('print_desired_load_pose').get_parameter_value().bool_value
         self.phase_change_requests_through_background = self.get_parameter('phase_change_requests_through_background').get_parameter_value().bool_value
-
+        
         #self.height_drone_rel_load = self.get_parameter('height_drone_rel_load').get_parameter_value().double_value
+        self.height_cable_attach_drone_rel_cs = self.get_parameter('height_cable_attach_drone_rel_cs').get_parameter_value().double_value
+        self.height_cable_attach_load_rel_cs = self.get_parameter('height_cable_attach_load_rel_cs').get_parameter_value().double_value
+        self.takeoff_height_load_max = self.get_parameter('takeoff_height_load_max').get_parameter_value().double_value
         self.takeoff_height_load_max = self.get_parameter('takeoff_height_load_max').get_parameter_value().double_value
         self.r_drones_rel_load = self.get_parameter('r_drones_rel_load').get_parameter_value().double_value
         self.d_drones_rel_min = self.get_parameter('d_drones_rel_min').get_parameter_value().double_value
@@ -99,9 +104,9 @@ class GCSBackground(Node):
         self.timer_period_gcs_background = self.get_parameter('timer_period_gcs_background').get_parameter_value().double_value
 
         self.cnt_threshold_fully_auto_mission = self.get_parameter('cnt_threshold_fully_auto_mission').get_parameter_value().integer_value
-
+        
         # Calculate height drone rel load
-        self.height_drone_rel_load = utils.drone_height_rel_load(self.cable_length, self.r_drones_rel_load, self.load_connection_point_r)
+        self.height_drone_rel_load = utils.drone_height_rel_load(self.cable_length, self.r_drones_rel_load, self.load_connection_point_r, self.height_cable_attach_drone_rel_cs+self.height_cable_attach_load_rel_cs)
 
 
         ## Print information
@@ -267,7 +272,7 @@ class GCSBackground(Node):
             self.cnt_phase_ticks = 0
 
         elif np.all(self.drone_phases == Phase.PHASE_LAND_POST_LOAD_DOWN):
-            # Spread drones out #self.r_drones_rel_load + 0.1
+            # Spread drones out #self.r_drones_rel_load + 0.1 #self.r_drones_rel_load-0.2
             self.set_drone_arrangement(self.r_drones_rel_load, np.array([self.height_drone_rel_load-0.1, self.height_drone_rel_load-0.1, self.height_drone_rel_load-0.1]), np.array(self.drone_yaws_rel_load)) #[0, np.pi*(2/self.num_drones), -np.pi*(2/self.num_drones)]
 
             # Reset phase ticks

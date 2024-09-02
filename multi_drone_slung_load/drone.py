@@ -56,6 +56,8 @@ class Drone(Node):
         self.declare_parameter('yawspeed_drone', 0.393)
 
         self.declare_parameter('height_drone_cs_rel_gnd', 0.0)
+        self.declare_parameter('height_cable_attach_drone_rel_cs', 0.0)
+        self.declare_parameter('height_cable_attach_load_rel_cs', 0.0)
         self.declare_parameter('height_load_pre_tension', -0.2)
         self.declare_parameter('pos_threshold', 0.3)
 
@@ -99,6 +101,8 @@ class Drone(Node):
         self.yawspeed_drone = self.get_parameter('yawspeed_drone').get_parameter_value().double_value
 
         self.height_drone_cs_rel_gnd = self.get_parameter('height_drone_cs_rel_gnd').get_parameter_value().double_value
+        self.height_cable_attach_drone_rel_cs = self.get_parameter('height_cable_attach_drone_rel_cs').get_parameter_value().double_value
+        self.height_cable_attach_load_rel_cs = self.get_parameter('height_cable_attach_load_rel_cs').get_parameter_value().double_value
         self.height_load_pre_tension = self.get_parameter('height_load_pre_tension').get_parameter_value().double_value
         self.pos_threshold = self.get_parameter('pos_threshold').get_parameter_value().double_value
 
@@ -123,7 +127,7 @@ class Drone(Node):
         self.cnt_threshold_land_pre_disarm = self.get_parameter('cnt_threshold_land_pre_disarm').get_parameter_value().integer_value
 
         # Calculate height drone rel load
-        self.height_drone_rel_load = utils.drone_height_rel_load(self.cable_length, self.r_drones_rel_load, self.load_connection_point_r)
+        self.height_drone_rel_load = utils.drone_height_rel_load(self.cable_length, self.r_drones_rel_load, self.load_connection_point_r, self.height_cable_attach_drone_rel_cs+self.height_cable_attach_load_rel_cs)
         
         ## TFS
         self.tf_buffer = Buffer()
