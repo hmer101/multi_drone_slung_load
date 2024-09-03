@@ -108,6 +108,7 @@ class Load(Node):
         tf_static_broadcaster_init_pose = StaticTransformBroadcaster(self)
         tf_static_broadcaster_marker_rel_load = StaticTransformBroadcaster(self)
         tf_static_broadcaster_marker_rel_load_gt = StaticTransformBroadcaster(self)
+        self.tf_static_broadcaster_marker_rel_load_qs = StaticTransformBroadcaster(self)
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -263,6 +264,13 @@ class Load(Node):
                     
                     self.pixhawk_pose.set_local_init_pose_non_ref(self.get_clock().now().to_msg(), initial_state_rel_world=None, cs_offset=np.array([0.0, 0.0, self.height_load_cs_rel_gnd]), \
                                                                  item2_name='load_marker', t_item2_rel_item1=self.t_marker_rel_load, R_item2_rel_item1=self.R_marker_rel_load)
+                    
+                    # Marker quasi static pose relative to the load
+                    q_marker_rel_load = ft.quaternion_from_euler(self.R_marker_rel_load[0], self.R_marker_rel_load[1], self.R_marker_rel_load[2])
+                    q_marker_rel_load = np.quaternion(*q_marker_rel_load)
+
+                    utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_qs', f'load_marker{self.load_id}_qs', self.t_marker_rel_load, q_marker_rel_load, self.tf_static_broadcaster_marker_rel_load_qs)
+
                     self.pixhawk_pose.global_origin_state_prev = self.pixhawk_pose.global_origin_state.copy()
 
         # For simulation only (physical load pose handled in pixhawk_pose callback)
@@ -271,6 +279,12 @@ class Load(Node):
             # If all drones are in load setup phase, setup load
             if np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD) and not self.pixhawk_pose.flag_local_init_pose_set: #and self.pixhawk_pose.flag_gps_home_set 
                 self.pixhawk_pose.set_local_init_pose_non_ref(self.get_clock().now().to_msg(), initial_state_rel_world=load_state_rel_world, cs_offset=np.array([0.0, 0.0, 0.0]), item2_name='load_marker', t_item2_rel_item1=self.t_marker_rel_load, R_item2_rel_item1=self.R_marker_rel_load)
+                
+                # Marker quasi static pose relative to the load
+                q_marker_rel_load = ft.quaternion_from_euler(self.R_marker_rel_load[0], self.R_marker_rel_load[1], self.R_marker_rel_load[2])
+                q_marker_rel_load = np.quaternion(*q_marker_rel_load)
+
+                utils.broadcast_tf(self.get_clock().now().to_msg(), f'{self.get_name()}_qs', f'load_marker{self.load_id}_qs', self.t_marker_rel_load, q_marker_rel_load, self.tf_static_broadcaster_marker_rel_load_qs)
 
                 self.get_logger().info(f'Set load init pose')
                 # TODO: If in physical, ARM LOAD's PX4/start log
@@ -292,7 +306,8 @@ class Load(Node):
             load_state_rel_world_qs = self.calc_load_pose_quasi_static()   
 
             if load_state_rel_world_qs is not None:
-                utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'{self.get_name()}_qs', load_state_rel_world_qs.pos, load_state_rel_world_qs.att_q, self.tf_broadcaster)      
+                utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'{self.get_name()}_qs', load_state_rel_world_qs.pos, load_state_rel_world_qs.att_q, self.tf_broadcaster) 
+
 
     ## HELPER FUNCTIONS
     def reset_pre_arm(self):
