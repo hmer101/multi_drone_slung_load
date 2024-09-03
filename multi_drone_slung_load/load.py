@@ -291,7 +291,8 @@ class Load(Node):
             # Set load_state_rel_world using quasi-static method
             load_state_rel_world_qs = self.calc_load_pose_quasi_static()   
 
-            utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'{self.get_name()}_qs', load_state_rel_world_qs.pos, load_state_rel_world_qs.att_q, self.tf_broadcaster)      
+            if load_state_rel_world_qs is not None:
+                utils.broadcast_tf(self.get_clock().now().to_msg(), 'world', f'{self.get_name()}_qs', load_state_rel_world_qs.pos, load_state_rel_world_qs.att_q, self.tf_broadcaster)      
 
     ## HELPER FUNCTIONS
     def reset_pre_arm(self):
