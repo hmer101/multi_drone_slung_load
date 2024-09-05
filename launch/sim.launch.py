@@ -23,6 +23,7 @@ def generate_launch_description():
     num_cameras = params["/**"]["ros__parameters"]["num_cameras"]
     run_logger = params["/**"]["ros__parameters"]["run_logger"]
     logging_rosbag = params["/**"]["ros__parameters"]["logging_rosbag"]
+    use_load_pose_estimator = params["/**"]["ros__parameters"]["use_load_pose_estimator"]
     
 
     ## INCLUDE ALL POSSIBLE LAUNCH TASKS
@@ -36,6 +37,13 @@ def generate_launch_description():
     gcs = ExecuteProcess(
             cmd=[[
                 f'gnome-terminal --tab -- bash -c "ros2 launch multi_drone_slung_load gcs.launch.py env:=sim"',
+            ]],
+            shell=True
+        )
+    
+    estimator = ExecuteProcess(
+            cmd=[[
+                f'gnome-terminal --tab -- bash -c "ros2 launch slung_pose_estimation estimator_online.launch.py env:=sim load_id:=1"',
             ]],
             shell=True
         )
@@ -86,6 +94,10 @@ def generate_launch_description():
 
     # Gazebo parameter and image bridges
     launch_description.append(gz_bridge)
+
+    # Load pose estimation
+    if use_load_pose_estimator:
+        launch_description.append(estimator)
 
     # Logging
     if run_logger:

@@ -28,6 +28,8 @@ def generate_launch_description():
     run_user_node_on = params["/**"]["ros__parameters"]["run_user_node_on"]
     run_logging_on = params["/**"]["ros__parameters"]["run_logging_on"]
     run_logger_on = params["/**"]["ros__parameters"]["run_logger_on"]
+    use_load_pose_estimator = params["/**"]["ros__parameters"]["use_load_pose_estimator"]
+    run_estimator_on = params["/**"]["ros__parameters"]["run_estimator_on"]
 
     ## INCLUDE LAUNCH FILES       
     load = IncludeLaunchDescription(
@@ -50,6 +52,13 @@ def generate_launch_description():
          '/logging.launch.py']),
       launch_arguments={'env': 'phys'}.items()
       )
+    
+    estimator = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([os.path.join(
+            get_package_share_directory('slung_pose_estimation'), 'launch'),
+            '/estimator_online.launch.py']),
+        launch_arguments={'load_id': str(load_id_env), 'env': 'phys'}.items()
+        )
 
     # GCS user and background so can be on physical drone network if selected (more reliable than GCS)    
     gcs_user = ExecuteProcess(
@@ -89,6 +98,10 @@ def generate_launch_description():
     if run_user_node_on == "load":
         launch_description.append(gcs_user)
 
+    # Launch estimator node if required
+    if use_load_pose_estimator and run_estimator_on == "load":
+        launch_description.append(estimator)
+
     # Only need to communicate with the Pixhawk if GPS position of the load is required (for feedback or evaluation)
     if evaluate or load_pose_type == "ground_truth":
         launch_description.append(micro_xcre_agent)
@@ -100,6 +113,7 @@ def generate_launch_description():
     # Launch logging node (rosbag) if required
     if run_logging_on == "load":
         launch_description.append(logging)
+
 
     ## RUN LAUNCH FILES
     return LaunchDescription(launch_description)

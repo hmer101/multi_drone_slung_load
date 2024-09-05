@@ -28,6 +28,10 @@
       user_interaction_through_rc: true #Send the user interaction commands from a remote controller (true) or through the ground control station (false)
       phase_change_requests_through_background: false # If true, phase change requests are sent through the gcs background node rather than from the gcs user node directly to the drones
 
+      ## ESTIMATOR SETTINGS
+      use_load_pose_estimator: true
+      run_estimator_on: 'load'
+
       ## RC SETTINGS
       rc_aux_thresholds: [0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.95] # Aux1 expected values for the different offboard phases: takeoff, formation, engage tension, mission, land, hold (all), kill (all)
       rc_aux_buffer: 0.01 # The +/- range from the above thresholds that are still considered acceptable
@@ -104,6 +108,8 @@
       timer_period_gcs_background: 0.2 # sec
       timer_period_load: 0.1 # sec
 
+      timer_estimation: 0.1 #sec
+
       cnt_threshold_drone_setup: 50 #5/timer_period_drone # Tried 3, sometimes issues (weird circling issue of drone 2)
       cnt_threshold_takeoff_start: 30 #3/timer_period_drone # INCREASE IF NEEDED
       cnt_threshold_takeoff_pre_tension: 100 #50
@@ -113,6 +119,10 @@
       cnt_threshold_land_post_load_down: 50
       cnt_threshold_land_drones: 100
       cnt_threshold_land_pre_disarm: 30
+
+      ## Estimation parameters
+      est_threshold_ang_dist: 10.0 # degrees. Angular threshold which new pose measurements must fall before triggering a warning
+      est_threshold_time: 3.0 # seconds. Time between load pose estimates where the previous estimate is still trusted as a viable prior
 
       ## TOPIC NAMES
       topic_img_rgb: /color/image_raw

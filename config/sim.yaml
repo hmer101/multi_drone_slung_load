@@ -17,7 +17,7 @@
       load_pose_type: 'ground_truth' # quasi-static, visual, ground_truth
       load_pub_quasi_static_tf: true # Publish the quasi-static load pose TF regardless of what load pose type is selected (useful baseline for evaluation)
       evaluate: true # If you want to evaluate the tracking performance of the load.
-      show_markers: 2 # Show the detected markers 0 = No, 1 = Yes all, 2 = Drone 1 only # TODO: Replace with ENUM?
+      show_markers: 1 # Show the detected markers 0 = No, 1 = Yes all, 2 = Drone 1 only # TODO: Replace with ENUM?
       marker_edge_length: 0.120 #0.08 # m. Simulated marker is 80/200 = 0.4 of box face size defined in aruco_box model.sdf
 
       ## GCS SETTINGS
@@ -27,6 +27,10 @@
       #run_user_node_on: 'drone' # 'drone', 'gcs'. Running the user node on the drone means that the RC will be used to send offboard transition commands, otherwise they will be sent from the gcs through WiFi
       user_interaction_through_rc: false #Send the user interaction commands from a remote controller (true) or through the ground control station (false)
       phase_change_requests_through_background: true # If true, phase change requests are sent through the gcs background node rather than from the gcs user node directly to the drones
+
+      ## ESTIMATOR SETTINGS
+      use_load_pose_estimator: true
+      #run_estimator_on: 'load'
 
       ## RC SETTINGS
       rc_aux_thresholds: [0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.95] # Aux1 expected values for the different offboard phases: takeoff, formation, engage tension, mission, land, hold (all), kill (all)
@@ -93,6 +97,8 @@
       timer_period_gcs_background: 0.2 # sec
       timer_period_load: 0.02 #0.1 # sec. Note faster than phys because simulated FT pose is published on loop, whereas real world GT pose is published on callback
 
+      timer_estimation: 0.1 #sec
+
       # Drone
       cnt_threshold_drone_setup: 25 #50 # Tried 3, sometimes issues (weird circling issue of drone 2)
       cnt_threshold_takeoff_start: 15 #30 # INCREASE IF NEEDED
@@ -105,6 +111,10 @@
 
       # GCS background
       cnt_threshold_fully_auto_mission: 50
+
+      ## Estimation parameters
+      est_threshold_ang_dist: 10.0 # degrees. Angular threshold which new pose measurements must fall before triggering a warning
+      est_threshold_time: 3.0 # seconds. Time between load pose estimates where the previous estimate is still trusted as a viable prior
 
       ## TOPIC NAMES
       topic_img_rgb: /out/camera

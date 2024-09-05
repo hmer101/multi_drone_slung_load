@@ -24,6 +24,8 @@ def generate_launch_description():
     run_load_node_on = params["/**"]["ros__parameters"]["run_load_node_on"]
     run_background_node_on = params["/**"]["ros__parameters"]["run_background_node_on"]
     run_user_node_on = params["/**"]["ros__parameters"]["run_user_node_on"]
+    use_load_pose_estimator = params["/**"]["ros__parameters"]["use_load_pose_estimator"]
+    run_estimator_on = params["/**"]["ros__parameters"]["run_estimator_on"]
 
     ## INCLUDE LAUNCH FILES
     # Launch drone
@@ -50,7 +52,7 @@ def generate_launch_description():
             launch_arguments={'drone_id': str(drone_id_env), 'env': 'phys'}.items()
             )
 
-    # Load, GCS user and GCS background so can be on physical drone network if selected (more reliable than GCS)
+    # Load, estimator, GCS user and GCS background so can be on physical drone network if selected (more reliable than GCS)
     load = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('multi_drone_slung_load'), 'launch'),
@@ -58,6 +60,13 @@ def generate_launch_description():
       launch_arguments={'env': 'phys'}.items()
       )
     
+    estimator = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([os.path.join(
+            get_package_share_directory('slung_pose_estimation'), 'launch'),
+            '/estimator_online.launch.py']),
+        launch_arguments={'load_id': str(drone_id_env), 'env': 'phys'}.items()
+        ) #TODO: fix load_id and drone_id mismatch. don't use load_id as param??
+
     gcs_user = ExecuteProcess(
             cmd=[[
                 f'bash -c "ros2 run multi_drone_slung_load gcs_user --ros-args -r __node:=gcs_user1 --params-file {config}"', #-r __ns:=/gcs_1 
@@ -90,12 +99,16 @@ def generate_launch_description():
         #if load_pose_type == "visual":
         launch_description.append(pose_measurement_visual)
 
-    # Only launch load, gcs_background and/or gcs_user on 1st drone if set to do so
+    # Only launch load, estimator, gcs_background and/or gcs_user on 1st drone if set to do so
     if int(drone_id_env) == first_drone_num:
         # Launch load node if required
         if run_load_node_on == "drone":
             launch_description.append(load)
         
+        # Launch estimator if required
+        if use_load_pose_estimator and run_estimator_on == "drone":
+            launch_description.append(estimator)
+
         # Launch GCS background or user nodes are required
         if run_background_node_on == "drone":
             launch_description.append(gcs_background)
