@@ -128,7 +128,8 @@ class Drone(Node):
 
         # Calculate height drone rel load
         self.height_drone_rel_load = utils.drone_height_rel_load(self.cable_length, self.r_drones_rel_load, self.load_connection_point_r, self.height_cable_attach_drone_rel_cs+self.height_cable_attach_load_rel_cs)
-        
+        #self.get_logger().info(f'self.height_drone_rel_load: {self.height_drone_rel_load}')
+
         ## TFS
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -136,6 +137,7 @@ class Drone(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
         tf_static_broadcaster_init_pose = StaticTransformBroadcaster(self) #self.
         tf_static_broadcaster_cam_rel_drone = StaticTransformBroadcaster(self)
+        tf_static_broadcaster_cam_rel_drone_d = StaticTransformBroadcaster(self)
         tf_static_broadcaster_cam_rel_drone_gt = StaticTransformBroadcaster(self)
         tf_static_broadcaster_world_rel_gt = None
         
@@ -152,8 +154,8 @@ class Drone(Node):
 
         self.pixhawk_pose = PosePixhawk(self.get_name(), self.env, self.load_pose_type, self.evaluate, self.get_logger(), \
                                         self.tf_broadcaster, tf_static_broadcaster_init_pose,  \
-                                        tf_static_broadcaster_cam_rel_drone, tf_static_broadcaster_cam_rel_drone_gt, \
-                                        tf_static_broadcaster_world_rel_gt)
+                                        tf_static_broadcaster_cam_rel_drone, tf_static_broadcaster_cam_rel_drone_d, \
+                                        tf_static_broadcaster_cam_rel_drone_gt, tf_static_broadcaster_world_rel_gt)
 
         self.vehicle_state_gt = State('ground_truth', CS_type.XYZ)
         self.vehicle_desired_state_rel_load = State(f'{self.load_name}', CS_type.ENU)
@@ -415,7 +417,7 @@ class Drone(Node):
                     self.cnt_phase_ticks += 1
 
         # Generate trajectory message for formation used after take-off.
-        elif self.phase > Phase.PHASE_SETUP_GCS:
+        elif self.phase >= Phase.PHASE_TAKEOFF_POST_TENSION and self.phase < Phase.PHASE_KILL: #Phase.PHASE_SETUP_GCS:
             # Note speed setpoints are not included by default (include in particular phases below)
             trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), timestamp_msg=timestamp_msg, print_warn=self.print_debug_msgs, tf_broadcaster=self.tf_broadcaster)
             #trajectory_msg_with_speed = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.vehicle_local_state, v_scalar=self.vel_drone, yawspeed_scalar=self.yawspeed_drone)
@@ -499,7 +501,9 @@ class Drone(Node):
             # Run takeoff
             case Phase.PHASE_TAKEOFF_START:               
                 # Override trajectory msg for straight-up takeoff in first phase
-                trajectory_msg = utils.gen_traj_msg_straight_up(self.height_load_pre_tension+self.height_drone_rel_load, self.pixhawk_pose.local_state.att_q, timestamp)
+                trajectory_msg = utils.gen_traj_msg_straight_up(1.0, self.pixhawk_pose.local_state.att_q, timestamp, \
+                                                                drone_name = self.get_name(), timestamp_msg = timestamp_msg, print_warn = self.print_debug_msgs, logger = self.get_logger(), \
+                                                                tf_buffer = self.tf_buffer, tf_broadcaster=self.tf_broadcaster) #0.5*(self.height_load_pre_tension+self.height_drone_rel_load-self.pos_threshold)
 
                 # Send takeoff setpoint
                 self.pub_trajectory.publish(trajectory_msg)
@@ -543,8 +547,9 @@ class Drone(Node):
                     #trajectory_msg = utils.gen_traj_msg_circle_load(desired_state_rel_load_lower_z, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.pixhawk_pose.local_state, yawspeed_scalar=self.yawspeed_drone, print_warn=self.print_debug_msgs)
                 
                 # Slowly rise to close to engage tension level
-                elif tf_drone_rel_world.transform.translation.z<=(self.vehicle_desired_state_rel_load.pos[2]-self.pos_threshold): # TODO: Account for load height
-                    desired_state_rel_load_lower_z.pos[2] = desired_state_rel_load_lower_z.pos[2]+self.height_load_pre_tension+self.vel_load_vertical_slow*self.timer_period_drone*(self.cnt_phase_ticks-self.cnt_threshold_takeoff_pre_tension) #min(self.vehicle_desired_state_rel_load.pos[2], )  # Reduce the amount below the pre-tension height
+                elif tf_drone_rel_world.transform.translation.z<=(self.vehicle_desired_state_rel_load.pos[2]+self.height_load_pre_tension-self.pos_threshold): # TODO: Account for load height
+                    desired_state_rel_load_lower_z.pos[2] = min(self.vehicle_desired_state_rel_load.pos[2]+self.height_load_pre_tension, # Set cap on pre-tension level -0.3 -self.pos_threshold
+                                                                desired_state_rel_load_lower_z.pos[2]+self.height_load_pre_tension+self.vel_load_vertical_slow*self.timer_period_drone*(self.cnt_phase_ticks-self.cnt_threshold_takeoff_pre_tension)) # Reduce the amount below the pre-tension height
 
                     self.cnt_phase_ticks += 1
 
@@ -595,7 +600,8 @@ class Drone(Node):
                 self.pub_trajectory.publish(trajectory_msg)
             
             case Phase.PHASE_LAND_DESCENT:
-                if tf_drone_rel_world.transform.translation.z<=(self.height_load_pre_tension+self.height_drone_rel_load-self.pos_threshold):
+                if tf_drone_rel_world.transform.translation.z<= min(self.height_drone_rel_load-0.3-self.pos_threshold, \
+                                                                    self.height_load_pre_tension+self.height_drone_rel_load-self.pos_threshold):
                     self.phase = Phase.PHASE_LAND_POST_LOAD_DOWN
                     self.cnt_phase_ticks = 0
                     self.get_logger().info(f'Load placed on ground') 
@@ -617,7 +623,9 @@ class Drone(Node):
 
 
             case Phase.PHASE_LAND_DRONES:
-                if self.cnt_phase_ticks <self.cnt_threshold_land_drones:
+                # if self.cnt_phase_ticks <self.cnt_threshold_land_drones:
+                #     self.cnt_phase_ticks += 1
+                if tf_drone_rel_world.transform.translation.z> self.pos_threshold:
                     self.cnt_phase_ticks += 1
                 else: 
                     self.phase = Phase.PHASE_LAND_END

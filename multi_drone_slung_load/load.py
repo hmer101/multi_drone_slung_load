@@ -108,6 +108,7 @@ class Load(Node):
         tf_static_broadcaster_init_pose = StaticTransformBroadcaster(self)
         tf_static_broadcaster_marker_rel_load = StaticTransformBroadcaster(self)
         tf_static_broadcaster_marker_rel_load_gt = StaticTransformBroadcaster(self)
+        tf_static_broadcaster_marker_rel_load_d = StaticTransformBroadcaster(self)
         self.tf_static_broadcaster_marker_rel_load_qs = StaticTransformBroadcaster(self)
 
         self.tf_buffer = Buffer()
@@ -118,8 +119,9 @@ class Load(Node):
 
         self.pixhawk_pose = PosePixhawk(self.get_name(), self.env, self.load_pose_type, self.evaluate, self.get_logger(), \
                                         self.tf_broadcaster, tf_static_broadcaster_init_pose, \
-                                        tf_static_broadcaster_marker_rel_load, tf_static_broadcaster_marker_rel_load_gt)
-  
+                                        tf_static_broadcaster_marker_rel_load, tf_static_broadcaster_marker_rel_load_d, \
+                                        tf_static_broadcaster_marker_rel_load_gt)
+
         self.load_state_gt = State('ground_truth', CS_type.XYZ)
 
         self.drone_phases = np.array([-1] * self.num_drones)

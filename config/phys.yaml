@@ -70,9 +70,10 @@
       # Heights/distances/dimensions
       # Formation dimensions
       height_drone_cs_rel_gnd: 0.25 #0.24 # m
-      height_cable_attach_drone_rel_cs: 0 #m
       height_load_cs_rel_gnd: 0.07 #0.1 # m
-      height_load_pre_tension: -1.0 # m
+      height_load_pre_tension: -0.3 #-1.0 # m
+      height_cable_attach_drone_rel_cs: 0 #m
+      height_cable_attach_load_rel_cs: 0.03 #m
 
       takeoff_height_load: 1.0 #m
       takeoff_height_load_max: 3.0 #m # Safety feature - maximum height load will be commanded to take off

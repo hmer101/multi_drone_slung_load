@@ -11,7 +11,7 @@ from multi_drone_slung_load_interfaces.msg import Phase, GlobalPose
 # Class to handle the vehicle's pose and state, both global and local.
 # This includes storing the state variables, publishing the TFs, and handling the callbacks for the vehicle's pose.
 class PosePixhawk:
-    def __init__(self, name, env, load_pose_type, evaluate, logger, tf_broadcaster, tf_static_broadcaster_init_pose, tf_static_broadcaster_item2_rel_item1=None, tf_static_broadcaster_item2_rel_item1_d = None, tf_static_broadcaster_item2_rel_item1_gt=None, tf_static_broadcaster_world_rel_gt=None):
+    def __init__(self, name, env, load_pose_type, evaluate, logger, tf_broadcaster, tf_static_broadcaster_init_pose, tf_static_broadcaster_item2_rel_item1=None, tf_static_broadcaster_item2_rel_item1_gt=None, tf_static_broadcaster_world_rel_gt=None):
         # PARAMETERS
         self.name = name
         self.id = int(name[-1])
@@ -33,7 +33,6 @@ class PosePixhawk:
         self.tf_static_broadcaster_init_pose = tf_static_broadcaster_init_pose
         self.tf_static_broadcaster_world_rel_gt = tf_static_broadcaster_world_rel_gt
         self.tf_static_broadcaster_item2_rel_item1 = tf_static_broadcaster_item2_rel_item1 
-        self.tf_static_broadcaster_item2_rel_item1_d = tf_static_broadcaster_item2_rel_item1_d
         self.tf_static_broadcaster_item2_rel_item1_gt = tf_static_broadcaster_item2_rel_item1_gt
 
         # FLAGS
@@ -145,9 +144,6 @@ class PosePixhawk:
             r_cam_rel_pixhawk = np.quaternion(*q_list)
             utils.broadcast_tf(time, f'{self.name}', f'{item2_name}{self.id}', t_item2_rel_item1, r_cam_rel_pixhawk, self.tf_static_broadcaster_item2_rel_item1)
             
-            # Also broadcast static TF for desired poses
-            utils.broadcast_tf(time, f'{self.name}_d', f'{item2_name}{self.id}_d', t_item2_rel_item1, r_cam_rel_pixhawk, self.tf_static_broadcaster_item2_rel_item1_d)
-
             # Also broadcast ground truth if evaluating or if this is the load and ground truth feedback is being used
             if self.evaluate == True or (('load' in self.name) and self.load_pose_type == 'ground_truth'):  
                 utils.broadcast_tf(time, f'{self.name}_gt', f'{item2_name}{self.id}_gt', t_item2_rel_item1, r_cam_rel_pixhawk, self.tf_static_broadcaster_item2_rel_item1_gt)

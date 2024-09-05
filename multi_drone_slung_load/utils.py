@@ -335,7 +335,7 @@ def gen_traj_msg_straight_up(takeoff_height, takeoff_q, timestamp, takeoff_N=0.0
     trajectory_msg.yaw = ft.quaternion_get_yaw(q_px4)
 
     # Construct desired state (position as orientation is unchanged for straight up)
-    vehicle_desired_local_state = State(f'droneX_init', CS_type.ENU)
+    vehicle_desired_local_state = State(f'drone{drone_name[-1]}_init', CS_type.ENU)
     vehicle_desired_local_state.pos = np.array([takeoff_E, takeoff_N, takeoff_height])
     vehicle_desired_local_state.att_q = takeoff_q
     
@@ -346,7 +346,7 @@ def gen_traj_msg_straight_up(takeoff_height, takeoff_q, timestamp, takeoff_N=0.0
 
     if tf_broadcaster is not None:    
         vehicle_desired_state_rel_world = transform_frames(vehicle_desired_local_state, 'world', tf_buffer, logger, cs_out_type=CS_type.ENU, print_warn=print_warn)
-        
+
         if vehicle_desired_state_rel_world != None:
             broadcast_tf(timestamp_msg, vehicle_desired_state_rel_world.frame, f'{drone_name}_d', vehicle_desired_state_rel_world.pos, vehicle_desired_state_rel_world.att_q, tf_broadcaster)
 

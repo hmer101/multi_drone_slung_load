@@ -46,9 +46,11 @@ class GCSBackground(Node):
         self.declare_parameter('print_desired_load_pose', False)
         self.declare_parameter('phase_change_requests_through_background', True)
 
-        #self.declare_parameter('height_drone_rel_load', 1.5)
+        self.declare_parameter('height_load_pre_tension', -1.5)
         self.declare_parameter('height_cable_attach_drone_rel_cs', 0.0)
         self.declare_parameter('height_cable_attach_load_rel_cs', 0.0)
+        self.declare_parameter('pos_threshold', 0.0)
+        
         self.declare_parameter('takeoff_height_load_max', 4.0)
         self.declare_parameter('r_drones_rel_load', 1.0)
         self.declare_parameter('d_drones_rel_min', 1.0)
@@ -81,9 +83,11 @@ class GCSBackground(Node):
         self.print_desired_load_pose = self.get_parameter('print_desired_load_pose').get_parameter_value().bool_value
         self.phase_change_requests_through_background = self.get_parameter('phase_change_requests_through_background').get_parameter_value().bool_value
         
-        #self.height_drone_rel_load = self.get_parameter('height_drone_rel_load').get_parameter_value().double_value
+        self.height_load_pre_tension = self.get_parameter('height_load_pre_tension').get_parameter_value().double_value
         self.height_cable_attach_drone_rel_cs = self.get_parameter('height_cable_attach_drone_rel_cs').get_parameter_value().double_value
         self.height_cable_attach_load_rel_cs = self.get_parameter('height_cable_attach_load_rel_cs').get_parameter_value().double_value
+        self.pos_threshold = self.get_parameter('pos_threshold').get_parameter_value().double_value
+        
         self.takeoff_height_load_max = self.get_parameter('takeoff_height_load_max').get_parameter_value().double_value
         self.takeoff_height_load_max = self.get_parameter('takeoff_height_load_max').get_parameter_value().double_value
         self.r_drones_rel_load = self.get_parameter('r_drones_rel_load').get_parameter_value().double_value
@@ -234,7 +238,7 @@ class GCSBackground(Node):
             self.reset_pre_arm()
 
         # TAKEOFF
-        elif np.all(self.drone_phases == Phase.PHASE_TAKEOFF_POST_TENSION):
+        elif np.all(self.drone_phases == Phase.PHASE_TAKEOFF_POST_TENSION):           
             # Rise slowly - tension will engage
             self.load_desired_local_state.pos = np.array([0.0, 0.0, min(self.load_desired_local_state.pos[2] + self.vel_load_vertical_slow*self.timer_period_gcs_background, self.takeoff_height_load_max)])
 
@@ -385,7 +389,7 @@ class GCSBackground(Node):
 
         # Set load desired state
         # As attitude is in ENU, initial desired local attitude must be the same as starting attitude
-        self.load_desired_local_state.pos = np.array([0.0, 0.0, 0.0])
+        self.load_desired_local_state.pos = np.array([0.0, 0.0, self.height_load_pre_tension - self.pos_threshold]) #0.0
         self.load_desired_local_state.att_q = self.load_initial_local_state.att_q.copy() 
 
         # Set drone arrangement around load
