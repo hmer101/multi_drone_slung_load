@@ -29,8 +29,9 @@
       phase_change_requests_through_background: false # If true, phase change requests are sent through the gcs background node rather than from the gcs user node directly to the drones
 
       ## ESTIMATOR SETTINGS
-      use_load_pose_estimator: true
+      use_load_pose_estimator: false
       run_estimator_on: 'load'
+      pnp_reprojection_threshold: 1.0 # Seems normal reprojection error is ~0.01
 
       ## RC SETTINGS
       rc_aux_thresholds: [0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.95] # Aux1 expected values for the different offboard phases: takeoff, formation, engage tension, mission, land, hold (all), kill (all)

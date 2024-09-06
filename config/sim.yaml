@@ -17,7 +17,7 @@
       load_pose_type: 'ground_truth' # quasi-static, visual, ground_truth
       load_pub_quasi_static_tf: true # Publish the quasi-static load pose TF regardless of what load pose type is selected (useful baseline for evaluation)
       evaluate: true # If you want to evaluate the tracking performance of the load.
-      show_markers: 1 # Show the detected markers 0 = No, 1 = Yes all, 2 = Drone 1 only # TODO: Replace with ENUM?
+      show_markers: 2 # Show the detected markers 0 = No, 1 = Yes all, 2 = Drone 1 only # TODO: Replace with ENUM?
       marker_edge_length: 0.120 #0.08 # m. Simulated marker is 80/200 = 0.4 of box face size defined in aruco_box model.sdf
 
       ## GCS SETTINGS
@@ -29,8 +29,9 @@
       phase_change_requests_through_background: true # If true, phase change requests are sent through the gcs background node rather than from the gcs user node directly to the drones
 
       ## ESTIMATOR SETTINGS
-      use_load_pose_estimator: true
+      use_load_pose_estimator: false
       #run_estimator_on: 'load'
+      pnp_reprojection_threshold: 1.0 # Seems normal reprojection error is ~0.01
 
       ## RC SETTINGS
       rc_aux_thresholds: [0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.95] # Aux1 expected values for the different offboard phases: takeoff, formation, engage tension, mission, land, hold (all), kill (all)
