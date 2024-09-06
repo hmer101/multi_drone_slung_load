@@ -128,7 +128,6 @@ class Drone(Node):
 
         # Calculate height drone rel load
         self.height_drone_rel_load = utils.drone_height_rel_load(self.cable_length, self.r_drones_rel_load, self.load_connection_point_r, self.height_cable_attach_drone_rel_cs+self.height_cable_attach_load_rel_cs)
-        #self.get_logger().info(f'self.height_drone_rel_load: {self.height_drone_rel_load}')
 
         ## TFS
         self.tf_buffer = Buffer()
@@ -185,14 +184,6 @@ class Drone(Node):
             history=qos.HistoryPolicy.KEEP_LAST,
             depth=1
         )
-
-        # qos_profile = QoSProfile(
-        #     reliability=qos.ReliabilityPolicy.BEST_EFFORT,
-        #     durability=qos.DurabilityPolicy.TRANSIENT_LOCAL,
-        #     history=qos.HistoryPolicy.KEEP_LAST,
-        #     depth=1
-        # )
-
 
         
         ## PUBLISHERS
@@ -544,7 +535,6 @@ class Drone(Node):
                     desired_yawspeed = self.yawspeed_drone
 
                     self.cnt_phase_ticks += 1
-                    #trajectory_msg = utils.gen_traj_msg_circle_load(desired_state_rel_load_lower_z, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.pixhawk_pose.local_state, yawspeed_scalar=self.yawspeed_drone, print_warn=self.print_debug_msgs)
                 
                 # Slowly rise to close to engage tension level
                 elif tf_drone_rel_world.transform.translation.z<=(self.vehicle_desired_state_rel_load.pos[2]+self.height_load_pre_tension-self.pos_threshold): # TODO: Account for load height
@@ -623,8 +613,6 @@ class Drone(Node):
 
 
             case Phase.PHASE_LAND_DRONES:
-                # if self.cnt_phase_ticks <self.cnt_threshold_land_drones:
-                #     self.cnt_phase_ticks += 1
                 if tf_drone_rel_world.transform.translation.z> self.pos_threshold:
                     self.cnt_phase_ticks += 1
                 else: 
