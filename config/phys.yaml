@@ -109,6 +109,7 @@
       timer_period_gcs_background: 0.2 # sec
       timer_period_load: 0.1 # sec
 
+      timer_period_logger: 0.1 # sec
       timer_estimation: 0.1 #sec
 
       cnt_threshold_drone_setup: 50 #5/timer_period_drone # Tried 3, sometimes issues (weird circling issue of drone 2)

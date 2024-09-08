@@ -98,6 +98,7 @@
       timer_period_gcs_background: 0.2 # sec
       timer_period_load: 0.02 #0.1 # sec. Note faster than phys because simulated FT pose is published on loop, whereas real world GT pose is published on callback
 
+      timer_period_logger: 0.1 # sec
       timer_estimation: 0.1 #sec
 
       # Drone
