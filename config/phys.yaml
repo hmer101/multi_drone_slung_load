@@ -116,11 +116,13 @@
       cnt_threshold_takeoff_start: 30 #3/timer_period_drone # INCREASE IF NEEDED
       cnt_threshold_takeoff_pre_tension: 100 #50
       cnt_threshold_fully_auto_pre_takeoff: 50
-      cnt_threshold_fully_auto_mission: 50
       cnt_threshold_land_pre_descent: 50
       cnt_threshold_land_post_load_down: 50
       cnt_threshold_land_drones: 100
       cnt_threshold_land_pre_disarm: 30
+
+      # GCS background
+      cnt_threshold_fully_auto_mission: 50
 
       ## Estimation parameters
       est_threshold_ang_dist: 10.0 # degrees. Angular threshold which new pose measurements must fall before triggering a warning

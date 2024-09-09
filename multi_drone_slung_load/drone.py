@@ -410,7 +410,7 @@ class Drone(Node):
         # Generate trajectory message for formation used after take-off.
         elif self.phase >= Phase.PHASE_TAKEOFF_POST_TENSION and self.phase < Phase.PHASE_KILL: #Phase.PHASE_SETUP_GCS:
             # Note speed setpoints are not included by default (include in particular phases below)
-            trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), timestamp_msg=timestamp_msg, print_warn=self.print_debug_msgs, tf_broadcaster=self.tf_broadcaster)
+            trajectory_msg = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_min_height=self.height_drone_cs_rel_gnd, timestamp_msg=timestamp_msg, print_warn=self.print_debug_msgs, tf_broadcaster=self.tf_broadcaster)
             #trajectory_msg_with_speed = utils.gen_traj_msg_circle_load(self.vehicle_desired_state_rel_load, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.vehicle_local_state, v_scalar=self.vel_drone, yawspeed_scalar=self.yawspeed_drone)
 
             if trajectory_msg == None: 
@@ -525,6 +525,7 @@ class Drone(Node):
             case Phase.PHASE_TAKEOFF_PRE_TENSION:
                 # Send pre-tension setpoint: in formation but slightly below height
                 desired_state_rel_load_lower_z = self.vehicle_desired_state_rel_load.copy()
+                #desired_state_rel_load_lower_z = min(self.vehicle_desired_state_rel_load.copy(), ) # SAFETY FEATURE - make sure drones don't drop down in this phase
                 desired_yawspeed = None
 
                 # Wait before attempt to pick up load as get into formation
@@ -550,7 +551,7 @@ class Drone(Node):
                     self.get_logger().info(f'Takeoff pre-tension complete') 
 
                 # Send lower trajectory msg while in this mode
-                trajectory_msg = utils.gen_traj_msg_circle_load(desired_state_rel_load_lower_z, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.pixhawk_pose.local_state, yawspeed_scalar=desired_yawspeed, timestamp_msg=timestamp_msg, print_warn=self.print_debug_msgs, tf_broadcaster=self.tf_broadcaster)
+                trajectory_msg = utils.gen_traj_msg_circle_load(desired_state_rel_load_lower_z, self.load_desired_local_state, self.get_name(), self.tf_buffer, timestamp, self.get_logger(), drone_prev_local_state=self.pixhawk_pose.local_state, yawspeed_scalar=desired_yawspeed, drone_min_height=self.height_drone_cs_rel_gnd, timestamp_msg=timestamp_msg, print_warn=self.print_debug_msgs, tf_broadcaster=self.tf_broadcaster)
                 self.pub_trajectory.publish(trajectory_msg)
                      
 

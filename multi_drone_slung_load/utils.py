@@ -267,9 +267,16 @@ def traj_msg_add_rate_setpoints(traj_msg, rate_desired_setpoints_ros2):
     
     return traj_msg
 
+# Note min height must be positive!
+def traj_msg_safety_limits(traj_msg, min_height):
+    # Operates on NED coordinates
+    traj_msg.position[2] = min(-min_height, traj_msg.position[2])
+
+    return traj_msg
+
 
 # Make drone follow desired load position, at the desired location relative to the load
-def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_state, drone_name, tf_buffer, timestamp, logger, timestamp_msg=None, drone_prev_local_state=None, v_scalar=None, a_scalar=None, yawspeed_scalar=None, print_warn=True, tf_broadcaster=None):
+def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_state, drone_name, tf_buffer, timestamp, logger, drone_min_height=None, timestamp_msg=None, drone_prev_local_state=None, v_scalar=None, a_scalar=None, yawspeed_scalar=None, print_warn=True, tf_broadcaster=None):
     # Generate trajectory message
     trajectory_msg = TrajectorySetpoint()
     trajectory_msg.timestamp = timestamp
@@ -316,6 +323,10 @@ def gen_traj_msg_circle_load(vehicle_desired_state_rel_load, load_desired_local_
     if drone_prev_local_state != None:
         rate_desired_setpoints_ros2 = gen_rate_setpoints_straight(vehicle_desired_state_rel_drone_init, drone_prev_local_state, v_scalar, a_scalar, yawspeed_scalar)
         trajectory_msg = traj_msg_add_rate_setpoints(trajectory_msg, rate_desired_setpoints_ros2)
+
+    # Add safety limits if applicable
+    if drone_min_height != None:
+        trajectory_msg = traj_msg_safety_limits(trajectory_msg, drone_min_height)
 
     return trajectory_msg
 
