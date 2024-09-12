@@ -14,7 +14,7 @@
 
       ## GROUND TRUTH SETTINGS
       gt_source: 'mocap' # 'gnss' (outdoors) or 'mocap' (indoors)
-      topic_mocap: '/merton_drone' #/merton_drone1/world
+      topic_mocap: '/merton' #/merton_drone1/world
 
       ## LOAD SETTINGS
       load_id: 1

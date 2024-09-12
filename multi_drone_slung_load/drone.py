@@ -157,7 +157,7 @@ class Drone(Node):
         self.phase = Phase.PHASE_UNASSIGNED        # Desired phase (action to perform when in offboard mode. Use 'phase' to differentiate from 'mode' of the FMU)
         self.phase_restore = Phase.PHASE_UNASSIGNED # Phase to restore to after dropping out of offboard mode 
 
-        self.pixhawk_pose = PosePixhawk(self.get_name(), self.env, self.load_pose_type, self.evaluate, self.get_logger(), \
+        self.pixhawk_pose = PosePixhawk(self.get_name(), self.env, self.load_pose_type, self.evaluate, self.gt_source, self.get_logger(), \
                                         self.tf_broadcaster, tf_static_broadcaster_init_pose,  \
                                         tf_static_broadcaster_cam_rel_drone, tf_static_broadcaster_cam_rel_drone_d, \
                                         tf_static_broadcaster_cam_rel_drone_gt, tf_static_broadcaster_world_rel_gt)
@@ -264,7 +264,7 @@ class Drone(Node):
             elif self.env == 'phys' and self.gt_source == 'mocap':
                 self.sub_vehicle_pose_gt = self.create_subscription(
                     PoseStamped,
-                    f'/{self.topic_mocap}{self.drone_id}/world',
+                    f'/{self.topic_mocap}_drone{self.drone_id}/world',
                     self.clbk_vehicle_pose_gt,
                     qos_profile_gt_mocap)
             else:
@@ -458,12 +458,20 @@ class Drone(Node):
                                                                       state_gt=self.vehicle_state_gt, item2_name='camera', t_item2_rel_item1=self.t_cam_rel_pixhawk, R_item2_rel_item1=self.R_cam_rel_pixhawk)
 
                         else:
+                            initial_state_rel_world = None
+
+                            # If using mocap, have an external reference frame to initialize relative to eachother
+                            if (self.env == 'phys' and self.gt_source == 'mocap'):
+                                # Find the pose relative to the first drone
+                                initial_state_rel_world = utils.lookup_tf(f'drone{self.first_drone_num}_gt', f'drone{self.drone_id}_gt', self.tf_buffer, rclpy.time.Time(), self.get_logger(), print_warn=self.print_debug_msgs)
+
                             # Set init poses once the first drone's initial position has been received
-                            if self.pixhawk_pose.global_origin_state != self.pixhawk_pose.global_origin_state_prev: #self.pixhawk_pose.global_origin_state != default_state: #
-                                self.pixhawk_pose.set_local_init_pose_non_ref(self.get_clock().now().to_msg(), initial_state_rel_world=None, cs_offset=np.array([0.0, 0.0, self.height_drone_cs_rel_gnd]), \
-                                                                 item2_name='camera', t_item2_rel_item1=self.t_cam_rel_pixhawk, R_item2_rel_item1=self.R_cam_rel_pixhawk)
+                            elif self.pixhawk_pose.global_origin_state != self.pixhawk_pose.global_origin_state_prev: #self.pixhawk_pose.global_origin_state != default_state: #
                                 self.pixhawk_pose.global_origin_state_prev = self.pixhawk_pose.global_origin_state.copy()
-                    
+
+                            self.pixhawk_pose.set_local_init_pose_non_ref(self.get_clock().now().to_msg(), initial_state_rel_world=initial_state_rel_world, cs_offset=np.array([0.0, 0.0, self.height_drone_cs_rel_gnd]), \
+                                                                 item2_name='camera', t_item2_rel_item1=self.t_cam_rel_pixhawk, R_item2_rel_item1=self.R_cam_rel_pixhawk)
+
                     # Exit setup only once drone's GPS home and initial positions have been set
                     elif tf_drone_init_rel_world != None: # Move on when TF lookup works 
                         self.cnt_phase_ticks = 0

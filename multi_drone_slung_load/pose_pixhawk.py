@@ -11,13 +11,15 @@ from multi_drone_slung_load_interfaces.msg import Phase, GlobalPose
 # Class to handle the vehicle's pose and state, both global and local.
 # This includes storing the state variables, publishing the TFs, and handling the callbacks for the vehicle's pose.
 class PosePixhawk:
-    def __init__(self, name, env, load_pose_type, evaluate, logger, tf_broadcaster, tf_static_broadcaster_init_pose, tf_static_broadcaster_item2_rel_item1=None, tf_static_broadcaster_item2_rel_item1_d = None, tf_static_broadcaster_item2_rel_item1_gt=None, tf_static_broadcaster_world_rel_gt=None):
+    def __init__(self, name, env, load_pose_type, evaluate, gt_source, logger, tf_broadcaster, tf_static_broadcaster_init_pose, tf_static_broadcaster_item2_rel_item1=None, tf_static_broadcaster_item2_rel_item1_d = None, tf_static_broadcaster_item2_rel_item1_gt=None, tf_static_broadcaster_world_rel_gt=None):
         # PARAMETERS
         self.name = name
         self.id = int(name[-1])
         self.env = env
         self.load_pose_type = load_pose_type
         self.evaluate = evaluate
+
+        self.gt_source = gt_source
 
         # STATES
         self.global_origin_state = State('globe', CS_type.LLA)
@@ -79,8 +81,8 @@ class PosePixhawk:
             # Update tf
             utils.broadcast_tf(current_time, f'{self.name}_init', f'{self.name}', self.local_state.pos, self.local_state.att_q, self.tf_broadcaster)
 
-            # If in the real world, and ground truth is on, use the vehicle local position to publish ground truth
-            if self.env == 'phys' and (self.load_pose_type == 'ground_truth' or self.evaluate == True): #and self.flag_local_init_pose_set:
+            # Note: don't need self.gt_source == 'gnss' check as only subscribe to this topic when using gnss
+            if (self.env == 'phys' and self.gt_source == 'gnss') and (self.load_pose_type == 'ground_truth' or self.evaluate == True): #(self.env == 'phys' and self.gt_source == 'gnss')
                 # Note how the TF tree will look different in the real world because the ground truth is published relative to the local init pose rather than directly from the ground truth.
                 # This is OK because the lookups will still work.
                 utils.broadcast_tf(current_time, f'{self.name}_init', f'{self.name}_gt', self.local_state.pos, self.local_state.att_q, self.tf_broadcaster)
@@ -177,20 +179,20 @@ class PosePixhawk:
         # If using ground truth, set transform from ground truth to world
         if self.load_pose_type == 'ground_truth' or self.evaluate == True:
             # Ground truth origin set by Gazebo in simulation
-            if self.env == 'sim':
+            if self.env == 'sim' or (self.env == 'phys' and self.gt_source == 'mocap'): #TODO: TEST MOCAP
                 # World frame is set cooincident with the first drone's initial pose, which is oriented in ENU. 
                 # Rotate drone 1's attitude measured in ground truth into ENU
                 q_initial_state_rel_world_inv = self.initial_state_rel_world.att_q.inverse()
                 state_gt_att_rotated = utils.transform_orientation(q_initial_state_rel_world_inv, state_gt.att_q)
                 utils.broadcast_tf(time, 'ground_truth', 'world', state_gt.pos, state_gt_att_rotated, self.tf_static_broadcaster_world_rel_gt) #self.get_clock().now().to_msg() self.vehicle_state_gt.pos, self.vehicle_state_gt.att_q, self.tf_static_broadcaster_world_rel_gt)
-            elif self.env == 'phys':
-                # Set ground truth origin at world origin in physical environment
+            elif self.env == 'phys' and self.gt_source == 'gnss':
+                # Set ground truth origin at world origin in outdoor physical environment
                 utils.broadcast_tf(time, 'ground_truth', 'world', np.array([0.0, 0.0, 0.0]), np.quaternion(1.0, 0.0, 0.0, 0.0), self.tf_static_broadcaster_world_rel_gt)     
      
     # Set the local initial position for all other Pixhawks
     def set_local_init_pose_non_ref(self, time, initial_state_rel_world=None, cs_offset=np.array([0.0, 0.0, 0.0]), item2_name=None, t_item2_rel_item1=None, R_item2_rel_item1=None): #set_local_init_pose_later_drones(self):
         # If we are given the initial state relative to the world, use that
-        if initial_state_rel_world is not None:
+        if initial_state_rel_world is not None: #TODO: TEST MOCAP here
             self._set_local_init_pose(initial_state_rel_world.pos, initial_state_rel_world.att_q, time, item2_name, t_item2_rel_item1, R_item2_rel_item1)
         else:
             ## Set initial pose relative to first drone's initial pose

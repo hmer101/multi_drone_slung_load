@@ -19,7 +19,7 @@ from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
 from px4_msgs.msg import VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint, VehicleLocalPosition, VehicleAttitude, VehicleGlobalPosition, VehicleCommand 
-from geometry_msgs.msg import Pose, PoseArray
+from geometry_msgs.msg import Pose, PoseArray, PoseStamped
 
 from multi_drone_slung_load.state import State, CS_type
 from multi_drone_slung_load.pose_pixhawk import PosePixhawk
@@ -102,6 +102,8 @@ class Load(Node):
             depth=1
         )
 
+        qos_profile_gt_mocap = qos_profile_sensor_data
+
         # qos_profile = QoSProfile(
         #     reliability=qos.ReliabilityPolicy.BEST_EFFORT,
         #     durability=qos.DurabilityPolicy.TRANSIENT_LOCAL,
@@ -123,7 +125,7 @@ class Load(Node):
         ## VARIABLES
         self.load_desired_state = State(f'{self.get_name()}_init', CS_type.ENU)
 
-        self.pixhawk_pose = PosePixhawk(self.get_name(), self.env, self.load_pose_type, self.evaluate, self.get_logger(), \
+        self.pixhawk_pose = PosePixhawk(self.get_name(), self.env, self.load_pose_type, self.evaluate, self.gt_source, self.get_logger(), \
                                         self.tf_broadcaster, tf_static_broadcaster_init_pose, \
                                         tf_static_broadcaster_marker_rel_load, tf_static_broadcaster_marker_rel_load_d, \
                                         tf_static_broadcaster_marker_rel_load_gt)
@@ -173,8 +175,14 @@ class Load(Node):
                     f'load_{self.load_id}/out/pose_ground_truth/gz',
                     self.clbk_load_pose_gt,
                     qos_profile_gt)
-            elif self.env == 'phys':
-                # Add subscriber for ground truth pose in physical environment
+            elif self.env == 'phys' and self.gt_source == 'mocap': # Note: ground truth is currently coming directly from mocap. Do like gnss below to run through EKF
+                self.sub_vehicle_pose_gt = self.create_subscription(
+                    PoseStamped,
+                    f'/{self.topic_mocap}_drone{self.load_id}/world',
+                    self.clbk_load_pose_gt,
+                    qos_profile_gt_mocap)
+            elif self.env == 'phys' and self.gt_source == 'gnss':
+                # Add subscriber for ground truth pose in outdoor physical environment
                 # Note that ground truth simply comes from the vehicle local position from the EKF
                 self.sub_attitude = self.create_subscription(
                     VehicleAttitude,
@@ -257,10 +265,10 @@ class Load(Node):
         
         elif self.load_pose_type == 'ground_truth':
             # Set load_state_rel_world using ground truth
-            if self.env == 'sim':
+            if self.env == 'sim' or (self.env == 'phys' and self.gt_source == 'mocap'):
                 load_state_rel_world = utils.transform_frames(self.load_state_gt, 'world', self.tf_buffer, self.get_logger(), cs_out_type=CS_type.ENU)
 
-            elif self.env == 'phys':
+            elif self.env == 'phys' and self.gt_source == 'gnss':
                 # Convert the pixhawk measured pose to the 'world' frame  
                 load_state_rel_world = utils.transform_frames(self.pixhawk_pose.local_state, 'world', self.tf_buffer, self.get_logger(), cs_out_type=CS_type.ENU)
 
@@ -281,9 +289,9 @@ class Load(Node):
 
                     self.pixhawk_pose.global_origin_state_prev = self.pixhawk_pose.global_origin_state.copy()
 
-        # For simulation only (physical load pose handled in pixhawk_pose callback)
+        # For simulation and mocap only (gnss physical load pose handled in pixhawk_pose callback)
         # Publish load pose if it has been set and if the initial load pose has been set
-        if load_state_rel_world != None and self.env == 'sim':            
+        if load_state_rel_world != None and (self.env == 'sim' or (self.env == 'phys' and self.gt_source == 'mocap')):            
             # If all drones are in load setup phase, setup load
             if np.all(self.drone_phases == Phase.PHASE_SETUP_LOAD) and not self.pixhawk_pose.flag_local_init_pose_set: #and self.pixhawk_pose.flag_gps_home_set 
                 self.pixhawk_pose.set_local_init_pose_non_ref(self.get_clock().now().to_msg(), initial_state_rel_world=load_state_rel_world, cs_offset=np.array([0.0, 0.0, 0.0]), item2_name='load_marker', t_item2_rel_item1=self.t_marker_rel_load, R_item2_rel_item1=self.R_marker_rel_load)
@@ -297,8 +305,7 @@ class Load(Node):
                 self.get_logger().info(f'Set load init pose')
                 # TODO: If in physical, ARM LOAD's PX4/start log
 
-            # Publish load relative to load initial position if in simulation
-            #if self.env == 'sim': 
+            # Publish load relative to load initial position
             # Set load relative to load initial position for publishing. Note: this is same as self.pixhawk_pose.local_state for phys 
             load_rel_load_init = utils.transform_frames(load_state_rel_world, f'{self.get_name()}_init', self.tf_buffer, self.get_logger(), cs_out_type=CS_type.ENU)
             
