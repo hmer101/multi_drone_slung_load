@@ -212,6 +212,25 @@ def get_drone_poses(num_drones, first_drone_num, tf_buffer, logger, print_warn=T
     return drone_positions, drone_orientations, count_tf
 
 
+def update_ground_truth_pose(gt_msg, msg_timestamp, name_frame_child, tf_broadcaster, pose_ind = None):
+    drone_pose_gt = None
+    state_obj_gt = State('ground_truth', CS_type.XYZ)
+    
+    # If the msg comes in as an array, extract the pose from the array
+    if pose_ind is not None:
+        drone_pose_gt = extract_pose_from_pose_array_msg(gt_msg, pose_ind)
+    else: # Otherwise use it directly
+        drone_pose_gt = gt_msg.pose
+
+    state_obj_gt.pos = np.array([drone_pose_gt.position.x, drone_pose_gt.position.y, drone_pose_gt.position.z])
+    state_obj_gt.att_q = np.quaternion(drone_pose_gt.orientation.w, drone_pose_gt.orientation.x, drone_pose_gt.orientation.y, drone_pose_gt.orientation.z)
+
+    # Publish drone ground truth
+    broadcast_tf(msg_timestamp, 'ground_truth', f'{name_frame_child}_gt', state_obj_gt.pos, state_obj_gt.att_q, tf_broadcaster)
+
+    return state_obj_gt
+
+
 ## TRAJECTORY GENERATION
 # Note trajectories sent to Pixhawk controller must be in NED co-ordinates relative to initial drone position. ENU -> NED and frame transformations handled here
 

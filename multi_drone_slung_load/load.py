@@ -40,6 +40,8 @@ class Load(Node):
         ## PARAMETERS
         self.declare_parameter('env', 'phys')
         self.declare_parameter('print_debug_msgs', True)
+        self.declare_parameter('gt_source', '') 
+        self.declare_parameter('topic_mocap', '')
         self.declare_parameter('load_pose_type', 'quasi-static')
         self.declare_parameter('num_drones', 1)
         self.declare_parameter('first_drone_num', 1)
@@ -64,6 +66,10 @@ class Load(Node):
         self.num_drones = self.get_parameter('num_drones').get_parameter_value().integer_value
         self.first_drone_num = self.get_parameter('first_drone_num').get_parameter_value().integer_value
         self.env = self.get_parameter('env').get_parameter_value().string_value
+        
+        self.gt_source = self.get_parameter('gt_source').get_parameter_value().string_value
+        self.topic_mocap = self.get_parameter('topic_mocap').get_parameter_value().string_value
+        
         self.load_pose_type = self.get_parameter('load_pose_type').get_parameter_value().string_value
         self.evaluate = self.get_parameter('evaluate').get_parameter_value().bool_value
         self.load_pub_quasi_static_tf = self.get_parameter('load_pub_quasi_static_tf').get_parameter_value().bool_value
@@ -221,15 +227,15 @@ class Load(Node):
             
 
     def clbk_load_pose_gt(self, msg):
-        # Extract the load pose from the message
-        load_pose_gt = utils.extract_pose_from_pose_array_msg(msg, 1)
+        pose_ind = None
 
-        self.load_state_gt.pos = np.array([load_pose_gt.position.x, load_pose_gt.position.y, load_pose_gt.position.z])
-        self.load_state_gt.att_q = np.quaternion(load_pose_gt.orientation.w, load_pose_gt.orientation.x, load_pose_gt.orientation.y, load_pose_gt.orientation.z)
+        if self.env == 'sim' and self.gt_source == 'gz': # Gz simulation is the source of ground truth
+            pose_ind = 1
 
-        # Publish load ground truth
-        utils.broadcast_tf(self.get_clock().now().to_msg(), 'ground_truth', f'{self.get_name()}_gt', self.load_state_gt.pos, self.load_state_gt.att_q, self.tf_broadcaster)
-
+        # Update ground truth state and TF
+        state_obj_gt = utils.update_ground_truth_pose(msg, self.get_clock().now().to_msg(), self.get_name(), self.tf_broadcaster, pose_ind = pose_ind)
+        self.load_state_gt.pos = state_obj_gt.pos
+        self.load_state_gt.att_q = state_obj_gt.att_q
 
     # Loop on timer to publish actual load pose
     def clbk_publoop(self):              

@@ -12,6 +12,10 @@
       run_logger_on: '' # If not empty, custom log data will be saved to the same directory as measurement data on the selected device
       run_logging_on: '' #'load' # If not empty, rosbags will be saved to the dir_rosbag directory on the selected device
 
+      ## GROUND TRUTH SETTINGS
+      gt_source: 'mocap' # 'gnss' (outdoors) or 'mocap' (indoors)
+      topic_mocap: '/merton_drone' #/merton_drone1/world
+
       ## LOAD SETTINGS
       load_id: 1
       load_pose_type: 'ground_truth' #'quasi-static' # quasi-static, visual, ground_truth

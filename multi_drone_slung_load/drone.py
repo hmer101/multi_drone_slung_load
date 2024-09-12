@@ -22,7 +22,7 @@ from tf2_ros import TransformBroadcaster, StaticTransformBroadcaster
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
-from geometry_msgs.msg import Pose, PoseArray
+from geometry_msgs.msg import Pose, PoseArray, PoseStamped
 from px4_msgs.msg import VehicleAttitude, VehicleLocalPosition, OffboardControlMode, VehicleControlMode, TrajectorySetpoint, VehicleStatus, VehicleCommand, VehicleAttitudeSetpoint, VehicleLocalPositionSetpoint, VehicleGlobalPosition
 from multi_drone_slung_load_interfaces.srv import PhaseChange, SetLocalPose # Note must build workspace and restart IDE before custom packages are found by python
 from multi_drone_slung_load_interfaces.msg import Phase, GlobalPose
@@ -41,6 +41,9 @@ class Drone(Node):
         self.declare_parameter('env', 'phys')
         
         self.declare_parameter('print_debug_msgs', True)
+
+        self.declare_parameter('gt_source', '') 
+        self.declare_parameter('topic_mocap', '')
 
         self.declare_parameter('load_id', 1)
         self.declare_parameter('load_pose_type', 'quasi-static')
@@ -85,6 +88,9 @@ class Drone(Node):
         self.env = self.get_parameter('env').get_parameter_value().string_value
 
         self.print_debug_msgs = self.get_parameter('print_debug_msgs').get_parameter_value().bool_value
+
+        self.gt_source = self.get_parameter('gt_source').get_parameter_value().string_value
+        self.topic_mocap = self.get_parameter('topic_mocap').get_parameter_value().string_value
 
         self.load_id = self.get_parameter('load_id').get_parameter_value().integer_value
         self.load_name = f'load{self.load_id}'
@@ -178,13 +184,14 @@ class Drone(Node):
             depth=1
         )
 
-        qos_profile_gt = QoSProfile(
+        qos_profile_gt_gz = QoSProfile(
             reliability=qos.ReliabilityPolicy.RELIABLE,
             durability=qos.DurabilityPolicy.VOLATILE,
             history=qos.HistoryPolicy.KEEP_LAST,
             depth=1
         )
 
+        qos_profile_gt_mocap = qos_profile_sensor_data
         
         ## PUBLISHERS
         # Local FMU inputs
@@ -238,7 +245,7 @@ class Drone(Node):
 
         # Other drones
         if not self.drone_id == self.first_drone_num:
-            self.sub_global_origin = self.create_subscription(
+            self.sub_global_origin = self.create_subscription( #TODO: CHECK RELIABILITY OF THIS OUTDOORS!
                 GlobalPose,
                 f'/px4_{self.first_drone_num}/out/global_init_pose', 
                 lambda msg: self.pixhawk_pose.clbk_global_origin(msg), #self.pixhawk_pose.clbk_global_origin, #
@@ -253,9 +260,15 @@ class Drone(Node):
                     PoseArray,
                     f'/px4_{self.drone_id}/out/pose_ground_truth/gz',
                     self.clbk_vehicle_pose_gt,
-                    qos_profile_gt)
+                    qos_profile_gt_gz)
+            elif self.env == 'phys' and self.gt_source == 'mocap':
+                self.sub_vehicle_pose_gt = self.create_subscription(
+                    PoseStamped,
+                    f'/{self.topic_mocap}{self.drone_id}/world',
+                    self.clbk_vehicle_pose_gt,
+                    qos_profile_gt_mocap)
             else:
-                # Closest we can get to ground truth in physical environment is to use the EKF position estimate using the RTK GPS
+                # Closest we can get to ground truth in physical outdoor environment is to use the EKF position estimate using the RTK GPS
                 # This is handled in the clbk_vehicle_local_position
                 pass
                 
@@ -299,20 +312,20 @@ class Drone(Node):
         self.vehicle_status = msg
 
     def clbk_vehicle_pose_gt(self, msg):
-        # Extract the drone pose from the message
-        # Index is 2 with cameras on in gz, 1 without
-        pose_ind = 2
+        pose_ind = None
 
-        if(self.num_cameras == 0): #self.env == 'sim' and 
-            pose_ind = 1
+        if self.env == 'sim' and self.gt_source == 'gz': # Gz simulation is the source of ground truth
+            # Extract the drone pose from the message
+            # Index is 2 with cameras on in gz, 1 without
+            pose_ind = 2
 
-        drone_pose_gt = utils.extract_pose_from_pose_array_msg(msg, pose_ind) 
-        
-        self.vehicle_state_gt.pos = np.array([drone_pose_gt.position.x, drone_pose_gt.position.y, drone_pose_gt.position.z])
-        self.vehicle_state_gt.att_q = np.quaternion(drone_pose_gt.orientation.w, drone_pose_gt.orientation.x, drone_pose_gt.orientation.y, drone_pose_gt.orientation.z)
+            if(self.num_cameras == 0):
+                pose_ind = 1
 
-        # Publish drone ground truth
-        utils.broadcast_tf(self.get_clock().now().to_msg(), 'ground_truth', f'{self.get_name()}_gt', self.vehicle_state_gt.pos, self.vehicle_state_gt.att_q, self.tf_broadcaster)
+        # Update ground truth state and TF
+        state_obj_gt = utils.update_ground_truth_pose(msg, self.get_clock().now().to_msg(), self.get_name(), self.tf_broadcaster, pose_ind = pose_ind)
+        self.vehicle_state_gt.pos = state_obj_gt.pos
+        self.vehicle_state_gt.att_q = state_obj_gt.att_q
 
 
     def clbk_load_desired_attitude(self, msg):

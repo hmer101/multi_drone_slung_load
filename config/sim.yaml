@@ -12,6 +12,10 @@
       run_logger: true # If true, logger will save data to the same directory as the measurement data
       logging_rosbag: false #true # If true, rosbags will be saved to the dir_rosbag directory
 
+      ## GROUND TRUTH SETTINGS
+      gt_source: 'gz' # gz - in simulation
+      #topic_gz: '/merton_' #/merton_drone1/world
+
       ## LOAD SETTINGS
       load_id: 1
       load_pose_type: 'ground_truth' # quasi-static, visual, ground_truth
