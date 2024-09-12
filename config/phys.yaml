@@ -6,7 +6,7 @@
       ## DIRECTORIES 
       dir_rosbag: ws_ros2/data/
 
-      ## DEBUG SETTINGS
+      ## DEBUG SETTINGSf the reference frame of the PX4 estimator and the one of the external pose estimate will not match in most cases. Therefore the reference f the reference frame of the PX4 estimator and the one of the external pose estimate will not match in most cases. Therefore the reference frame of the external pose estimate is named differently, it is calleframe of the external pose estimate is named differently, it is calle
       print_desired_load_pose: false # In the gcs background node
       print_debug_msgs: false # In the drone and load nodes (can add to other nodes too). TODO: Could properly use ROS logging levels: https://docs.ros.org/en/humble/Tutorials/Demos/Logging-and-logger-configuration.html
       run_logger_on: '' # If not empty, custom log data will be saved to the same directory as measurement data on the selected device
@@ -15,6 +15,11 @@
       ## GROUND TRUTH SETTINGS
       gt_source: 'mocap' # 'gnss' (outdoors) or 'mocap' (indoors)
       topic_mocap: '/merton' #/merton_drone1/world
+
+      t_px4_rel_mocap: [0.0, 0.0, 0.0] # Static offset of mocap world frame to body-fixed frame
+      R_px4_rel_mocap_ypr: [-1.570796327, 3.141592654, 0.0] # Rotation of px4 relative to mocap world (defined on computer) in YPR, also in this order here (note that old mavros tf is in YPR like [-1.570796327, 3.141592654, 0.0])
+
+      timer_period_mocap_repub: 0.02 # Need a min of 50 Hz without covariances, or 30 Hz with
 
       ## LOAD SETTINGS
       load_id: 1
