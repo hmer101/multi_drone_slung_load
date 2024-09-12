@@ -21,11 +21,15 @@ def generate_launch_description():
     
     num_cameras = params["/**"]["ros__parameters"]["num_cameras"]
     first_drone_num = params["/**"]["ros__parameters"]["first_drone_num"]
+    
     run_load_node_on = params["/**"]["ros__parameters"]["run_load_node_on"]
     run_background_node_on = params["/**"]["ros__parameters"]["run_background_node_on"]
     run_user_node_on = params["/**"]["ros__parameters"]["run_user_node_on"]
-    use_load_pose_estimator = params["/**"]["ros__parameters"]["use_load_pose_estimator"]
+    
     run_estimator_on = params["/**"]["ros__parameters"]["run_estimator_on"]
+
+    use_load_pose_estimator = params["/**"]["ros__parameters"]["use_load_pose_estimator"]
+    gt_source = params["/**"]["ros__parameters"]["gt_source"]
 
     ## INCLUDE LAUNCH FILES
     # Launch drone
@@ -66,6 +70,13 @@ def generate_launch_description():
             '/estimator_online.launch.py']),
         launch_arguments={'load_id': str(drone_id_env), 'env': 'phys'}.items()
         ) #TODO: fix load_id and drone_id mismatch. don't use load_id as param??
+    
+    mocap_to_px4 = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([os.path.join(
+            get_package_share_directory('highbay_vicon_px4'), 'launch'),
+            '/highbay_to_px4.launch.py']),
+        launch_arguments={'drone_id': str(drone_id_env)}.items()
+        )
 
     gcs_user = ExecuteProcess(
             cmd=[[
@@ -115,6 +126,10 @@ def generate_launch_description():
 
         if run_user_node_on == "drone":
             launch_description.append(gcs_user)
+
+    # If using motion capture, launch the mocap conversion node
+    if gt_source == "mocap":
+        launch_description.append(mocap_to_px4)
 
 
     ## RUN LAUNCH FILES and start MicroDDS agent

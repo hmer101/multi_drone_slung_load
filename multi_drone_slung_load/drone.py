@@ -264,7 +264,7 @@ class Drone(Node):
             elif self.env == 'phys' and self.gt_source == 'mocap':
                 self.sub_vehicle_pose_gt = self.create_subscription(
                     PoseStamped,
-                    f'/{self.topic_mocap}_drone{self.drone_id}/world',
+                    f'{self.topic_mocap}_drone{self.drone_id}/world',
                     self.clbk_vehicle_pose_gt,
                     qos_profile_gt_mocap)
             else:

@@ -178,7 +178,7 @@ class Load(Node):
             elif self.env == 'phys' and self.gt_source == 'mocap': # Note: ground truth is currently coming directly from mocap. Do like gnss below to run through EKF
                 self.sub_vehicle_pose_gt = self.create_subscription(
                     PoseStamped,
-                    f'/{self.topic_mocap}_drone{self.load_id}/world',
+                    f'{self.topic_mocap}_load{self.load_id}/world',
                     self.clbk_load_pose_gt,
                     qos_profile_gt_mocap)
             elif self.env == 'phys' and self.gt_source == 'gnss':
