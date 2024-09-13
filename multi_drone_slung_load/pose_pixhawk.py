@@ -40,6 +40,7 @@ class PosePixhawk:
 
         # FLAGS
         self.flag_gps_home_set = False # GPS home set when vehicle armed
+        self.flag_global_init_att_set = False
         self.flag_local_init_pose_set = False
 
         # MISC
@@ -58,9 +59,11 @@ class PosePixhawk:
         self.local_state.att_q.y = q_ros[2]   
         self.local_state.att_q.z = q_ros[3] 
 
-        if not self.flag_gps_home_set:
+        # Set the global attitude if it hasn't been set before or if the gps is still waiting to be set
+        if not self.flag_gps_home_set or not self.flag_global_init_att_set:
             # Set the initial attitude as the current attitude
             self.initial_global_state.att_q = self.local_state.att_q.copy()
+            self.flag_global_init_att_set = True
 
         # Update tf
         # if not (np.isnan(self.local_state.pos[0])):
@@ -114,7 +117,8 @@ class PosePixhawk:
 
                 pub_global_init_pose.publish(msg_global_pose)
 
-            self.flag_gps_home_set = True   
+            #self.flag_gps_home_set = True  
+            self.set_flag_gps_home()
 
     def clbk_global_origin(self, msg):
         self.global_origin_state.pos[0] = msg.global_pos.lat
@@ -130,9 +134,13 @@ class PosePixhawk:
         self.flag_local_init_pose_set = False
 
     ## HELPER FUNCTIONS
+    def set_flag_gps_home(self): # Allows functions outside of this class to set the gps flag (useful for spoofing)
+        self.flag_gps_home_set = True
+    
     def reset(self):
         self.flag_gps_home_set = False
         self.flag_local_init_pose_set = False
+        self.flag_global_init_att_set = False
 
 
     def broadcast_tf_init_pose(self, time, item2_name=None, t_item2_rel_item1=None, R_item2_rel_item1=None):
@@ -178,9 +186,9 @@ class PosePixhawk:
 
         # If using ground truth, set transform from ground truth to world
         if self.load_pose_type == 'ground_truth' or self.evaluate == True:
-            # Ground truth origin set by Gazebo in simulation
+            # Ground truth origin set by Gazebo in simulation OR by motion capture
             if self.env == 'sim' or (self.env == 'phys' and self.gt_source == 'mocap'): #TODO: TEST MOCAP
-                # World frame is set cooincident with the first drone's initial pose, which is oriented in ENU. 
+                # World frame is set cooincident with the first drone's initial pose, which is oriented in ENU in sim and XYZ in mocap. 
                 # Rotate drone 1's attitude measured in ground truth into ENU
                 q_initial_state_rel_world_inv = self.initial_state_rel_world.att_q.inverse()
                 state_gt_att_rotated = utils.transform_orientation(q_initial_state_rel_world_inv, state_gt.att_q)

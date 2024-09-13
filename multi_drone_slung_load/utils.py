@@ -212,7 +212,7 @@ def get_drone_poses(num_drones, first_drone_num, tf_buffer, logger, print_warn=T
     return drone_positions, drone_orientations, count_tf
 
 
-def update_ground_truth_pose(gt_msg, msg_timestamp, name_frame_child, tf_broadcaster, pose_ind = None):
+def update_ground_truth_pose(gt_msg, msg_timestamp, name_frame_child, tf_broadcaster, pose_ind = None, pixhawk_pose = None):
     drone_pose_gt = None
     state_obj_gt = State('ground_truth', CS_type.XYZ)
     
@@ -227,6 +227,12 @@ def update_ground_truth_pose(gt_msg, msg_timestamp, name_frame_child, tf_broadca
 
     # Publish drone ground truth
     broadcast_tf(msg_timestamp, 'ground_truth', f'{name_frame_child}_gt', state_obj_gt.pos, state_obj_gt.att_q, tf_broadcaster)
+
+    # If a pixhawk pose has been passed in, this ground truth pose is to be used instead of a GPS signal.
+    # If this is the case, the gps_home can be set as it is replaced by ground truth
+    if pixhawk_pose is not None:
+        if not pixhawk_pose.flag_gps_home_set:
+            pixhawk_pose.set_flag_gps_home()
 
     return state_obj_gt
 

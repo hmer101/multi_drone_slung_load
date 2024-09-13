@@ -240,8 +240,14 @@ class Load(Node):
         if self.env == 'sim' and self.gt_source == 'gz': # Gz simulation is the source of ground truth
             pose_ind = 1
 
+        # If the system uses mocap, set the gps flag to true
+        pixhawk_pose_for_flag_set = None
+
+        if self.env == 'phys' and self.gt_source == 'mocap':
+            pixhawk_pose_for_flag_set = self.pixhawk_pose
+
         # Update ground truth state and TF
-        state_obj_gt = utils.update_ground_truth_pose(msg, self.get_clock().now().to_msg(), self.get_name(), self.tf_broadcaster, pose_ind = pose_ind)
+        state_obj_gt = utils.update_ground_truth_pose(msg, self.get_clock().now().to_msg(), self.get_name(), self.tf_broadcaster, pose_ind = pose_ind, pixhawk_pose=pixhawk_pose_for_flag_set)
         self.load_state_gt.pos = state_obj_gt.pos
         self.load_state_gt.att_q = state_obj_gt.att_q
 
