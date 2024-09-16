@@ -44,7 +44,7 @@
       ## DRONE SETTINGS
       first_drone_num: 1 #1
       num_drones: 3
-      num_cameras: 3 # 0 if cameras are off
+      num_cameras: 0 # 0 if cameras are off
     
       drone_order: [1, 2, 3] #[1, 2, 3] #ACW from load's x axis
 
@@ -76,7 +76,7 @@
       takeoff_height_load: 1.0 #m
       takeoff_height_load_max: 3.0 #m # Safety feature - maximum height load will be commanded to take off
 
-      r_drones_rel_load: 1.25 #1.0 # m
+      r_drones_rel_load: 1.0 #1.25 #1.0 # m
       d_drones_rel_min: 0.0 #0.5 #1.0 # m
       d_drones_rel_max: 100.0 #5.0 #2.0 # m
 
