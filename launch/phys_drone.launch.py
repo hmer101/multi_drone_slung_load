@@ -51,7 +51,7 @@ def generate_launch_description():
     # Visual pose measurement
     pose_measurement_visual = IncludeLaunchDescription(
             PythonLaunchDescriptionSource([os.path.join(
-                get_package_share_directory('slung_pose_estimation'), 'launch'),
+                get_package_share_directory('slung_pose_measurement'), 'launch'),
                 '/visual_measurement.launch.py']),
             launch_arguments={'drone_id': str(drone_id_env), 'env': 'phys'}.items()
             )
@@ -63,20 +63,6 @@ def generate_launch_description():
          '/load.launch.py']),
       launch_arguments={'env': 'phys'}.items()
       )
-    
-    estimator = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([os.path.join(
-            get_package_share_directory('slung_pose_estimation'), 'launch'),
-            '/estimator_online.launch.py']),
-        launch_arguments={'load_id': str(drone_id_env), 'env': 'phys'}.items()
-        ) #TODO: fix load_id and drone_id mismatch. don't use load_id as param??
-    
-    mocap_to_px4 = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([os.path.join(
-            get_package_share_directory('highbay_vicon_px4'), 'launch'),
-            '/highbay_to_px4.launch.py']),
-        launch_arguments={'drone_id': str(drone_id_env)}.items()
-        )
 
     gcs_user = ExecuteProcess(
             cmd=[[
@@ -117,7 +103,14 @@ def generate_launch_description():
             launch_description.append(load)
         
         # Launch estimator if required
-        if use_load_pose_estimator and run_estimator_on == "drone":
+        if use_load_pose_estimator and run_estimator_on == "drone":    
+            estimator = IncludeLaunchDescription(
+                PythonLaunchDescriptionSource([os.path.join(
+                    get_package_share_directory('slung_pose_estimation'), 'launch'),
+                    '/estimator_online.launch.py']),
+                launch_arguments={'load_id': str(drone_id_env), 'env': 'phys'}.items()
+                ) #TODO: fix load_id and drone_id mismatch. don't use load_id as param??
+            
             launch_description.append(estimator)
 
         # Launch GCS background or user nodes are required
@@ -129,6 +122,13 @@ def generate_launch_description():
 
     # If using motion capture, launch the mocap conversion node
     if gt_source == "mocap":
+        mocap_to_px4 = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([os.path.join(
+                get_package_share_directory('highbay_vicon_px4'), 'launch'),
+                '/highbay_to_px4.launch.py']),
+            launch_arguments={'drone_id': str(drone_id_env)}.items()
+            )
+            
         launch_description.append(mocap_to_px4)
 
 

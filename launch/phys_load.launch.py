@@ -41,7 +41,7 @@ def generate_launch_description():
     
     logger = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([os.path.join(
-            get_package_share_directory('slung_pose_estimation'), 'launch'),
+            get_package_share_directory('slung_pose_measurement'), 'launch'),
             '/logger.launch.py']),
         launch_arguments={'log_id': str(load_id_env), 'env': 'phys'}.items()
         )
@@ -52,13 +52,6 @@ def generate_launch_description():
          '/logging.launch.py']),
       launch_arguments={'env': 'phys'}.items()
       )
-    
-    estimator = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([os.path.join(
-            get_package_share_directory('slung_pose_estimation'), 'launch'),
-            '/estimator_online.launch.py']),
-        launch_arguments={'load_id': str(load_id_env), 'env': 'phys'}.items()
-        )
 
     # GCS user and background so can be on physical drone network if selected (more reliable than GCS)    
     gcs_user = ExecuteProcess(
@@ -100,6 +93,13 @@ def generate_launch_description():
 
     # Launch estimator node if required
     if use_load_pose_estimator and run_estimator_on == "load":
+        estimator = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([os.path.join(
+                get_package_share_directory('slung_pose_estimation'), 'launch'),
+                '/estimator_online.launch.py']),
+            launch_arguments={'load_id': str(load_id_env), 'env': 'phys'}.items()
+            )
+
         launch_description.append(estimator)
 
     # Only need to communicate with the Pixhawk if GPS position of the load is required (for feedback or evaluation)

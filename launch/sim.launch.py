@@ -41,13 +41,6 @@ def generate_launch_description():
             shell=True
         )
     
-    estimator = ExecuteProcess(
-            cmd=[[
-                f'gnome-terminal --tab -- bash -c "ros2 launch slung_pose_estimation estimator_online.launch.py env:=sim load_id:=1"',
-            ]],
-            shell=True
-        )
-    
     gz_bridge = IncludeLaunchDescription(
       PythonLaunchDescriptionSource([os.path.join(
          get_package_share_directory('multi_drone_slung_load'), 'launch'),
@@ -60,7 +53,7 @@ def generate_launch_description():
         )
 
     logger = ExecuteProcess(
-            cmd=['ros2', 'launch', 'slung_pose_estimation', 'logger.launch.py', 'env:=sim'],
+            cmd=['ros2', 'launch', 'slung_pose_measurement', 'logger.launch.py', 'env:=sim'],
             output='screen'
         )
 
@@ -83,7 +76,7 @@ def generate_launch_description():
     for i in range(first_drone_num, num_cameras+first_drone_num):
         launch_description.append(ExecuteProcess(
             cmd=[[
-                f'gnome-terminal --tab -- bash -c "ros2 launch slung_pose_estimation visual_measurement.launch.py drone_id:={i} env:=sim"',
+                f'gnome-terminal --tab -- bash -c "ros2 launch slung_pose_measurement visual_measurement.launch.py drone_id:={i} env:=sim"',
             ]],
             shell=True
         ))
@@ -97,6 +90,13 @@ def generate_launch_description():
 
     # Load pose estimation
     if use_load_pose_estimator:
+        estimator = ExecuteProcess(
+            cmd=[[
+                f'gnome-terminal --tab -- bash -c "ros2 launch slung_pose_estimation estimator_online.launch.py env:=sim load_id:=1"',
+            ]],
+            shell=True
+        )
+            
         launch_description.append(estimator)
 
     # Logging
