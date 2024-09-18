@@ -11,7 +11,7 @@
 
 # SETUP
 # Directories
-FIRMWARE_DIR="~/repos/PX4-Autopilot"
+FIRMWARE_DIR="../../../../repos/PX4-Autopilot"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 GZ_DIR="$(dirname "$SCRIPT_DIR")/gz"
 
@@ -71,4 +71,4 @@ cd $SCRIPT_DIR
 #gnome-terminal --tab -- bash -c "./multi_mavsdk_server.sh -n $(($NUM_DRONES+1))"
 
 # Create ROS2 agent
-gnome-terminal --tab -- bash -c "cd ~/repos/PX4-Autopilot; MicroXRCEAgent udp4 -p 8888" #micro-ros-agent udp4 --port 8888"
+gnome-terminal --tab -- bash -c "cd $FIRMWARE_DIR; MicroXRCEAgent udp4 -p 8888" #micro-ros-agent udp4 --port 8888"

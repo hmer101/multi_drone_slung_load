@@ -11,7 +11,7 @@
 
 # SETUP
 # Directories
-FIRMWARE_DIR="~/repos/PX4-Autopilot"
+FIRMWARE_DIR="../../../../repos/PX4-Autopilot"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 GZ_DIR="$(dirname "$SCRIPT_DIR")/gz"
 
