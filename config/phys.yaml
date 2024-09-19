@@ -38,6 +38,7 @@
       phase_change_requests_through_background: false # If true, phase change requests are sent through the gcs background node rather than from the gcs user node directly to the drones
 
       ## ESTIMATOR SETTINGS
+      use_temporal_filtering: false
       use_load_pose_estimator: false
       run_estimator_on: 'load'
       pnp_reprojection_threshold: 1.0 # Seems normal reprojection error is ~0.01

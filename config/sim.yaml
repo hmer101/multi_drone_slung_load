@@ -33,6 +33,7 @@
       phase_change_requests_through_background: true # If true, phase change requests are sent through the gcs background node rather than from the gcs user node directly to the drones
 
       ## ESTIMATOR SETTINGS
+      use_temporal_filtering: true
       use_load_pose_estimator: false
       #run_estimator_on: 'load'
       pnp_reprojection_threshold: 1.0 # Seems normal reprojection error is ~0.01
@@ -44,7 +45,7 @@
       ## DRONE SETTINGS
       first_drone_num: 1 #1
       num_drones: 3
-      num_cameras: 0 # 0 if cameras are off. Note to turn cameras off in simulation, comment out the camera in gz/models/x500_camera_down/model.sdf. DO NOT TURN OFF DIRECTLY IN OAKDLITE as this will disrupt the ground truth
+      num_cameras: 1 # 0 if cameras are off. Note to turn cameras off in simulation, comment out the camera in gz/models/x500_camera_down/model.sdf. DO NOT TURN OFF DIRECTLY IN OAKDLITE as this will disrupt the ground truth
     
       drone_order: [1, 2, 3] #[1, 2, 3] #ACW from load's x axis
 
@@ -55,7 +56,7 @@
       ## PHASE SETTINGS      
       # Mission settings
       mission_circle_r: 2.0 # m
-      mission_circle_v: 1.0 #0.75 # m/s 
+      mission_circle_v: 0.75 # m/s 
 
       # Drone rate settings
       vel_load_vertical_slow: 0.05 # m/s
